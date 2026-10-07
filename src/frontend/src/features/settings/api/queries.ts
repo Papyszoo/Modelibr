@@ -2,7 +2,7 @@ import { queryOptions, useQuery } from '@tanstack/react-query'
 
 import { type QueryConfig } from '@/lib/react-query'
 
-import { getMcpAgents } from './mcpAgentsApi'
+import { getMcpAgents, getMcpTools } from './mcpAgentsApi'
 import { getSettings } from './settingsApi'
 
 export function getSettingsQueryOptions() {
@@ -41,6 +41,26 @@ export function useMcpAgentsQuery({
 }: UseMcpAgentsQueryOptions = {}) {
   return useQuery({
     ...getMcpAgentsQueryOptions(),
+    ...queryConfig,
+  })
+}
+
+export function getMcpToolsQueryOptions() {
+  return queryOptions({
+    queryKey: ['mcp-tools'] as const,
+    queryFn: () => getMcpTools(),
+  })
+}
+
+type UseMcpToolsQueryOptions = {
+  queryConfig?: QueryConfig<typeof getMcpToolsQueryOptions>
+}
+
+export function useMcpToolsQuery({
+  queryConfig = {},
+}: UseMcpToolsQueryOptions = {}) {
+  return useQuery({
+    ...getMcpToolsQueryOptions(),
     ...queryConfig,
   })
 }

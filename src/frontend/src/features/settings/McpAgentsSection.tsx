@@ -1,10 +1,18 @@
-import { type JSX } from 'react'
+import { type JSX, useMemo, useState } from 'react'
 
-import { type McpAgentTool } from './api/mcpAgentsApi'
-import { useMcpAgentsQuery } from './api/queries'
+import {
+  type McpAgent,
+  type McpAgentTool,
+  type McpTool,
+} from './api/mcpAgentsApi'
+import { useMcpAgentsQuery, useMcpToolsQuery } from './api/queries'
 
 /** Above this many tools, the list collapses behind a summary. */
 const TOOL_COLLAPSE_THRESHOLD = 3
+
+/** Sentinel values for the agent filter, which also admits a real agent name. */
+const ALL_TOOLS = '__all__'
+const UNUSED_BY_AGENT = '__unused__'
 
 function ToolList({ tools }: { tools: McpAgentTool[] }): JSX.Element {
   return (
@@ -21,8 +29,75 @@ function ToolList({ tools }: { tools: McpAgentTool[] }): JSX.Element {
   )
 }
 
+/** The names of the agents that expose `tool`, in agent order. */
+function agentsUsing(agents: McpAgent[], tool: McpTool): string[] {
+  return agents
+    .filter(agent => agent.tools.some(t => t.name === tool.name))
+    .map(agent => agent.name)
+}
+
+/** Ordinal, so the list order does not depend on the runtime's locale. */
+function ordinalByName(a: McpTool, b: McpTool): number {
+  if (a.name < b.name) return -1
+  if (a.name > b.name) return 1
+  return 0
+}
+
 export function McpAgentsSection(): JSX.Element {
-  const { data: agents, isLoading, isError, error } = useMcpAgentsQuery()
+  const {
+    data: agentsData,
+    isLoading: agentsLoading,
+    isError: agentsIsError,
+    error: agentsError,
+  } = useMcpAgentsQuery()
+  const {
+    data: toolsData,
+    isLoading: toolsLoading,
+    isError: toolsIsError,
+    error: toolsError,
+  } = useMcpToolsQuery()
+
+  const [toolFilter, setToolFilter] = useState('')
+  const [agentFilter, setAgentFilter] = useState(ALL_TOOLS)
+
+  // Memoised so the derived lists below keep stable identities across renders.
+  const agents = useMemo(() => agentsData ?? [], [agentsData])
+  const tools = useMemo(() => toolsData ?? [], [toolsData])
+
+  const usersByTool = useMemo(() => {
+    const map = new Map<string, string[]>()
+    for (const tool of tools) {
+      map.set(tool.name, agentsUsing(agents, tool))
+    }
+    return map
+  }, [agents, tools])
+
+  const unusedCount = tools.filter(
+    tool => (usersByTool.get(tool.name) ?? []).length === 0
+  ).length
+
+  const visibleTools = useMemo(() => {
+    const query = toolFilter.trim().toLowerCase()
+    return [...tools].sort(ordinalByName).filter(tool => {
+      if (
+        query &&
+        !tool.name.toLowerCase().includes(query) &&
+        !tool.description.toLowerCase().includes(query)
+      ) {
+        return false
+      }
+
+      if (agentFilter === ALL_TOOLS) return true
+
+      const users = usersByTool.get(tool.name) ?? []
+      if (agentFilter === UNUSED_BY_AGENT) return users.length === 0
+      return users.includes(agentFilter)
+    })
+  }, [tools, toolFilter, agentFilter, usersByTool])
+
+  const isLoading = agentsLoading || toolsLoading
+  const isError = agentsIsError || toolsIsError
+  const error = agentsError ?? toolsError
 
   if (isLoading) {
     return <div className="settings-help">Loading MCP agents…</div>
@@ -37,42 +112,125 @@ export function McpAgentsSection(): JSX.Element {
     )
   }
 
-  if (!agents || agents.length === 0) {
-    return (
-      <div className="settings-help mcp-agents-empty">
-        No MCP agents are available.
-      </div>
-    )
-  }
-
   return (
     <div className="mcp-agents-section">
-      {agents.map(agent => (
-        <div key={agent.name} className="mcp-agent-card">
-          <div className="mcp-agent-header">
-            <span className="mcp-agent-name">{agent.name}</span>
-            <div className="mcp-agent-families">
-              {agent.families.map(family => (
-                <span key={family} className="mcp-agent-family-chip">
-                  {family}
-                </span>
-              ))}
-            </div>
-          </div>
-          {agent.description && (
-            <p className="mcp-agent-desc">{agent.description}</p>
-          )}
-          {agent.tools.length > 0 &&
-            (agent.tools.length > TOOL_COLLAPSE_THRESHOLD ? (
-              <details className="mcp-agent-tools-details">
-                <summary>Tools ({agent.tools.length})</summary>
-                <ToolList tools={agent.tools} />
-              </details>
-            ) : (
-              <ToolList tools={agent.tools} />
-            ))}
+      {agents.length === 0 ? (
+        <div className="settings-help mcp-agents-empty">
+          No MCP agents are available.
         </div>
-      ))}
+      ) : (
+        agents.map(agent => (
+          <div key={agent.name} className="mcp-agent-card">
+            <div className="mcp-agent-header">
+              <span className="mcp-agent-name">{agent.name}</span>
+              <div className="mcp-agent-families">
+                {agent.families.map(family => (
+                  <span key={family} className="mcp-agent-family-chip">
+                    {family}
+                  </span>
+                ))}
+              </div>
+            </div>
+            {agent.description && (
+              <p className="mcp-agent-desc">{agent.description}</p>
+            )}
+            {agent.tools.length > 0 &&
+              (agent.tools.length > TOOL_COLLAPSE_THRESHOLD ? (
+                <details className="mcp-agent-tools-details">
+                  <summary>Tools ({agent.tools.length})</summary>
+                  <ToolList tools={agent.tools} />
+                </details>
+              ) : (
+                <ToolList tools={agent.tools} />
+              ))}
+          </div>
+        ))
+      )}
+
+      <div className="mcp-tools-block">
+        <div className="mcp-tools-header">
+          <h4 className="mcp-tools-heading">Tools</h4>
+          <span className="mcp-tools-summary">
+            {tools.length} tools · {unusedCount} used by no agent
+          </span>
+        </div>
+
+        <div className="mcp-tools-filters">
+          <div className="mcp-tools-filter">
+            <label
+              className="mcp-tools-filter-label"
+              htmlFor="mcp-tools-search"
+            >
+              Search tools
+            </label>
+            <input
+              id="mcp-tools-search"
+              type="search"
+              className="mcp-tools-search"
+              placeholder="Filter by name or description"
+              value={toolFilter}
+              onChange={event => setToolFilter(event.target.value)}
+            />
+          </div>
+          <div className="mcp-tools-filter">
+            <label
+              className="mcp-tools-filter-label"
+              htmlFor="mcp-tools-agent-filter"
+            >
+              Filter by agent
+            </label>
+            <select
+              id="mcp-tools-agent-filter"
+              className="mcp-tools-agent-select"
+              value={agentFilter}
+              onChange={event => setAgentFilter(event.target.value)}
+            >
+              <option value={ALL_TOOLS}>All tools</option>
+              <option value={UNUSED_BY_AGENT}>Used by no agent</option>
+              {agents.map(agent => (
+                <option key={agent.name} value={agent.name}>
+                  {agent.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {visibleTools.length === 0 ? (
+          <div className="settings-help mcp-tools-empty">
+            No tools match this filter.
+          </div>
+        ) : (
+          <ul className="mcp-tools-list" aria-label="Registered MCP tools">
+            {visibleTools.map(tool => {
+              const users = usersByTool.get(tool.name) ?? []
+              return (
+                <li key={tool.name} className="mcp-tool-row">
+                  <div className="mcp-tool-row-header">
+                    <code className="mcp-tool-name">{tool.name}</code>
+                    <div className="mcp-tool-agents">
+                      {users.length === 0 ? (
+                        <span className="mcp-tool-agent-chip mcp-tool-agent-chip-none">
+                          no agent
+                        </span>
+                      ) : (
+                        users.map(name => (
+                          <span key={name} className="mcp-tool-agent-chip">
+                            {name}
+                          </span>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                  {tool.description && (
+                    <span className="mcp-tool-desc">{tool.description}</span>
+                  )}
+                </li>
+              )
+            })}
+          </ul>
+        )}
+      </div>
 
       <p className="settings-help mcp-agents-connect-hint">
         Connect a client to <code>/mcp/agents/&lt;name&gt;</code> to use an

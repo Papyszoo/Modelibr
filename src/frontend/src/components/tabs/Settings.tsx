@@ -169,10 +169,10 @@ const SECTIONS: SectionMeta[] = [
   },
   {
     key: 'mcpAgents',
-    label: 'MCP agents',
+    label: 'MCP explorer',
     icon: 'pi-microchip-ai',
-    desc: 'Read-only agents and the tools they can call',
-    fields: ['MCP agents', 'Connect a client'],
+    desc: 'Agents and every tool the server exposes',
+    fields: ['MCP agents', 'MCP tools', 'Connect a client'],
     hasFormSave: false,
     demoLocked: false,
   },

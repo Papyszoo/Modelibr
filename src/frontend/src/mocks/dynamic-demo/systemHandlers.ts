@@ -1348,6 +1348,25 @@ export const systemHandlers = [
     ])
   }),
 
+  // Every tool the server registers. The first six are assigned to the mock
+  // agents above; the last two belong to no agent, so the explorer's "no agent"
+  // chip and its "used by no agent" filter are both exercised in demo mode.
+  http.get('*/mcp-tools', async () => {
+    return HttpResponse.json([
+      {
+        name: 'bind_texture_set',
+        description: 'Bind a texture set to a model version',
+      },
+      { name: 'create_material', description: 'Create a global material' },
+      { name: 'tag_asset', description: 'Apply tags to an asset' },
+      { name: 'move_to_pack', description: 'Move a model into a pack' },
+      { name: 'create_project', description: 'Create a project' },
+      { name: 'set_project_thumbnail', description: 'Set a project thumbnail' },
+      { name: 'search_assets', description: 'Search the library' },
+      { name: 'render_scene', description: 'Render a scene preview' },
+    ])
+  }),
+
   // ════════════════════════════════════════════════════════════════════════
   //  RECYCLED FILES
   // ════════════════════════════════════════════════════════════════════════

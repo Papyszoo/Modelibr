@@ -1007,6 +1007,125 @@
   font-style: italic;
 }
 
+/* ── MCP tools (the server's registered tool surface) ────────────── */
+
+.mcp-tools-block {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mod-space-xs);
+  padding: var(--mod-space-sm) var(--mod-space-md);
+  border: 1px solid var(--surface-border);
+  border-radius: var(--mod-radius-lg);
+  background: var(--surface-card);
+}
+.mcp-tools-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--mod-space-xs);
+  flex-wrap: wrap;
+}
+.mcp-tools-heading {
+  margin: 0;
+  font-size: var(--mod-text-sm);
+  font-weight: var(--mod-font-weight-semibold);
+}
+.mcp-tools-summary {
+  font-size: var(--mod-text-xs);
+  color: var(--text-color-secondary);
+}
+.mcp-tools-filters {
+  display: flex;
+  gap: var(--mod-space-xs);
+  flex-wrap: wrap;
+}
+.mcp-tools-filter {
+  display: flex;
+  flex: 1 1 12rem;
+  flex-direction: column;
+  gap: var(--mod-space-2xs);
+}
+.mcp-tools-filter-label {
+  font-size: var(--mod-text-xs);
+  color: var(--text-color-secondary);
+}
+.mcp-tools-search,
+.mcp-tools-agent-select {
+  width: 100%;
+  box-sizing: border-box;
+  padding: var(--mod-space-2xs) var(--mod-space-xs);
+  border: 1px solid var(--surface-border);
+  border-radius: var(--mod-radius-md);
+  background: var(--surface-ground);
+  color: var(--text-color);
+  font-family: inherit;
+  font-size: var(--mod-text-sm);
+  outline: none;
+}
+.mcp-tools-search:focus,
+.mcp-tools-agent-select:focus {
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 3px rgba(var(--primary-color-rgb), 0.18);
+}
+.mcp-tools-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mod-space-2xs);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.mcp-tool-row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mod-space-2xs);
+  padding-top: var(--mod-space-xs);
+  border-top: 1px solid var(--surface-border);
+}
+.mcp-tool-row:first-child {
+  padding-top: 0;
+  border-top: none;
+}
+.mcp-tool-row-header {
+  display: flex;
+  align-items: center;
+  gap: var(--mod-space-xs);
+  flex-wrap: wrap;
+}
+.mcp-tool-name {
+  width: fit-content;
+  padding: 1px 5px;
+  font-size: var(--mod-text-xs);
+  background: var(--surface-ground);
+  border-radius: var(--mod-radius-sm);
+}
+.mcp-tool-desc {
+  font-size: var(--mod-text-xs);
+  color: var(--text-color-secondary);
+}
+.mcp-tool-agents {
+  display: flex;
+  gap: var(--mod-space-2xs);
+  flex-wrap: wrap;
+}
+.mcp-tool-agent-chip {
+  display: inline-block;
+  padding: 0.1rem 0.5rem;
+  font-size: var(--mod-text-xs);
+  border-radius: var(--mod-radius-pill);
+  background: rgba(var(--primary-color-rgb), 0.12);
+  border: 1px solid rgba(var(--primary-color-rgb), 0.24);
+  color: var(--text-color);
+}
+.mcp-tool-agent-chip-none {
+  background: var(--mod-color-warning-bg);
+  border-color: var(--mod-color-warning);
+  color: var(--mod-color-warning);
+}
+.mcp-tools-empty {
+  font-style: italic;
+}
+
 /* BackupsSection still uses these legacy button classes */
 .settings-button {
   display: inline-flex;
