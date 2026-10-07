@@ -18,10 +18,17 @@ import { ProjectLevelScenesSection } from './ProjectLevelScenesSection'
 import { ProjectLevelSceneButton } from './ProjectLevelSceneButton'
 import { ProjectReferenceBoard } from './ProjectReferenceBoard'
 import {
-  PROJECT_LEVEL_VIEWS,
   ProjectWorkspaceShell,
   type ProjectLevelView,
+  type WorkspaceViewDescriptor,
 } from './ProjectWorkspaceShell'
+
+const LEVEL_VIEWS: Array<WorkspaceViewDescriptor<ProjectLevelView>> = [
+  { id: 'overview', label: 'Overview', icon: 'pi pi-info-circle' },
+  { id: 'assets', label: 'Assets', icon: 'pi pi-box' },
+  { id: 'scenes', label: 'Scenes', icon: 'pi pi-camera' },
+  { id: 'references', label: 'References', icon: 'pi pi-images' },
+]
 import { levelStatusLabel } from '../levelStatus'
 
 interface ProjectLevelWorkspaceProps {
@@ -106,7 +113,7 @@ export function ProjectLevelWorkspace({
     <ProjectWorkspaceShell
       view={view}
       onViewChange={setView}
-      views={PROJECT_LEVEL_VIEWS}
+      views={LEVEL_VIEWS}
       label="Level workspace"
       counts={{ scenes: undefined }}
       breadcrumb={

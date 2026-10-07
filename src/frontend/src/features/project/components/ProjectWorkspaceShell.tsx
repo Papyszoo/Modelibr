@@ -36,13 +36,6 @@ const PROJECT_VIEWS: Array<WorkspaceViewDescriptor<ProjectWorkspaceView>> = [
   { id: 'references', label: 'References', icon: 'pi pi-images' },
 ]
 
-const LEVEL_VIEWS: Array<WorkspaceViewDescriptor<ProjectLevelView>> = [
-  { id: 'overview', label: 'Overview', icon: 'pi pi-info-circle' },
-  { id: 'assets', label: 'Assets', icon: 'pi pi-box' },
-  { id: 'scenes', label: 'Scenes', icon: 'pi pi-camera' },
-  { id: 'references', label: 'References', icon: 'pi pi-images' },
-]
-
 interface ProjectWorkspaceShellProps<T extends string> {
   view: T
   onViewChange: (view: T) => void
@@ -118,6 +111,3 @@ export function ProjectWorkspaceShell<T extends string>({
     </div>
   )
 }
-
-/** Exported for the Level workspace, which reuses this exact vocabulary. */
-export const PROJECT_LEVEL_VIEWS = LEVEL_VIEWS
