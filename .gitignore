@@ -502,7 +502,12 @@ $RECYCLE.BIN/
 .env
 !.env.example
 
-data/
+# Runtime data stays out of git, but the bind-mount folders ship empty: a
+# folder Docker has to create itself is created as root, and the API (user app)
+# then cannot write to it.
+data/**
+!data/*/
+!data/*/.gitkeep
 # E2E test state file (generated during test runs)
 tests/e2e/.shared-state.json
 
