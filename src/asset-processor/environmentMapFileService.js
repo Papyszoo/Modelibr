@@ -117,6 +117,10 @@ export class EnvironmentMapFileService {
     const tempFileName = `environment_map_${fileId}_${Date.now()}${fileExtension}`
     const tempFilePath = path.join(this.tempDir, tempFileName)
 
+    // The periodic temp sweep (ModelFileService.cleanupOldFiles) removes this
+    // directory once it is an hour stale; recreate it at the write site, as
+    // ModelDataService.downloadTextureFile does.
+    this.ensureTempDirectory()
     await this.writeStreamToFile(response.data, tempFilePath)
 
     return {
