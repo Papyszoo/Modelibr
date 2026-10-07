@@ -130,7 +130,9 @@ internal sealed class AssetSearchQueryHandler
     ///
     /// The parse is free - it is the same pure function the repository ran - so the words
     /// kept and dropped are always reported. The per-word corpus counts are not free, and are
-    /// measured only for a result thin enough that the caller is about to retry blind.
+    /// measured for a result thin enough that the caller is about to retry blind, and for any
+    /// multi-word query - because a word that matched nothing has to be named however many
+    /// results the other words produced.
     /// </summary>
     private async Task<AssetSearchQueryView?> ExplainAsync(
         string term,
@@ -146,7 +148,14 @@ internal sealed class AssetSearchQueryHandler
             return null;
         }
 
-        var diagnostics = totalCount <= ThinResultThreshold && !parsed.IsEmpty
+        // A zero-match word can be named only while its count is measured, and the note that
+        // names it is no longer reserved for thin results. Single-term queries are the
+        // exception: a word that matches nothing leaves no results at all, so the thin path
+        // already covers them and an answered one has nothing to explain.
+        var measuresTerms = !parsed.IsEmpty
+            && (totalCount <= ThinResultThreshold || parsed.Terms.Count > 1);
+
+        var diagnostics = measuresTerms
             ? await _searchRepository.ExplainTermsAsync(parsed.Terms, assetType, cancellationToken)
             : Array.Empty<SearchTermDiagnostic>();
 
@@ -169,8 +178,8 @@ internal sealed class AssetSearchQueryHandler
     }
 
     /// <summary>
-    /// One sentence, or nothing. A caller reading a thin result should not have to compare two
-    /// arrays to notice that half its words are not in this library.
+    /// One sentence, or nothing. A caller should not have to compare two arrays to notice that
+    /// a word it sent is not in this library at all - that is named whatever the result size.
     /// </summary>
     private static string? Note(
         IReadOnlyList<SearchTermView> terms,

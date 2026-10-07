@@ -1,8 +1,13 @@
 using System.ComponentModel;
+using System.Text.Json;
 using Application.Abstractions.Messaging;
 using Application.Extraction;
 using Application.Extraction.Compute;
 using Application.Search;
+using Application.Thumbnails;
+using Domain.ValueObjects;
+using ModelContextProtocol;
+using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
 
 namespace WebApi.Mcp;
@@ -20,6 +25,7 @@ public sealed class AssetSearchMcpTools
     [Description("Search the asset library with full-text + fuzzy identifier matching and structural filters. " +
                  "Returns ranked hits (current version only, prominence-aware) each with a deterministic browse summary. " +
                  "Assets holding identical geometry are collapsed into one hit; the ids folded into it are listed as `alsoAt`. " +
+                 "Numbered variants of the same idea are folded into one hit as well, listed in `variants` beside `alsoAt`. " +
                  "Pass projectId (or sceneId) to search on behalf of a project: its style ranks the results and its triangle " +
                  "budget is reported on each hit as facts.profileFit. The response's `profile` block always says what was applied. " +
                  "The response also carries `query`: the words the search actually ran on, the words it dropped (stopwords, " +
@@ -72,6 +78,10 @@ public sealed class AssetSearchMcpTools
                      "bias (default): style ranks the results, the budget is reported per hit and nothing is removed. " +
                      "enforce: the triangle budget also becomes a filter, and the response says how many assets it removed. " +
                      "off: ordinary search. Only meaningful with projectId or sceneId.")] string? applyProfile = null,
+        [Description("when true, the reply also carries one image tiling the hits' thumbnails in hit order, " +
+                     "left to right, top to bottom (tile 1 = hits[0]); use it to choose between candidates by how they look.")]
+        bool withImage = false,
+        IQueryHandler<GetVersionThumbnailQuery, GetVersionThumbnailQueryResponse>? thumbnailHandler = null,
         McpCallerContext? caller = null,
         CancellationToken cancellationToken = default)
     {
@@ -89,16 +99,40 @@ public sealed class AssetSearchMcpTools
                 hasUvs, uvStatus, minParts, maxParts, minVertices, maxVertices, category,
                 styles, themes, license, projectId, sceneId, applyProfile),
             cancellationToken);
-        return result.IsFailure
-            ? new { error = result.Error.Code, message = result.Error.Message }
-            : new
-            {
-                hits = result.Value.Hits,
-                totalCount = result.Value.TotalCount,
-                // Always returned when a profile was asked for, including when it was not
-                // applied. A ranking the caller cannot see is one it cannot argue with.
-                profile = result.Value.Profile,
-            };
+
+        if (result.IsFailure)
+        {
+            return new { error = result.Error.Code, message = result.Error.Message };
+        }
+
+        var payload = new
+        {
+            hits = result.Value.Hits,
+            totalCount = result.Value.TotalCount,
+            // Always returned when a profile was asked for, including when it was not
+            // applied. A ranking the caller cannot see is one it cannot argue with.
+            profile = result.Value.Profile,
+            // What the search understood, and the note on words it could not match. The
+            // description above tells the caller to read it, so it has to be here.
+            query = result.Value.Query,
+        };
+
+        // Nothing but the same object as before: a caller that did not ask for a picture
+        // gets exactly the reply it always did.
+        if (!withImage)
+        {
+            return payload;
+        }
+
+        var thumbnails = new List<byte[]?>(result.Value.Hits.Count);
+        foreach (var hit in result.Value.Hits)
+        {
+            thumbnails.Add(await ThumbnailBytesAsync(thumbnailHandler, hit, cancellationToken));
+        }
+
+        return result.Value.Hits.Count == 0
+            ? Sheet(payload, [])
+            : Sheet(payload, [ThumbnailSheet.Build(thumbnails)]);
     }
 
     /// <summary>
@@ -131,6 +165,10 @@ public sealed class AssetSearchMcpTools
         [Description("Search every entry on behalf of this project: its style ranks the results and its budget rides along.")] int? projectId = null,
         [Description("Search on behalf of this scene's project. A shortcut for looking the project up yourself.")] int? sceneId = null,
         [Description("How much of the project's profile to apply: bias (default), enforce or off.")] string? applyProfile = null,
+        [Description("when true, the reply also carries one image per entry that has hits, tiling that entry's thumbnails in hit order, " +
+                     "left to right, top to bottom (tile 1 = hits[0]); use it to choose between candidates by how they look.")]
+        bool withImage = false,
+        IQueryHandler<GetVersionThumbnailQuery, GetVersionThumbnailQueryResponse>? thumbnailHandler = null,
         McpCallerContext? caller = null,
         CancellationToken cancellationToken = default)
     {
@@ -151,6 +189,7 @@ public sealed class AssetSearchMcpTools
         }
 
         var results = new List<object>(entries.Length);
+        var images = new List<byte[]>(entries.Length);
 
         for (var index = 0; index < entries.Length; index++)
         {
@@ -182,20 +221,91 @@ public sealed class AssetSearchMcpTools
 
             // One bad entry does not lose the nine good answers. A batch that failed whole
             // would make the batching worse than the loop it replaces.
-            results.Add(result.IsFailure
-                ? new { index, label, query = entry.Query, error = result.Error.Code, message = result.Error.Message }
-                : new
-                {
-                    index,
-                    label,
-                    query = entry.Query,
-                    hits = (object)result.Value.Hits,
-                    totalCount = result.Value.TotalCount,
-                    profile = result.Value.Profile,
-                });
+            if (result.IsFailure)
+            {
+                results.Add(new { index, label, query = entry.Query, error = result.Error.Code, message = result.Error.Message });
+                continue;
+            }
+
+            results.Add(new
+            {
+                index,
+                label,
+                query = entry.Query,
+                hits = (object)result.Value.Hits,
+                totalCount = result.Value.TotalCount,
+                profile = result.Value.Profile,
+                // Only the note: the full explanation per entry would double the batch.
+                note = result.Value.Query?.Note,
+            });
+
+            // An entry with no hits has nothing to show, so it contributes no picture -
+            // which is why the images are not simply one per entry.
+            if (!withImage || result.Value.Hits.Count == 0)
+            {
+                continue;
+            }
+
+            var thumbnails = new List<byte[]?>(result.Value.Hits.Count);
+            foreach (var hit in result.Value.Hits)
+            {
+                thumbnails.Add(await ThumbnailBytesAsync(thumbnailHandler, hit, cancellationToken));
+            }
+
+            images.Add(ThumbnailSheet.Build(thumbnails));
         }
 
-        return new { searches = results, count = results.Count };
+        var payload = new { searches = results, count = results.Count };
+
+        // Nothing but the same object as before when no picture was asked for.
+        return withImage ? Sheet(payload, images) : (object)payload;
+    }
+
+    /// <summary>
+    /// The hit's thumbnail bytes, resolved exactly as GET /model-versions/{id}/thumbnail/file
+    /// does, or null when the hit has no picture to show (not a model, no version, not ready,
+    /// or the file is gone). Null is a normal answer here - it becomes a grey cell, never an
+    /// error, so one unready thumbnail cannot lose the whole sheet.
+    /// </summary>
+    private static async Task<byte[]?> ThumbnailBytesAsync(
+        IQueryHandler<GetVersionThumbnailQuery, GetVersionThumbnailQueryResponse>? handler,
+        AssetSearchHit hit,
+        CancellationToken cancellationToken)
+    {
+        if (handler is null
+            || !string.Equals(hit.AssetType, ExtractionAssetTypes.Model, StringComparison.OrdinalIgnoreCase)
+            || hit.VersionId is not { } versionId)
+        {
+            return null;
+        }
+
+        var result = await handler.Handle(new GetVersionThumbnailQuery(versionId), cancellationToken);
+        if (result.IsFailure
+            || result.Value.Status != ThumbnailStatus.Ready
+            || string.IsNullOrEmpty(result.Value.ThumbnailPath)
+            || !File.Exists(result.Value.ThumbnailPath))
+        {
+            return null;
+        }
+
+        return await File.ReadAllBytesAsync(result.Value.ThumbnailPath, cancellationToken);
+    }
+
+    /// <summary>
+    /// The picture reply: the images in hit/entry order, then the same JSON text the tool
+    /// would have returned on its own. Serialized with the MCP default options so the text
+    /// block is byte-for-byte the reply of the no-image path.
+    /// </summary>
+    private static CallToolResult Sheet(object payload, IReadOnlyList<byte[]> images)
+    {
+        var content = new List<ContentBlock>(images.Count + 1);
+        foreach (var image in images)
+        {
+            content.Add(ImageContentBlock.FromBytes(image, "image/png"));
+        }
+
+        content.Add(new TextContentBlock { Text = JsonSerializer.Serialize(payload, McpJsonUtilities.DefaultOptions) });
+        return new CallToolResult { Content = content };
     }
 
     /// <summary>Cap on one batched read. Twenty is more questions than any one brief has.</summary>

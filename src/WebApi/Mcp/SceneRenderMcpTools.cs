@@ -176,12 +176,9 @@ public sealed class SceneRenderMcpTools
         {
             Content =
             [
-                new ImageContentBlock
-                {
-                    // Raw bytes: the block base64-encodes them itself on the wire.
-                    Data = bytes,
-                    MimeType = "image/png"
-                },
+                // FromBytes, not Data: Data must already hold base64 text, and raw PNG bytes
+                // assigned to it went out on the wire as a corrupt string.
+                ImageContentBlock.FromBytes(bytes, "image/png"),
                 new TextContentBlock { Text = JsonSerializer.Serialize(summary) }
             ]
         };

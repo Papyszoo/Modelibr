@@ -39,8 +39,9 @@ public interface ISearchRepository
     /// filter - and, for a word the library has never heard, the nearest names it does hold.
     ///
     /// Deliberately not part of the search itself. It answers a different question ("is this
-    /// word in this library?") and costs a query per word, so it is run only when the result
-    /// was thin enough that the caller is about to retry blind.
+    /// word in this library?") and costs a query per word, so it is run only when the answer
+    /// is needed: a result thin enough that the caller is about to retry blind, or a
+    /// multi-word query whose per-word counts feed the zero-match note.
     /// </summary>
     Task<IReadOnlyList<SearchTermDiagnostic>> ExplainTermsAsync(
         IReadOnlyList<SearchQueryParser.QueryTerm> terms,

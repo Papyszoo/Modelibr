@@ -1,4 +1,5 @@
 using System.Linq.Expressions;
+using System.Text.RegularExpressions;
 using Application.Abstractions.Repositories;
 using Application.Search;
 using Domain.Models;
@@ -7,7 +8,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Infrastructure.Repositories;
 
-internal sealed class SearchRepository : ISearchRepository
+internal sealed partial class SearchRepository : ISearchRepository
 {
     // Trigram similarity above which a fuzzy identifier match counts. Calibrated on a
     // 1,700-model library: at the old 0.2 the query "strt" confidently returned "strap"
@@ -365,6 +366,28 @@ internal sealed class SearchRepository : ISearchRepository
                 profile is null ? null : ProfileSearchBiasBuilder.Describe(profile, browseRemoved));
         }
 
+        // Rarity tie-break: when several assets match the same number of query words, the one
+        // matching the rarer word is the better answer - "stone" is common and "ancient" is
+        // not, so an ancient statue should lead a stone mace. A word's weight is its inverse
+        // document count, measured exactly as the per-word explanation measures it: how many
+        // assets carry the word on their own, ignoring the rest of the query and every filter.
+        // A word nothing carries contributes nothing - there is nobody it admitted to prefer.
+        // Single-term queries have no such tie to break, so they pay for no count.
+        var rarityWeights = new int[SearchQueryParser.MaxTerms];
+        if (parsed.Terms.Count > 1)
+        {
+            var corpus = CorpusDocuments(request.AssetType);
+            for (var i = 0; i < parsed.Terms.Count; i++)
+            {
+                var matches = await CountTermMatchesAsync(corpus, parsed.Terms[i], cancellationToken);
+                rarityWeights[i] = matches == 0 ? 0 : 1_000_000 / matches;
+            }
+        }
+
+        // Unrolled like the term patterns below: EF Core translates a static shape.
+        int w0 = rarityWeights[0], w1 = rarityWeights[1], w2 = rarityWeights[2],
+            w3 = rarityWeights[3], w4 = rarityWeights[4], w5 = rarityWeights[5];
+
         // Per-word matching with coverage ranking. Each query word is scored on its own
         // (against the indexed tokens, their singular form, and the display name) and a
         // document matching MORE words ranks higher. The previous implementation matched
@@ -551,6 +574,13 @@ internal sealed class SearchRepository : ISearchRepository
                            + (x.K3 ? 1 : 0) + (x.K4 ? 1 : 0) + (x.K5 ? 1 : 0),
             FolderCoverage = (x.F0 ? 1 : 0) + (x.F1 ? 1 : 0) + (x.F2 ? 1 : 0)
                              + (x.F3 ? 1 : 0) + (x.F4 ? 1 : 0) + (x.F5 ? 1 : 0),
+            // The rarity tie-break, built from the same literal-match flags the coverage uses:
+            // the sum of the weights of the query words this document matched. A word reached
+            // only through a weaker signal (concept, prose, folder, pack) is not counted, and a
+            // single-term query's weights are all zero, so this decides only between documents
+            // that coverage could not tell apart.
+            RarityScore = (x.T0 ? w0 : 0) + (x.T1 ? w1 : 0) + (x.T2 ? w2 : 0)
+                          + (x.T3 ? w3 : 0) + (x.T4 ? w4 : 0) + (x.T5 ? w5 : 0),
         })
         .Select(x => new
         {
@@ -565,6 +595,7 @@ internal sealed class SearchRepository : ISearchRepository
             x.ConceptCoverage,
             x.PackCoverage,
             x.FolderCoverage,
+            x.RarityScore,
             // A confident fuzzy match counts as covering the (single) query word, so a
             // near-miss on the real name competes with an incidental substring hit:
             // "aple" must reach "apple", not stop at "staple".
@@ -608,6 +639,10 @@ internal sealed class SearchRepository : ISearchRepository
         var ranked = await withinBudget
             .OrderByDescending(x => x.PhraseHit)   // the whole phrase in the name wins
             .ThenByDescending(x => x.Coverage)     // then: how many query words the NAME matched
+            // Between hits that matched the same number of words, the one matching the rarer
+            // word leads: "ancient stone statue" should not put a stone mace above an ancient
+            // statue just because "stone" is common. Only ties here - coverage above still wins.
+            .ThenByDescending(x => x.RarityScore)  // then: how rare the words it matched are
             // The project's profile decides between hits the query cannot tell apart, which is
             // the whole of what `bias` does. It sits here, below relevance and above every
             // weaker text signal: a 180k photoscan matches the word "chair" exactly as
@@ -686,9 +721,49 @@ internal sealed class SearchRepository : ISearchRepository
             kept.Add(i);
         }
 
-        // The whole window is folded before the page is cut, so a survivor's AlsoAt names
-        // every duplicate seen - not only the ones that happened to rank above the limit.
-        var best = kept.Take(limit).Select(i => perAsset[i]).ToList();
+        // Then fold NUMBERED VARIANTS the same way. Game libraries author one idea many times
+        // - SM_Env_Stalagmite_01 through _05 is one stalagmite with five numbers - and a page
+        // of five is five copies of one choice rather than five choices. Only names that END
+        // in a number participate; the stem strips that number and any separators directly
+        // before it, so "SM_Env_BonePile_Small_02" keeps "Small" and folds only with its own
+        // siblings, while "Barrel" and "Barrel_01" stay separate assets. As with geometry, a
+        // hit whose winning document is a PART is left alone: a part is not its asset.
+        var variantsOf = new Dictionary<int, List<int>>();
+        var winnerByStem = new Dictionary<(string AssetType, string Stem), int>();
+        var afterVariants = new List<int>();
+
+        foreach (var i in kept)
+        {
+            var doc = perAsset[i].Doc;
+
+            if (doc.PartPath is not null)
+            {
+                afterVariants.Add(i);
+                continue;
+            }
+
+            var stem = VariantStem(doc.DisplayName);
+            if (stem is null)
+            {
+                afterVariants.Add(i);
+                continue;
+            }
+
+            if (winnerByStem.TryGetValue((doc.AssetType, stem), out var winner))
+            {
+                variantsOf[winner].Add(doc.AssetId);
+                continue;
+            }
+
+            winnerByStem[(doc.AssetType, stem)] = doc.AssetId;
+            variantsOf[doc.AssetId] = new List<int>();
+            afterVariants.Add(i);
+        }
+
+        // The whole window is folded before the page is cut, so a survivor's AlsoAt and
+        // Variants name every duplicate seen - not only the ones that happened to rank above
+        // the limit.
+        var best = afterVariants.Take(limit).Select(i => perAsset[i]).ToList();
 
         // A hit must describe the thing place_asset can actually place. Where the winning
         // document is a part, its asset-level document is fetched so the hit carries the
@@ -735,14 +810,18 @@ internal sealed class SearchRepository : ISearchRepository
         IReadOnlyList<int>? AlsoAtFor(int assetId) =>
             duplicatesOf.TryGetValue(assetId, out var ids) && ids.Count > 0 ? ids : null;
 
+        IReadOnlyList<int>? VariantsFor(int assetId) =>
+            variantsOf.TryGetValue(assetId, out var ids) && ids.Count > 0 ? ids : null;
+
         var hits = best
             .Select(x =>
             {
                 var alsoAt = AlsoAtFor(x.Doc.AssetId);
+                var variants = VariantsFor(x.Doc.AssetId);
 
                 if (x.Doc.PartPath is null)
                 {
-                    return ToHit(x.Doc, x.MatchedOn, profile) with { AlsoAt = alsoAt };
+                    return ToHit(x.Doc, x.MatchedOn, profile) with { AlsoAt = alsoAt, Variants = variants };
                 }
 
                 // No profileFit on the part: it is evidence about why the asset came back, and
@@ -759,8 +838,8 @@ internal sealed class SearchRepository : ISearchRepository
                 // MatchedPart still marks it as a part match, so nothing claims to be
                 // something it is not.
                 return assetDocs.TryGetValue((x.Doc.AssetType, x.Doc.AssetId, x.Doc.VersionId), out var assetDoc)
-                    ? ToHit(assetDoc, x.MatchedOn, profile) with { MatchedPart = part, AlsoAt = alsoAt }
-                    : ToHit(x.Doc, x.MatchedOn, profile) with { MatchedPart = part, AlsoAt = alsoAt };
+                    ? ToHit(assetDoc, x.MatchedOn, profile) with { MatchedPart = part, AlsoAt = alsoAt, Variants = variants }
+                    : ToHit(x.Doc, x.MatchedOn, profile) with { MatchedPart = part, AlsoAt = alsoAt, Variants = variants };
             })
             .ToList();
 
@@ -769,6 +848,29 @@ internal sealed class SearchRepository : ISearchRepository
             total,
             profile is null ? null : ProfileSearchBiasBuilder.Describe(profile, removedByBudget));
     }
+
+    /// <summary>
+    /// The base name of a numbered variant, or null when the name does not end in a number.
+    /// "SM_Env_Stalagmite_05" gives "sm_env_stalagmite", "Moon Rock 01" gives "moon rock" and
+    /// "SM_Env_BonePile_Small_02" keeps "Small". A name with no trailing number - "Barrel" -
+    /// returns null and never folds, because a number is the whole signal that two names are
+    /// the same asset authored twice. The trailing number and any run of separators directly
+    /// before it (space, underscore, hyphen or dot) are the only thing removed.
+    /// </summary>
+    private static string? VariantStem(string displayName)
+    {
+        var match = NumberedVariantSuffix().Match(displayName);
+        if (!match.Success)
+        {
+            return null;
+        }
+
+        var stem = match.Groups["stem"].Value.Trim();
+        return stem.Length == 0 ? null : stem.ToLowerInvariant();
+    }
+
+    [GeneratedRegex(@"^(?<stem>.*?)[\s_\-.]*\d+$")]
+    private static partial Regex NumberedVariantSuffix();
 
     /// <summary>
     /// The text a style token is matched against, space-padded so a token matches on word
@@ -968,47 +1070,12 @@ internal sealed class SearchRepository : ISearchRepository
         string? assetType,
         CancellationToken cancellationToken = default)
     {
+        var documents = CorpusDocuments(assetType);
         var diagnostics = new List<SearchTermDiagnostic>(terms.Count);
 
         foreach (var term in terms)
         {
-            var documents = _context.AssetSearchDocuments
-                .AsNoTracking()
-                .Where(d => d.IsCurrentVersion && d.IsActive && d.Prominence != "hidden");
-
-            if (!string.IsNullOrWhiteSpace(assetType))
-            {
-                documents = documents.Where(d => d.AssetType == assetType);
-            }
-
-            // Unrolled to two variant slots for the same reason the search is: EF Core has to
-            // translate a static shape, and the parser never produces more than the word and
-            // its singular.
-            var shortest = term.Variants[term.Variants.Count - 1];
-            var v0 = " " + term.Variants[0] + " ";
-            var v1 = " " + shortest + " ";
-
-            var matching = documents.Where(d =>
-                EF.Functions.ILike(" " + d.Tokens + " ", "%" + v0 + "%")
-                || EF.Functions.ILike(" " + d.Tokens + " ", "%" + v1 + "%")
-                || EF.Functions.ILike(" " + d.ConceptLabels + " ", "%" + v0 + "%")
-                || EF.Functions.ILike(" " + d.ConceptLabels + " ", "%" + v1 + "%")
-                || EF.Functions.ILike(" " + d.AuthoredTags + " ", "%" + v0 + "%")
-                || EF.Functions.ILike(" " + d.AuthoredTags + " ", "%" + v1 + "%")
-                // Folder tokens admit a document in the search above, so they have to count
-                // here too. This block exists to explain a thin result set, and it can only
-                // do that while "how many assets carry this word" means the same set of
-                // fields the query itself looked at.
-                || EF.Functions.ILike(" " + d.FolderTokens + " ", "%" + v0 + "%")
-                || EF.Functions.ILike(" " + d.FolderTokens + " ", "%" + v1 + "%")
-                || EF.Functions.ILike(d.DisplayName, "%" + shortest + "%"));
-
-            // Assets, not documents - an asset is indexed once for itself and once per part,
-            // so a document count would tell the caller it has 46 chairs when it has 17.
-            var matches = await matching
-                .Select(d => new { d.AssetType, d.AssetId })
-                .Distinct()
-                .CountAsync(cancellationToken);
+            var matches = await CountTermMatchesAsync(documents, term, cancellationToken);
 
             var nearest = Array.Empty<string>() as IReadOnlyList<string>;
 
@@ -1043,6 +1110,59 @@ internal sealed class SearchRepository : ISearchRepository
         }
 
         return diagnostics;
+    }
+
+    /// <summary>
+    /// The document set every per-word count is taken over: current-version, active, visible,
+    /// and scoped to a family when one was asked for. Shared so the per-word explanation and
+    /// the rarity weight cannot count different things.
+    /// </summary>
+    private IQueryable<Domain.Models.AssetSearchDocument> CorpusDocuments(string? assetType)
+    {
+        var documents = _context.AssetSearchDocuments
+            .AsNoTracking()
+            .Where(d => d.IsCurrentVersion && d.IsActive && d.Prominence != "hidden");
+
+        return string.IsNullOrWhiteSpace(assetType)
+            ? documents
+            : documents.Where(d => d.AssetType == assetType);
+    }
+
+    /// <summary>
+    /// How many assets carry one query word at all - assets, not documents, since an asset is
+    /// indexed once for itself and once per part. The clauses are the ones the search itself
+    /// scores on, so a count taken here ranks against the same set the query admitted.
+    /// </summary>
+    private static async Task<int> CountTermMatchesAsync(
+        IQueryable<Domain.Models.AssetSearchDocument> documents,
+        SearchQueryParser.QueryTerm term,
+        CancellationToken cancellationToken)
+    {
+        // Unrolled to two variant slots for the same reason the search is: EF Core has to
+        // translate a static shape, and the parser never produces more than the word and
+        // its singular.
+        var shortest = term.Variants[term.Variants.Count - 1];
+        var v0 = " " + term.Variants[0] + " ";
+        var v1 = " " + shortest + " ";
+
+        var matching = documents.Where(d =>
+            EF.Functions.ILike(" " + d.Tokens + " ", "%" + v0 + "%")
+            || EF.Functions.ILike(" " + d.Tokens + " ", "%" + v1 + "%")
+            || EF.Functions.ILike(" " + d.ConceptLabels + " ", "%" + v0 + "%")
+            || EF.Functions.ILike(" " + d.ConceptLabels + " ", "%" + v1 + "%")
+            || EF.Functions.ILike(" " + d.AuthoredTags + " ", "%" + v0 + "%")
+            || EF.Functions.ILike(" " + d.AuthoredTags + " ", "%" + v1 + "%")
+            // Folder tokens admit a document in the search above, so they have to count
+            // here too - otherwise "how many assets carry this word" would mean a different
+            // set of fields than the query itself looked at.
+            || EF.Functions.ILike(" " + d.FolderTokens + " ", "%" + v0 + "%")
+            || EF.Functions.ILike(" " + d.FolderTokens + " ", "%" + v1 + "%")
+            || EF.Functions.ILike(d.DisplayName, "%" + shortest + "%"));
+
+        return await matching
+            .Select(d => new { d.AssetType, d.AssetId })
+            .Distinct()
+            .CountAsync(cancellationToken);
     }
 
     public async Task<SearchFacetRangesResponse> GetFacetRangesAsync(
