@@ -153,13 +153,19 @@ internal sealed class DeleteProjectLevelCommandHandler
     : ICommandHandler<DeleteProjectLevelCommand>
 {
     private readonly IProjectLevelRepository _levels;
+    private readonly ISceneRepository _scenes;
+    private readonly IDateTimeProvider _clock;
     private readonly IUnitOfWork _unitOfWork;
 
     public DeleteProjectLevelCommandHandler(
         IProjectLevelRepository levels,
+        ISceneRepository scenes,
+        IDateTimeProvider clock,
         IUnitOfWork unitOfWork)
     {
         _levels = levels;
+        _scenes = scenes;
+        _clock = clock;
         _unitOfWork = unitOfWork;
     }
 
@@ -167,15 +173,35 @@ internal sealed class DeleteProjectLevelCommandHandler
         DeleteProjectLevelCommand command,
         CancellationToken cancellationToken)
     {
-        var level = await _levels.GetByIdAsync(command.ProjectId, command.LevelId, cancellationToken);
-        if (level is null)
-            return Result.Failure(new Error(
-                "ProjectLevelNotFound",
-                $"Level {command.LevelId} was not found in project {command.ProjectId}."));
+        // The level's scenes keep existing, but the FK that clears their ProjectLevelId
+        // is SET NULL, and a scene left primary with no level violates
+        // CK_Scenes_PrimaryLevelRequiresLevel. Clear the link (and the primary flag)
+        // and commit it BEFORE the level row goes - see DeleteProjectCommandHandler for
+        // why the two saves are split.
+        var tx = await _unitOfWork.InTransactionAsync<bool>(async ct =>
+        {
+            var level = await _levels.GetByIdAsync(command.ProjectId, command.LevelId, ct);
+            if (level is null)
+            {
+                return Result.Failure<bool>(new Error(
+                    "ProjectLevelNotFound",
+                    $"Level {command.LevelId} was not found in project {command.ProjectId}."));
+            }
 
-        await _levels.DeleteAsync(level, cancellationToken);
-        await _unitOfWork.SaveChangesAsync(cancellationToken);
-        return Result.Success();
+            var now = _clock.UtcNow;
+            var scenes = await _scenes.GetByLevelsAsync(new[] { level.Id }, ct);
+            foreach (var scene in scenes)
+            {
+                scene.SetLevel(null, false, now);
+            }
+            await _unitOfWork.SaveChangesAsync(ct);
+
+            await _levels.DeleteAsync(level, ct);
+            await _unitOfWork.SaveChangesAsync(ct);
+            return Result.Success(true);
+        }, cancellationToken);
+
+        return tx.IsFailure ? Result.Failure(tx.Error) : Result.Success();
     }
 }
 

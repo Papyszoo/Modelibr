@@ -36,6 +36,22 @@ internal sealed class SceneRepository : ISceneRepository
                 s => s.ProjectLevelId == levelId && s.IsPrimaryLevelScene,
                 cancellationToken);
 
+    public async Task<IReadOnlyList<Scene>> GetByLevelsAsync(
+        IReadOnlyCollection<int> levelIds,
+        CancellationToken cancellationToken = default)
+    {
+        if (levelIds.Count == 0)
+        {
+            return Array.Empty<Scene>();
+        }
+
+        // Tracked on purpose: the delete handlers unlink these before the level row
+        // goes, so the UPDATE must be flushed rather than thrown away by AsNoTracking.
+        return await _context.Scenes
+            .Where(s => s.ProjectLevelId != null && levelIds.Contains(s.ProjectLevelId.Value))
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task<IEnumerable<Scene>> GetAllAsync(CancellationToken cancellationToken = default)
     {
         return await _context.Scenes

@@ -35,13 +35,17 @@ export async function createModelVersion(
   const formData = new FormData()
   formData.append('file', file)
 
-  const params = new URLSearchParams()
+  // description/setAsActive are FORM fields, not query params: POST
+  // /models/{id}/versions binds them with [FromForm] (the asset-processor
+  // worker sends them the same way, and an integration test pins that). Sending
+  // them on the query string silently dropped them - the "set as active"
+  // checkbox and the version description never reached the server.
   if (description) {
-    params.append('description', description)
+    formData.append('description', description)
   }
-  params.append('setAsActive', setAsActive.toString())
+  formData.append('setAsActive', setAsActive.toString())
 
-  const url = `/models/${modelId}/versions${params.toString() ? `?${params.toString()}` : ''}`
+  const url = `/models/${modelId}/versions`
 
   const response = await client.post<CreateModelVersionResponse>(
     url,

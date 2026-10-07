@@ -29,6 +29,12 @@ export function getScenesQueryOptions() {
   return queryOptions({
     queryKey: ['scenes'] as const,
     queryFn: () => getScenes(),
+    // Same reason as the detail query below: a scene is written from outside
+    // this browser (an agent over MCP, or the level's own scene control in
+    // another tab), so the list must not be served from a five-minute cache.
+    // Without this, returning to the list after a scene was created out of band
+    // showed the list as it was when the tab was last mounted.
+    staleTime: 0,
   })
 }
 
