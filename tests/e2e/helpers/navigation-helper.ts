@@ -29,6 +29,7 @@ import { Page, expect } from "@playwright/test";
 const TILE_LABELS: Record<string, string> = {
   modelList: "Models",
   globalMaterials: "Global Materials",
+  pbrMaterials: "PBR Materials",
   modelTextures: "Multi-Model Textures",
   sprites: "Sprites",
   environmentMaps: "Environment Maps",
@@ -51,6 +52,7 @@ const TAB_ICONS: Record<string, string> = {
   modelViewer: "pi-box",
   scenes: "pi-box",
   globalMaterials: "pi-palette",
+  pbrMaterials: "pi-circle-fill",
   modelTextures: "pi-images",
   textureSetViewer: "pi-image",
   environmentMaps: "pi-globe",

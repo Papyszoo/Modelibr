@@ -37,12 +37,12 @@ Feature: Project Studio
     Then character "Ashen Warden" should list variant "Frozen" scoped to level "Forest Crossing"
     And the API should scope variant "Frozen" on character "Ashen Warden" to level "Forest Crossing"
 
-  Scenario: Write an enemy weakness note
+  Scenario: Write an enemy weakness comment
     Given a character named "Ashen Warden" exists
     When I am on the studio project
-    And I add the note "Quenches under water" to character "Ashen Warden"
-    Then character "Ashen Warden" should use the enemy notes area
-    And character "Ashen Warden" should show the note "Quenches under water"
+    And I add the comment "Quenches under water" to character "Ashen Warden"
+    Then character "Ashen Warden" should use the enemy weaknesses area
+    And character "Ashen Warden" should show the comment "Quenches under water"
 
   Scenario: Add and title a reference image
     When I am on the studio project
@@ -77,8 +77,8 @@ Feature: Project Studio
   Scenario: Annotate a reference image
     When I am on the studio project
     And I add a reference image to the board
-    And I add the note "Keep the horizon soft" to the reference image
-    Then the reference image should show the note "Keep the horizon soft"
+    And I add the comment "Keep the horizon soft" to the reference image
+    Then the reference image should show the comment "Keep the horizon soft"
 
   Scenario: Remove a reference image without deleting the file
     When I am on the studio project

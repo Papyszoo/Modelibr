@@ -13,6 +13,12 @@ services:
             - AllowedOrigins__0=http://localhost:3002
             - AllowedOrigins__1=http://localhost:3010
             - BLENDER_INSTALL_PATH=/var/lib/modelibr/blender
+            # The companion store runs in this same network namespace (see
+            # store-fixture-e2e), so loopback reaches it. Configuring it here is
+            # what lets the agent catalog tools (search_store_assets and friends)
+            # resolve a store; the browser path keeps using VITE_STORE_URL on the
+            # frontend. http: is allowed because the host is localhost.
+            - STORE_URL=http://localhost:9280
             # This stack recreates its DB fresh every run, so first boot always has
             # every migration pending. It has no backup configuration (no POSTGRES_*
             # env / BACKUP_STORAGE_PATH), so the pre-migration backup cannot run here
@@ -20,6 +26,12 @@ services:
             # covered by backup-restore-e2e spec 06 + the DatabaseExtensions
             # integration tests.
             - MODELIBR_SKIP_PREMIGRATION_BACKUP=true
+            # The agent write tools (add_to_project, add_project_comment, ...) are
+            # opt-in and off in a stock server. The project features that exist
+            # only for agents are covered through them, so this stack turns them
+            # on. No tokens are configured, so the endpoint stays unauthenticated
+            # like the rest of this throwaway stack.
+            - MCP_WRITE_ENABLED=true
         ports:
             - "8090:8080"
             # Published for store-fixture-e2e, which shares this container's

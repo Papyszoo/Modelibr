@@ -438,31 +438,37 @@ Then(
 );
 
 When(
-  "I add the note {string} to character {string}",
-  async ({ page }, noteTitle: string, character: string) => {
+  "I add the comment {string} to character {string}",
+  async ({ page }, commentTitle: string, character: string) => {
     const studio = new ProjectStudioPage(page);
-    await studio.addCharacterNote(character, noteTitle, `${noteTitle} body`);
+    await studio.addCharacterComment(
+      character,
+      commentTitle,
+      `${commentTitle} body`,
+    );
   },
 );
 
 Then(
-  "character {string} should use the enemy notes area",
+  "character {string} should use the enemy weaknesses area",
   async ({ page }, character: string) => {
     const studio = new ProjectStudioPage(page);
-    const card = await studio.openCharacterSection(character, "notes");
+    const card = await studio.openCharacterSection(character, "comments");
     await expect(
-      card.getByRole("heading", { name: /enemy notes/i }),
+      card.getByRole("heading", { name: /enemy weaknesses/i }),
     ).toBeVisible();
   },
 );
 
 Then(
-  "character {string} should show the note {string}",
-  async ({ page }, character: string, noteTitle: string) => {
+  "character {string} should show the comment {string}",
+  async ({ page }, character: string, commentTitle: string) => {
     const studio = new ProjectStudioPage(page);
-    const card = await studio.openCharacterSection(character, "notes");
+    const card = await studio.openCharacterSection(character, "comments");
     await expect(
-      card.getByTestId("project-character-note").filter({ hasText: noteTitle }),
+      card
+        .getByTestId("project-character-comment")
+        .filter({ hasText: commentTitle }),
     ).toBeVisible({ timeout: 15000 });
   },
 );
@@ -577,27 +583,27 @@ Then(
 );
 
 When(
-  "I add the note {string} to the reference image",
-  async ({ page }, noteTitle: string) => {
+  "I add the comment {string} to the reference image",
+  async ({ page }, commentTitle: string) => {
     const studio = new ProjectStudioPage(page);
-    await studio.addReferenceNote(
+    await studio.addReferenceComment(
       studio.referenceCards().first(),
-      noteTitle,
-      `${noteTitle} body`,
+      commentTitle,
+      `${commentTitle} body`,
     );
   },
 );
 
 Then(
-  "the reference image should show the note {string}",
-  async ({ page }, noteTitle: string) => {
+  "the reference image should show the comment {string}",
+  async ({ page }, commentTitle: string) => {
     const studio = new ProjectStudioPage(page);
     await expect(
       studio
         .referenceCards()
         .first()
-        .getByTestId("project-reference-note")
-        .filter({ hasText: noteTitle }),
+        .getByTestId("project-reference-comment")
+        .filter({ hasText: commentTitle }),
     ).toBeVisible({ timeout: 15000 });
   },
 );

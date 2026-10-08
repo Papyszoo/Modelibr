@@ -1,4 +1,4 @@
-@setup @projects-setup
+@setup @projects-setup @batch1
 Feature: Setup - Create Test Data for Project Tests
 
   Scenario: Create test model for project association tests

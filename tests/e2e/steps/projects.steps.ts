@@ -3,6 +3,7 @@ import { expect, Page } from "@playwright/test";
 import { getScenarioState } from "../fixtures/shared-state";
 import { UniqueFileGenerator } from "../fixtures/unique-file-generator";
 import { ApiHelper } from "../helpers/api-helper";
+import { loadPersistedModel } from "../fixtures/setup-state-bridge";
 import { ProjectsPage } from "../pages/ProjectsPage";
 
 const { Given, When, Then } = createBdd();
@@ -21,6 +22,26 @@ function getProjectThumbnailFileId(
   );
 }
 
+const CURRENT_PROJECT_KEY = "projects:currentProject";
+
+/**
+ * The project the scenario last opened, recorded by "I am on the project viewer
+ * for ...". Preconditions that self-provision (add this model, add this texture
+ * set) used to hard-code "Test Project" and so could not serve a scenario that
+ * owns its own project - which is exactly what the association scenarios need
+ * to stop racing each other.
+ */
+function currentProject(page: Page): { id: number; name: string } {
+  const name = getScenarioState(page).getCustom<string>(CURRENT_PROJECT_KEY);
+  const project = name ? getScenarioState(page).getProject(name) : undefined;
+  if (!project) {
+    throw new Error(
+      "No project is open in this scenario - open one before self-provisioning an association.",
+    );
+  }
+  return project;
+}
+
 /**
  * Resolves a model from shared state, falling back to DB lookup.
  * This handles the case where setup project created the model
@@ -29,6 +50,15 @@ function getProjectThumbnailFileId(
 async function resolveModel(page: Page, modelStateName: string) {
   let model = getScenarioState(page).getModel(modelStateName);
   if (model) return model;
+
+  // The setup bridge is the deterministic source for a model a setup scenario
+  // created. Consulted before the DB fallback, which grabs the newest model in
+  // the library and so can pick up a different worker's parallel upload.
+  const persisted = loadPersistedModel(modelStateName);
+  if (persisted) {
+    getScenarioState(page).saveModel(modelStateName, persisted);
+    return persisted;
+  }
 
   console.log(
     `[AutoProvision] Model "${modelStateName}" not in shared state, looking up in DB...`,
@@ -100,6 +130,10 @@ Given(
       .locator(".container-viewer")
       .first()
       .waitFor({ state: "visible", timeout: 15000 });
+
+    // Recorded so a later precondition can self-provision into THIS project
+    // rather than a hard-coded one.
+    getScenarioState(page).setCustom(CURRENT_PROJECT_KEY, projectName);
 
     console.log(
       `[Navigation] Opened project viewer for "${projectName}" (ID: ${project.id})`,
@@ -549,12 +583,7 @@ Given(
 
     if (!isPresent) {
       // Auto-provision: add the model to the project via API
-      const project = getScenarioState(page).getProject("Test Project");
-      if (!project) {
-        throw new Error(
-          `Project "Test Project" not found in shared state. Cannot auto-add model.`,
-        );
-      }
+      const project = currentProject(page);
       console.log(
         `[AutoProvision] Model "${model.name}" not in project, adding via API...`,
       );
@@ -623,7 +652,7 @@ async function addTextureSetOfKindToProject(
   }
 
   // Clean up: remove this texture set from the project if already present
-  const project = getScenarioState(page).getProject("Test Project");
+  const project = currentProject(page);
   if (project) {
     const projRes = await page.request.get(
       `${API_BASE}/projects/${project.id}`,
@@ -959,7 +988,7 @@ async function ensureProjectContainsTextureSetOfKind(
     const currentUrl = page.url();
     // Extract project ID from shared state
     const projectMatch = currentUrl.match(/project[=/](\d+)/);
-    const projectState = getScenarioState(page).getProject("Test Project");
+    const projectState = currentProject(page);
     const projectId = projectState?.id || projectMatch?.[1];
 
     if (projectId && textureSet.id) {

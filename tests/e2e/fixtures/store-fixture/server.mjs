@@ -24,7 +24,15 @@ const PASSWORD = "e2e-store-pass";
 const ACCESS_TOKEN = "e2e-access-token";
 const REFRESH_TOKEN = "e2e-refresh-token";
 const IMPORT_TOKEN = "e2e-import-token";
+// The browser sign-in path browses the store by its own non-Guid pack id.
 const ASSET_ID = "e2e-props-pack";
+// The agent catalog path (MCP) requires the store's public catalog contract:
+// anonymous routes and Guid asset ids. A separate, free, GUID-keyed asset keeps
+// those two paths from sharing bytes (SHA dedupe) or provenance.
+const CATALOG_ASSET_ID = "3b1a2c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d";
+const CATALOG_ITEM_ID = "7c8d9e0f-1a2b-4c3d-9e4f-5a6b7c8d9e0f";
+const CATALOG_PREVIEW_ID = "9e0f1a2b-3c4d-4e5f-8a6b-7c8d9e0f1a2b";
+const CATALOG_TITLE = "E2E Catalog Cube";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 
@@ -81,6 +89,17 @@ const files = {
         name: "preview.png",
         contentType: "image/png",
         bytes: readFileSync(path.join(here, "assets/blue_color.png")),
+    },
+    // The agent catalog asset's mesh. Re-tagged with a DIFFERENT marker than the
+    // browser pack's file so its SHA-256 differs - otherwise the first import
+    // would dedupe the second one's model away.
+    3: {
+        name: "test-cube.glb",
+        contentType: "model/gltf-binary",
+        bytes: retagGlb(
+            readFileSync(path.join(here, "assets/test-cube.glb")),
+            "e2e-store-catalog",
+        ),
     },
 };
 
@@ -164,6 +183,116 @@ const libraryItem = {
     previewThumbnailUrl: `${PUBLIC_BASE}/api/files/2/download`,
     addedAt: "2026-07-01T00:00:00+00:00",
 };
+
+// Catalog detail (GET /api/assets/{guid}) - the shape the backend's
+// StoreCatalogClient deserializes into StoreAssetDto. Anonymous, and the id
+// is a Guid because the catalog client parses it as one.
+const catalogAssetDetail = {
+    id: CATALOG_ASSET_ID,
+    title: "E2E Catalog Pack",
+    description: "Fixture pack for the agent catalog path.",
+    author: "E2E Fixture",
+    thumbnailUrl: `${PUBLIC_BASE}/api/files/2/download`,
+    itemTypes: ["Model"],
+    formats: ["glb"],
+    fileSize: files[3].bytes.length,
+    isPack: true,
+    itemCount: 1,
+    downloadCount: 0,
+    tags: ["e2e", "catalog"],
+    price: 0,
+    currency: "USD",
+    creditName: "E2E Fixture",
+    creditUrl: `${PUBLIC_BASE}/credits/e2e-fixture`,
+    license: "CC0",
+    items: [
+        {
+            id: CATALOG_ITEM_ID,
+            itemType: "Model",
+            name: CATALOG_TITLE,
+            isPreviewable: true,
+            category: "Catalog Props",
+            subcategory: null,
+        },
+    ],
+    previews: [
+        {
+            id: CATALOG_PREVIEW_ID,
+            type: "Thumbnail",
+            url: `${PUBLIC_BASE}/api/files/2/download`,
+            fileName: "preview.png",
+            packItemId: CATALOG_ITEM_ID,
+        },
+    ],
+};
+
+// Catalog manifest (GET /api/assets/{guid}/manifest) - anonymous because a free
+// approved asset is fetchable with no credential (the agent import sends none).
+const catalogManifest = {
+    schemaVersion: 1,
+    title: "E2E Catalog Pack",
+    description: "Fixture pack for the agent catalog path.",
+    license: "CC0",
+    author: "E2E Fixture",
+    creditName: "E2E Fixture",
+    creditUrl: `${PUBLIC_BASE}/credits/e2e-fixture`,
+    tags: ["e2e", "catalog"],
+    items: [
+        {
+            id: CATALOG_ITEM_ID,
+            itemType: "Model",
+            name: CATALOG_TITLE,
+            metadataJson: JSON.stringify({ category: "Catalog Props" }),
+            description: "A catalog-imported cube.",
+            tags: ["catalog-import"],
+            files: [
+                {
+                    fileName: files[3].name,
+                    fileSize: files[3].bytes.length,
+                    sha256: sha256(files[3].bytes),
+                    role: "Mesh",
+                    downloadUrl: `${PUBLIC_BASE}/api/files/3/download`,
+                },
+            ],
+            previews: [],
+        },
+    ],
+    previews: [
+        {
+            type: "Thumbnail",
+            fileName: files[2].name,
+            contentType: files[2].contentType,
+            url: `${PUBLIC_BASE}/api/files/2/download`,
+        },
+    ],
+};
+
+// GET /api/assets - the public catalog search. The backend's StoreCatalogClient
+// calls this anonymously with page/pageSize and the optional filters.
+function catalogSearchResults(url) {
+    const search = (url.searchParams.get("search") || "").trim().toLowerCase();
+    const itemType = url.searchParams.get("itemType");
+    const tag = url.searchParams.get("tag");
+    const format = url.searchParams.get("format");
+
+    const haystack =
+        `${catalogAssetDetail.title} ${catalogAssetDetail.author} ${catalogAssetDetail.description}`.toLowerCase();
+
+    const matches =
+        (!search || haystack.includes(search)) &&
+        (!itemType || catalogAssetDetail.itemTypes.includes(itemType)) &&
+        (!tag || catalogAssetDetail.tags.includes(tag)) &&
+        (!format || catalogAssetDetail.formats.includes(format));
+
+    const items = matches ? [catalogAssetDetail] : [];
+    return {
+        items,
+        page: 1,
+        pageSize: 12,
+        totalCount: items.length,
+        totalPages: items.length > 0 ? 1 : 0,
+    };
+}
 
 const json = (res, status, body) => {
     const payload = JSON.stringify(body);
@@ -268,6 +397,33 @@ const server = http.createServer(async (req, res) => {
         if (!hasImportToken(req))
             return json(res, 401, { message: "Unauthorized" });
         return json(res, 200, manifest);
+    }
+
+    // ── Agent catalog contract (anonymous, Guid ids) ──────────────────────
+    // The backend's StoreCatalogClient sends no credential and parses asset
+    // ids as Guids, so these routes must not require the browser's Bearer.
+    if (route === "GET /api/assets") {
+        return json(res, 200, catalogSearchResults(url));
+    }
+
+    const catalogDetail = url.pathname.match(
+        /^\/api\/assets\/([0-9a-fA-F-]{36})$/,
+    );
+    if (req.method === "GET" && catalogDetail) {
+        if (catalogDetail[1].toLowerCase() === CATALOG_ASSET_ID) {
+            return json(res, 200, catalogAssetDetail);
+        }
+        return json(res, 404, { message: "No such asset." });
+    }
+
+    const catalogManifestRoute = url.pathname.match(
+        /^\/api\/assets\/([0-9a-fA-F-]{36})\/manifest$/,
+    );
+    if (req.method === "GET" && catalogManifestRoute) {
+        if (catalogManifestRoute[1].toLowerCase() === CATALOG_ASSET_ID) {
+            return json(res, 200, catalogManifest);
+        }
+        return json(res, 404, { message: "No such asset." });
     }
 
     const download = url.pathname.match(/^\/api\/files\/(\d+)\/download$/);

@@ -1,4 +1,4 @@
-@asset-store
+@infra @asset-store
 Feature: Asset Store import
   A user signs into the companion asset store from the Asset Store tab,
   sees their store library, and imports a pack into the local instance.

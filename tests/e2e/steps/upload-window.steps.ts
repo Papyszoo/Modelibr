@@ -4,6 +4,7 @@ import { UploadProgressPage } from "../pages/UploadProgressPage";
 import { UploadHistoryPage } from "../pages/UploadHistoryPage";
 import { ModelListPage } from "../pages/ModelListPage";
 import { UniqueFileGenerator } from "../fixtures/unique-file-generator";
+import { getScenarioState } from "../fixtures/shared-state";
 import path from "path";
 import { fileURLToPath } from "url";
 
@@ -443,6 +444,29 @@ Then("the item should display the filename", async ({ page }) => {
     expect(filename?.length).toBeGreaterThan(0);
     console.log(`[UI] Item displays filename: "${filename}" ✓`);
 });
+
+Then(
+    "the history should list the freshly uploaded model {string}",
+    async ({ page }, stateName: string) => {
+        const historyPage = new UploadHistoryPage(page);
+        const model = getScenarioState(page).getModel(stateName);
+        if (!model) {
+            throw new Error(
+                `No model "${stateName}" in shared state - an upload Given is missing.`,
+            );
+        }
+        // Polled: the history query can answer from cache for a beat after the
+        // upload, and a single read would race the refetch.
+        await expect
+            .poll(async () => historyPage.findItemByFilename(model.name), {
+                message: `Waiting for "${model.name}" to appear in the upload history`,
+                timeout: 15000,
+                intervals: [500, 1000, 2000],
+            })
+            .toBeGreaterThanOrEqual(0);
+        console.log(`[UI] History lists "${model.name}" ✓`);
+    },
+);
 
 Then("the item should display an extension icon", async ({ page }) => {
     const icon = page.locator(".history-item-ext-icon").first();

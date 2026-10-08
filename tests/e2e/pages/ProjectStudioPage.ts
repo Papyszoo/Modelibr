@@ -1,7 +1,7 @@
 import { Locator, Page, expect } from "@playwright/test";
 
 /**
- * The Project studio: levels, production notes, the character workspace, and
+ * The Project studio: levels, comments, the character workspace, and
  * the reference board. All locators are `data-testid` contracts owned by the
  * frontend components - no CSS-class locators here.
  */
@@ -79,9 +79,9 @@ export class ProjectStudioPage {
     );
   }
 
-  noteRow(title: string): Locator {
+  commentRow(title: string): Locator {
     return this.page.locator(
-      `[data-testid="project-note-row"][data-note-title="${title}"]`,
+      `[data-testid="project-comment-row"][data-comment-title="${title}"]`,
     );
   }
 
@@ -342,7 +342,7 @@ export class ProjectStudioPage {
 
   async openCharacterSection(
     name: string,
-    section: "identity" | "notes" | "media" | "abilities" | "variants",
+    section: "identity" | "comments" | "media" | "abilities" | "variants",
   ): Promise<Locator> {
     const card = await this.ensureCharacterEditorOpen(name);
     await card
@@ -446,30 +446,32 @@ export class ProjectStudioPage {
     ).toBeVisible({ timeout: 15000 });
   }
 
-  async addCharacterNote(
+  async addCharacterComment(
     characterName: string,
-    noteTitle: string,
-    noteBody: string,
+    commentTitle: string,
+    commentBody: string,
   ): Promise<void> {
-    const card = await this.openCharacterSection(characterName, "notes");
+    const card = await this.openCharacterSection(characterName, "comments");
     await card
-      .getByRole("button", { name: `Add note to ${characterName}` })
+      .getByRole("button", { name: `Add comment to ${characterName}` })
       .click();
-    await card.getByLabel(`Note title for ${characterName}`).fill(noteTitle);
-    await card.getByLabel(`Note body for ${characterName}`).fill(noteBody);
+    await card
+      .getByLabel(`Comment title for ${characterName}`)
+      .fill(commentTitle);
+    await card.getByLabel(`Comment for ${characterName}`).fill(commentBody);
 
     const responsePromise = this.page.waitForResponse(
       (response) =>
-        response.url().includes("/production-notes") &&
+        response.url().includes("/comments") &&
         response.request().method() === "POST",
       { timeout: 15000 },
     );
-    await card.getByRole("button", { name: "Save note" }).click();
+    await card.getByRole("button", { name: "Add comment" }).click();
     const response = await responsePromise;
     expect(response.ok()).toBeTruthy();
     await expect(
-      card.getByTestId("project-character-note").filter({
-        hasText: noteTitle,
+      card.getByTestId("project-character-comment").filter({
+        hasText: commentTitle,
       }),
     ).toBeVisible({ timeout: 15000 });
   }
@@ -555,28 +557,30 @@ export class ProjectStudioPage {
     await expect(chip).toHaveCount(0, { timeout: 15000 });
   }
 
-  async addReferenceNote(
+  async addReferenceComment(
     card: Locator,
-    noteTitle: string,
-    noteBody: string,
+    commentTitle: string,
+    commentBody: string,
   ): Promise<void> {
-    await card.getByRole("button", { name: /^Add note to / }).click();
-    const form = card.locator(".project-reference-note-form");
+    await card.getByRole("button", { name: /^Add comment to / }).click();
+    const form = card.getByTestId("project-comment-form");
     await expect(form).toBeVisible();
-    await form.getByLabel(/^Note title for /).fill(noteTitle);
-    await form.getByLabel(/^Note body for /).fill(noteBody);
+    await form.getByLabel(/^Comment title for /).fill(commentTitle);
+    await form.getByLabel(/^Comment for /).fill(commentBody);
 
     const responsePromise = this.page.waitForResponse(
       (response) =>
-        response.url().includes("/production-notes") &&
+        response.url().includes("/comments") &&
         response.request().method() === "POST",
       { timeout: 15000 },
     );
-    await form.getByRole("button", { name: "Save note" }).click();
+    await form.getByRole("button", { name: "Add comment" }).click();
     const response = await responsePromise;
     expect(response.ok()).toBeTruthy();
     await expect(
-      card.getByTestId("project-reference-note").filter({ hasText: noteTitle }),
+      card
+        .getByTestId("project-reference-comment")
+        .filter({ hasText: commentTitle }),
     ).toBeVisible({ timeout: 15000 });
   }
 
