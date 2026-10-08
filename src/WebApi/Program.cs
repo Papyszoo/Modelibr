@@ -176,6 +176,8 @@ namespace WebApi
                     .WithTools<WebApi.Mcp.SceneRenderMcpTools>()
                     // Browsing the material library is a read like any other search.
                     .WithTools<WebApi.Mcp.MaterialReadMcpTools>()
+                    // Browsing visual effects is the same read.
+                    .WithTools<WebApi.Mcp.VfxReadMcpTools>()
                     // Asking what a queued job did. A read about work someone else asked
                     // for - and the only way an agent can collect the result of anything
                     // that hands back a job id instead of an answer.
@@ -216,6 +218,9 @@ namespace WebApi
                         // Inventing a material mid-scene. A write, and the cheapest one
                         // there is: it creates no files at all.
                         .WithTools<WebApi.Mcp.MaterialWriteMcpTools>()
+                        // Authoring a visual effect. A write like any other, over one
+                        // validated JSON document that references library assets.
+                        .WithTools<WebApi.Mcp.VfxWriteMcpTools>()
                         // Running Blender on an asset. A write: it adds a version to a
                         // model, even though what it hands back is a job id.
                         .WithTools<WebApi.Mcp.BlenderWriteMcpTools>()
@@ -279,6 +284,7 @@ namespace WebApi
             app.MapThumbnailJobEndpoints();
             app.MapTextureSetEndpoints();
             app.MapMaterialEndpoints();
+            app.MapVfxEndpoints();
             app.MapTextureSetCategoryEndpoints();
             app.MapPackEndpoints();
             app.MapProjectEndpoints();

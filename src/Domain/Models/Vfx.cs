@@ -1,0 +1,89 @@
+namespace Domain.Models;
+
+/// <summary>
+/// A visual effect: timed components (particles, meshes, lights, sounds) that play on
+/// one timeline. The whole effect is ONE validated JSON definition stored as a single
+/// jsonb document, not a graph of rows.
+///
+/// Why a document rather than component tables: the effect is authored and played as a
+/// unit, like a scene document, and the browser preview and the Godot export read the
+/// same numbers. A row per component would buy indexing nobody filters on and cost a
+/// join on every read. The server validates the document on the way in, so what is
+/// stored is always the contract the frontend and the export understand.
+///
+/// Deliberately no tags, categories, thumbnails or soft delete: an effect is a small
+/// authored document, and a hard delete is unambiguous.
+/// </summary>
+public class Vfx : AggregateRoot
+{
+    public int Id { get; private set; }
+    public string Name { get; private set; } = string.Empty;
+    public string? Description { get; private set; }
+
+    /// <summary>The validated v1 definition, serialized as camelCase JSON.</summary>
+    public string DefinitionJson { get; private set; } = string.Empty;
+
+    public DateTime CreatedAt { get; private set; }
+    public DateTime UpdatedAt { get; private set; }
+
+    public static Vfx Create(string name, string? description, string definitionJson, DateTime now)
+    {
+        ValidateName(name);
+        ValidateDescription(description);
+        ValidateDefinition(definitionJson);
+
+        return new Vfx
+        {
+            Name = name.Trim(),
+            Description = description?.Trim(),
+            DefinitionJson = definitionJson,
+            CreatedAt = now,
+            UpdatedAt = now
+        };
+    }
+
+    public void Rename(string name, DateTime updatedAt)
+    {
+        ValidateName(name);
+
+        Name = name.Trim();
+        UpdatedAt = updatedAt;
+    }
+
+    public void UpdateDescription(string? description, DateTime updatedAt)
+    {
+        ValidateDescription(description);
+
+        Description = description?.Trim();
+        UpdatedAt = updatedAt;
+    }
+
+    public void UpdateDefinition(string definitionJson, DateTime updatedAt)
+    {
+        ValidateDefinition(definitionJson);
+
+        DefinitionJson = definitionJson;
+        UpdatedAt = updatedAt;
+    }
+
+    private static void ValidateName(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+            throw new ArgumentException("Vfx name cannot be null or empty.", nameof(name));
+
+        if (name.Length > 200)
+            throw new ArgumentException("Vfx name cannot exceed 200 characters.", nameof(name));
+    }
+
+    private static void ValidateDescription(string? description)
+    {
+        if (description != null && description.Length > 1000)
+            throw new ArgumentException("Vfx description cannot exceed 1000 characters.", nameof(description));
+    }
+
+    private static void ValidateDefinition(string definitionJson)
+    {
+        if (string.IsNullOrWhiteSpace(definitionJson))
+            throw new ArgumentException("Vfx definition cannot be null or empty.", nameof(definitionJson));
+    }
+}

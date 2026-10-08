@@ -32,6 +32,7 @@ The interface is split into **two panels** (left and right), each containing mul
 | **Sprites**              | 2D sprite sheets, atlases, and UI iconography                      |
 | **Sounds**               | Audio assets - SFX, dialogue, ambient loops                        |
 | **Scripts**              | Source code and shaders with live previews                         |
+| **VFX**                  | Visual effects: timed particles, meshes, lights and sounds         |
 | **Scenes**               | Compose library assets into a scene, by hand or through an agent   |
 
 **Organize and system:**
@@ -45,7 +46,7 @@ The interface is split into **two panels** (left and right), each containing mul
 | **Recycled Files** | Recover deleted items                           |
 | **Settings**       | Storage, appearance, WebDAV, and Blender CLI    |
 
-**Viewers** open when you click an asset: **Model Viewer** (3D), **Texture Set Viewer**, **Environment Map Viewer**, **Script Viewer**, plus **Pack** and **Project** viewers.
+**Viewers** open when you click an asset: **Model Viewer** (3D), **Texture Set Viewer**, **Environment Map Viewer**, **Script Viewer**, **VFX Editor**, plus **Pack** and **Project** viewers.
 
 A **Scene editor** opens the same way - clicking a scene in the Scenes tab
 replaces the list with a dock tab of its own, one per scene, so two scenes can be

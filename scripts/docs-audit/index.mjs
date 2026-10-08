@@ -149,6 +149,8 @@ const manifestOutputs = [
     scriptViewer: "Script Viewer",
     scenes: "Scenes",
     sceneEditor: "Scene",
+    vfxList: "VFX",
+    vfxEditor: "VFX Editor",
     assetStore: "Asset Store",
     settings: "Settings",
     history: "History",

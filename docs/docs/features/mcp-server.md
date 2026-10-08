@@ -18,7 +18,7 @@ the tools that change anything only appear when you opt in with
 
 ## What the agent can read
 
-These thirty-three read tools are always available, each a thin wrapper over an
+These thirty-five read tools are always available, each a thin wrapper over an
 ordinary Modelibr API endpoint - there is no separate search or extraction path:
 
 | Tool | What it does |
@@ -34,6 +34,8 @@ ordinary Modelibr API endpoint - there is no separate search or extraction path:
 | `list_facets` | The structural filters `search_assets` accepts and their value ranges (including size, rig, materials, UVs, part counts, and category), so the agent can compose filters without guessing. |
 | `list_materials` | Browse the material library: **parameter materials** (a colour and a roughness - no UVs needed) and **tiling global materials** (image channels, which do need UVs) in one list, because both attach to a model's material slot. Every hit carries `requiresUvs`, so an agent dressing an asset with a bad or missing unwrap can ask for only what will look right on it. |
 | `get_material` | One parameter material in full - every factor, its render state, its category and tags. |
+| `list_vfx` | Browse the visual effects in the library. Each hit carries its duration, component count and component types, so an agent can pick an effect without opening its definition. |
+| `get_vfx` | One visual effect in full: its name, description and v1 definition parsed as a JSON object - version, duration, loop and the timed components exactly as they are stored. |
 | `get_job_status` | What a queued job is doing, and once it has finished, what it produced - the new version id an unwrap wrote, for instance. Pass `waitSeconds` to block for the verdict instead of writing a polling loop; the job runs on regardless. This is how you collect the result of any tool that hands back a job id. |
 | `get_metadata_schema` | The asset metadata schema: every field an asset can carry, per family, with its type, its allowed values, whether it is authored, derived or imported, and which store-manifest path populates it. Read it before `set_asset_metadata` - it is the field list that call validates against. |
 | `get_asset_metadata` | Every schema field's current value for one asset, authored and measured alike, plus `completeness` - the fields a caller could still fill. Use it to ask what an asset is missing instead of reading it and comparing by hand. |
@@ -118,7 +120,7 @@ and look.
 
 ## What the agent can change (opt-in)
 
-Set `MCP_WRITE_ENABLED=true` in your root `.env` and fifty-four more tools appear,
+Set `MCP_WRITE_ENABLED=true` in your root `.env` and fifty-six more tools appear,
 letting an agent curate the library the way you would in the app. They are a thin
 pass-through over the same command handlers the UI uses, so there is one source
 of truth for what a change means:
@@ -142,6 +144,9 @@ of truth for what a change means:
 | `review_import_suggestions` | Settle what the import automation guessed, in bulk: `accept=true` keeps the categories and tags it applied, `accept=false` takes them back. Omit `modelIds` to settle everything waiting; that form is bounded per call, so repeat while `remaining` is above zero. Taking back never undoes a decision a person made since.                                                               |
 | `collapse_duplicate_assets` | Keep one copy of a same-geometry group and **recycle** the rest. You name the survivor - the two copies of a prop are usually an FBX and an OBJ, and only the user knows which their pipeline reads. Every id is re-checked against the survivor's fingerprint first, so a stale listing cannot delete a different asset. Recycled, not merged: `restore_asset` brings one back untouched. |
 | `set_scene_project`         | Link a scene to a project so its brief applies, or unlink it with `projectId=null`. A scene write: it bumps the revision and is undoable.                                                                                                                                                                                                                                                  |
+
+| `create_vfx`                | Create a visual effect from a validated v1 definition: timed particles, meshes, lights and sounds that reference library assets. An invalid definition is rejected in full - every problem comes back with the path of the field it is about, so an agent can fix them all in one retry. Omit the definition for a default empty effect. |
+| `update_vfx`                | Change a visual effect. Omitted fields are left alone; a supplied definition **replaces** the whole definition rather than merging it, because a timeline is edited as a unit. Uses the same v1 contract as `create_vfx`, and reports every validation problem with its path. |
 
 #### Bringing a store asset home
 

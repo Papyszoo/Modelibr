@@ -100,6 +100,7 @@ namespace Infrastructure
             services.AddSingleton(derivationOptions);
             services.AddScoped<ITextureSetRepository, TextureSetRepository>();
             services.AddScoped<IMaterialRepository, MaterialRepository>();
+            services.AddScoped<IVfxRepository, VfxRepository>();
             services.AddScoped<ITextureProxyRepository, TextureProxyRepository>();
             services.AddScoped<IPackRepository, PackRepository>();
             services.AddScoped<IProjectRepository, ProjectRepository>();

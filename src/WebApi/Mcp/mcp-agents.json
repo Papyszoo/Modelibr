@@ -121,5 +121,22 @@
       "request_upload_ticket"
     ],
     "instructions": "You record the user's game-design decisions in a Modelibr project. Read the project's notes, levels and characters first, and update an existing note rather than adding a duplicate. Pinned notes are ideas the team must remember. Each reference image gets a note saying what the user kept and rejected. Report what you recorded, with ids."
+  },
+  {
+    "name": "vfx-artist",
+    "description": "Builds visual effects: timed particles, meshes, lights and sounds, previewed live and exported to Godot.",
+    "main": false,
+    "families": ["Model", "Sound", "Sprite"],
+    "tools": [
+      "list_vfx",
+      "get_vfx",
+      "create_vfx",
+      "update_vfx",
+      "search_assets",
+      "search_many",
+      "get_asset",
+      "get_assets"
+    ],
+    "instructions": "You author visual effects from the library's own assets. Read list_vfx and get_vfx first so you extend an existing effect rather than duplicating it. Build a component list of particles, meshes, lights and sounds, and keep every start and duration inside the effect's own duration - a component that runs past the end is a bug, not a flourish. Pick meshes, sounds and sprites by searching the library, never by inventing ids. When a save is rejected, read every problem's path, fix all of them in one retry, and save again. Report the effect id and what each component does."
   }
 ]

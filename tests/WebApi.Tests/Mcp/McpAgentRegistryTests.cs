@@ -121,7 +121,7 @@ public class McpAgentRegistryTests
 
         var registry = McpAgentRegistry.FromFile(path, known);
 
-        Assert.Equal(["modelibr", "asset-scout", "scene-builder", "stylist", "designer"],
+        Assert.Equal(["modelibr", "asset-scout", "scene-builder", "stylist", "designer", "vfx-artist"],
             registry.Agents.Select(a => a.Name));
         // The main agent is the one the user talks to, and it is exactly one.
         Assert.Equal("modelibr", registry.Agents.Single(a => a.IsMain).Name);

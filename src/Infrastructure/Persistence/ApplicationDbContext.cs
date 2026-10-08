@@ -82,6 +82,7 @@ namespace Infrastructure.Persistence
         public DbSet<Texture> Textures => Set<Texture>();
         public DbSet<TextureSet> TextureSets => Set<TextureSet>();
         public DbSet<Material> Materials => Set<Material>();
+        public DbSet<Vfx> Vfx => Set<Vfx>();
         public DbSet<Pack> Packs => Set<Pack>();
         public DbSet<Project> Projects => Set<Project>();
         public DbSet<ProjectLevel> ProjectLevels => Set<ProjectLevel>();
@@ -681,6 +682,22 @@ namespace Infrastructure.Persistence
                 entity.HasIndex(m => m.IsDeleted);
 
                 entity.HasQueryFilter(m => !m.IsDeleted);
+            });
+
+            // Configure Vfx - a visual effect stored as one validated JSON definition.
+            // No tags, categories, thumbnails or soft delete: it is a small authored
+            // document, browsed and deleted as a unit.
+            modelBuilder.Entity<Vfx>(entity =>
+            {
+                entity.HasKey(v => v.Id);
+                entity.ToTable("Vfx");
+                entity.Property(v => v.Name).IsRequired().HasMaxLength(200);
+                entity.Property(v => v.Description).HasMaxLength(1000);
+                entity.Property(v => v.DefinitionJson).IsRequired().HasColumnType("jsonb");
+                entity.Property(v => v.CreatedAt).IsRequired();
+                entity.Property(v => v.UpdatedAt).IsRequired();
+
+                entity.HasIndex(v => v.Name);
             });
 
             // Configure Pack entity
