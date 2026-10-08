@@ -161,6 +161,10 @@ export function VfxList(): JSX.Element {
         onClose={() => setPendingDelete(null)}
         header="Delete effect"
         size="sm"
+        // The dialog opens on the right button's contextmenu (pointerdown on
+        // macOS/Linux), so the same click's pointerup lands on the new mask
+        // and would dismiss it at once. Cancel and Escape still close it.
+        dismissableMask={false}
         footer={
           <>
             <Button
