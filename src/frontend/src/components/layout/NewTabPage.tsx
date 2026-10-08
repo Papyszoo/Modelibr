@@ -149,6 +149,16 @@ const TILES: Tile[] = [
     targetLabel: 'Stages',
     disabled: true,
   },
+  {
+    key: 'vfx',
+    group: 'assets',
+    icon: 'pi-sparkles',
+    label: 'VFX',
+    description:
+      'Visual effects: particles, meshes, lights and sounds on one timeline.',
+    targetType: 'vfxList',
+    targetLabel: 'VFX',
+  },
 
   // ── Organize ──────────────────────────────────────────────────────────────
   {
@@ -250,6 +260,8 @@ const RECENT_TAB_ICON: Partial<Record<TabType, string>> = {
   stageEditor: 'pi-th-large',
   scenes: 'pi-box',
   sceneEditor: 'pi-box',
+  vfxList: 'pi-sparkles',
+  vfxEditor: 'pi-sparkles',
   assetStore: 'pi-shopping-bag',
   settings: 'pi-cog',
   history: 'pi-history',

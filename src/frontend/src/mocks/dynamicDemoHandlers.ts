@@ -58,6 +58,7 @@ import {
   trackUpload,
 } from './dynamic-demo/shared'
 import { systemHandlers } from './dynamic-demo/systemHandlers'
+import { vfxHandlers } from './dynamic-demo/vfxHandlers'
 
 export { prewarmSeedThumbnails } from './dynamic-demo/shared'
 
@@ -4115,4 +4116,5 @@ export const dynamicDemoHandlers = [
   ...assetStoreHandlers,
   ...containerHandlers,
   ...systemHandlers,
+  ...vfxHandlers,
 ]

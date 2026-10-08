@@ -26,6 +26,7 @@ const DEEP_LINK_PATTERNS: Array<{
   { pattern: /^\/view\/pack\/(.+)$/, tabType: 'packViewer', idGroup: 1 },
   { pattern: /^\/view\/project\/(.+)$/, tabType: 'projectViewer', idGroup: 1 },
   { pattern: /^\/view\/stage\/(.+)$/, tabType: 'stageEditor', idGroup: 1 },
+  { pattern: /^\/view\/vfx\/(.+)$/, tabType: 'vfxEditor', idGroup: 1 },
 ]
 
 /**

@@ -233,6 +233,10 @@ export function getTabLabel(
     case 'modelViewer':
       if (modelName) return modelName
       return modelId ? `Model ${modelId}` : 'Model Viewer'
+    case 'vfxList':
+      return 'VFX'
+    case 'vfxEditor':
+      return 'Effect'
     case 'globalMaterials':
       return 'Global Materials'
     case 'pbrMaterials':
@@ -333,6 +337,10 @@ export function createTab(
       case 'sceneEditor':
         tabId = `scene-${id}`
         params.sceneId = id
+        break
+      case 'vfxEditor':
+        tabId = `vfx-${id}`
+        params.vfxId = id
         break
     }
   }

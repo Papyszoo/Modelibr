@@ -76,6 +76,10 @@ export function parseCompactTabFormat(
         tabs.push(createTab('sceneEditor', tabId.substring(6)))
         continue
       }
+      if (tabId.startsWith('vfx-')) {
+        tabs.push(createTab('vfxEditor', tabId.substring(4)))
+        continue
+      }
 
       // Legacy URL id from before the texture-set split.
       const tabType = (
@@ -102,6 +106,8 @@ export function parseCompactTabFormat(
           'stageEditor',
           'scenes',
           'sceneEditor',
+          'vfxList',
+          'vfxEditor',
           'assetStore',
           'history',
           'settings',
@@ -263,6 +269,11 @@ export async function parseCompactTabFormatAsync(
         continue
       }
 
+      if (tabId.startsWith('vfx-')) {
+        tabs.push(createTab('vfxEditor', tabId.substring(4)))
+        continue
+      }
+
       // Legacy URL id from before the texture-set split.
       const tabType = (
         tabId === 'textureSets' ? 'modelTextures' : tabId
@@ -288,6 +299,8 @@ export async function parseCompactTabFormatAsync(
           'stageEditor',
           'scenes',
           'sceneEditor',
+          'vfxList',
+          'vfxEditor',
           'assetStore',
           'history',
           'settings',

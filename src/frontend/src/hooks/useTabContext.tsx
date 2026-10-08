@@ -174,6 +174,22 @@ export const TabProvider = ({
     setActiveTab(newTab.id)
   }
 
+  const openVfxEditorTab = (vfxId: string, name?: string): void => {
+    // One tab per effect, like scenes: re-opening focuses it and keeps its draft.
+    const existingTab = tabs.find(
+      tab => tab.type === 'vfxEditor' && tab.params.vfxId === vfxId
+    )
+
+    if (existingTab) {
+      setActiveTab(existingTab.id)
+      return
+    }
+
+    const newTab = createTab('vfxEditor', vfxId, name)
+    setTabs([...tabs, newTab])
+    setActiveTab(newTab.id)
+  }
+
   /**
    * Relabels an existing tab in place.
    *
@@ -209,6 +225,7 @@ export const TabProvider = ({
           type === 'packs' ||
           type === 'sprites' ||
           type === 'stageList' ||
+          type === 'vfxList' ||
           (type === 'modelViewer' &&
             tab.modelId === (data as { id?: string })?.id) ||
           (type === 'textureSetViewer' &&
@@ -245,6 +262,7 @@ export const TabProvider = ({
     openProjectDetailsTab,
     openScriptDetailsTab,
     openSceneEditorTab,
+    openVfxEditorTab,
     openScenesList,
     relabelTab,
     openTab,

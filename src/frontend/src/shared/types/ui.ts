@@ -20,6 +20,8 @@ export type TabType =
   | 'stageEditor'
   | 'scenes'
   | 'sceneEditor'
+  | 'vfxList'
+  | 'vfxEditor'
   | 'assetStore'
   | 'settings'
   | 'history'

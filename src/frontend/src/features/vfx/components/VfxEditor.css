@@ -1,0 +1,711 @@
+/*
+ * The VFX editor shell: toolbar, a preview + inspector workspace, and a
+ * timeline along the bottom. Colours come from the --mod-* tokens so both
+ * themes flow through; the only literal is the particles track accent, for
+ * which no token exists.
+ */
+
+.vfx-editor {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  background: var(--mod-color-bg);
+  color: var(--mod-color-text);
+}
+
+/* ── Toolbar ─────────────────────────────────────────────────────────────── */
+
+.vfx-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--mod-space-xs) var(--mod-space-sm);
+  padding: var(--mod-space-xs) var(--mod-space-sm);
+  border-bottom: 1px solid var(--mod-color-border);
+  background: var(--mod-color-surface);
+}
+
+.vfx-toolbar-group {
+  display: flex;
+  align-items: center;
+  gap: var(--mod-space-xs);
+}
+
+.vfx-toolbar-end {
+  gap: var(--mod-space-sm);
+  margin-left: auto;
+}
+
+.vfx-transport {
+  padding: 0.125rem var(--mod-space-xs) 0.125rem 0.125rem;
+  background: var(--mod-color-bg);
+  border: 1px solid var(--mod-color-border);
+  border-radius: var(--mod-radius-pill);
+}
+
+.vfx-time {
+  min-width: 3.25rem;
+  font-size: var(--mod-text-xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--mod-color-text-muted);
+  white-space: nowrap;
+}
+
+.vfx-toolbar-divider {
+  align-self: stretch;
+  width: 1px;
+  margin: var(--mod-space-2xs) 0;
+  background: var(--mod-color-border);
+}
+
+.vfx-length-input {
+  width: 4.25rem;
+  padding: 0.125rem var(--mod-space-2xs);
+  font: inherit;
+  font-size: var(--mod-text-xs);
+  color: var(--mod-color-text);
+  background: var(--mod-color-surface);
+  border: 1px solid var(--mod-color-border);
+  border-radius: var(--mod-radius-sm);
+}
+
+.vfx-segmented {
+  gap: 0;
+}
+
+.vfx-segmented .vfx-segment:not(.p-button):not(.p-component):not(.p-link) {
+  border-radius: 0;
+  margin-left: -1px;
+}
+
+.vfx-segmented
+  .vfx-segment:not(.p-button):not(.p-component):not(.p-link):first-child {
+  margin-left: 0;
+  border-radius: var(--mod-radius-sm) 0 0 var(--mod-radius-sm);
+}
+
+.vfx-segmented
+  .vfx-segment:not(.p-button):not(.p-component):not(.p-link):last-child {
+  border-radius: 0 var(--mod-radius-sm) var(--mod-radius-sm) 0;
+}
+
+.vfx-segmented .vfx-segment:not(.p-button):not(.p-component):not(.p-link):hover,
+.vfx-segmented
+  .vfx-segment:not(.p-button):not(.p-component):not(.p-link):focus-visible {
+  position: relative;
+}
+
+.vfx-toolbar-field {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--mod-space-2xs);
+  font-size: var(--mod-text-xs);
+  color: var(--mod-color-text-muted);
+}
+
+.vfx-title {
+  flex: 1 1 10rem;
+  min-width: 0;
+  padding: var(--mod-space-2xs) var(--mod-space-xs);
+  font: inherit;
+  font-size: var(--mod-text-md);
+  font-weight: var(--mod-font-weight-semibold);
+  color: inherit;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--mod-radius-sm);
+}
+
+.vfx-title:hover,
+.vfx-title:focus {
+  background: var(--mod-color-surface-hover);
+  border-color: var(--mod-color-border);
+  outline: none;
+}
+
+/* ── Buttons ─────────────────────────────────────────────────────────────── */
+
+.vfx-icon-button:not(.p-button):not(.p-component):not(.p-link) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  padding: 0;
+  color: var(--mod-color-text);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--mod-radius-sm);
+  cursor: pointer;
+  transition:
+    background var(--mod-transition-fast),
+    border-color var(--mod-transition-fast);
+}
+
+.vfx-icon-button:not(.p-button):not(.p-component):not(.p-link):hover {
+  background: var(--mod-color-surface-hover);
+  border-color: var(--mod-color-border);
+}
+
+.vfx-icon-button:not(.p-button):not(.p-component):not(.p-link):focus-visible {
+  outline: 2px solid var(--mod-color-primary);
+  outline-offset: 1px;
+}
+
+.vfx-danger {
+  color: var(--mod-color-danger);
+}
+
+.vfx-play-button:not(.p-button):not(.p-component):not(.p-link) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  color: var(--mod-color-primary-text);
+  background: var(--mod-color-primary);
+  border: none;
+  border-radius: var(--mod-radius-pill);
+  cursor: pointer;
+  transition: background var(--mod-transition-fast);
+}
+
+.vfx-play-button:not(.p-button):not(.p-component):not(.p-link):hover {
+  background: var(--mod-color-primary-hover);
+}
+
+.vfx-play-button:not(.p-button):not(.p-component):not(.p-link):focus-visible {
+  outline: 2px solid var(--mod-color-primary);
+  outline-offset: 2px;
+}
+
+.vfx-text-button:not(.p-button):not(.p-component):not(.p-link) {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--mod-space-2xs);
+  padding: var(--mod-space-2xs) var(--mod-space-xs);
+  font-family: inherit;
+  font-size: var(--mod-text-xs);
+  white-space: nowrap;
+  color: var(--mod-color-text);
+  text-decoration: none;
+  background: transparent;
+  border: 1px solid var(--mod-color-border);
+  border-radius: var(--mod-radius-sm);
+  cursor: pointer;
+  transition: background var(--mod-transition-fast);
+}
+
+.vfx-text-button:not(.p-button):not(.p-component):not(.p-link):hover {
+  background: var(--mod-color-surface-hover);
+}
+
+.vfx-text-button:not(.p-button):not(.p-component):not(.p-link):focus-visible {
+  outline: 2px solid var(--mod-color-primary);
+  outline-offset: 1px;
+}
+
+/* ── Add-asset picker & effect problems ──────────────────────────────────── */
+
+.vfx-add-picker {
+  padding: var(--mod-space-xs) var(--mod-space-sm);
+  border-bottom: 1px solid var(--mod-color-border);
+  background: var(--mod-color-surface);
+}
+
+.vfx-add-picker p {
+  margin: 0 0 var(--mod-space-xs);
+  font-size: var(--mod-text-xs);
+  color: var(--mod-color-text-muted);
+}
+
+.vfx-problems {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mod-space-2xs);
+  margin: 0;
+  padding: var(--mod-space-xs) var(--mod-space-sm);
+  font-size: var(--mod-text-xs);
+  color: var(--mod-color-danger);
+  list-style: none;
+  background: var(--mod-color-danger-bg);
+  border-radius: var(--mod-radius-sm);
+}
+
+.vfx-problems-effect {
+  margin: var(--mod-space-xs) var(--mod-space-sm) 0;
+}
+
+/* ── Workspace: preview + inspector ──────────────────────────────────────── */
+
+.vfx-workspace {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.vfx-preview {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+  background: #14161b;
+}
+
+.vfx-preview canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.vfx-inspector {
+  flex: 0 0 320px;
+  width: 320px;
+  padding: 0 var(--mod-space-sm) var(--mod-space-2xl);
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+  background: var(--mod-color-surface);
+  border-left: 1px solid var(--mod-color-border);
+}
+
+.vfx-inspector-empty {
+  display: flex;
+  align-items: flex-start;
+  padding-top: var(--mod-space-sm);
+}
+
+.vfx-inspector-header {
+  position: sticky;
+  top: 0;
+  z-index: var(--mod-z-sticky);
+  display: flex;
+  align-items: center;
+  gap: var(--mod-space-xs);
+  margin: 0 calc(-1 * var(--mod-space-sm)) var(--mod-space-sm);
+  padding: var(--mod-space-xs) var(--mod-space-sm);
+  background: var(--mod-color-surface);
+  border-bottom: 1px solid var(--mod-color-border);
+}
+
+.vfx-inspector-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: var(--mod-space-2xs) var(--mod-space-xs);
+  font: inherit;
+  font-size: var(--mod-text-sm);
+  font-weight: var(--mod-font-weight-semibold);
+  color: inherit;
+  background: var(--mod-color-bg);
+  border: 1px solid var(--mod-color-border);
+  border-radius: var(--mod-radius-sm);
+}
+
+.vfx-section {
+  padding-top: var(--mod-space-sm);
+  margin-top: var(--mod-space-sm);
+  border-top: 1px solid var(--mod-color-border);
+}
+
+.vfx-section:first-of-type {
+  padding-top: 0;
+  margin-top: 0;
+  border-top: none;
+}
+
+.vfx-section h4 {
+  margin: 0 0 var(--mod-space-xs);
+  font-size: var(--mod-text-xs);
+  font-weight: var(--mod-font-weight-semibold);
+  color: var(--mod-color-text-muted);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.vfx-section-body {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--mod-space-xs) var(--mod-space-sm);
+}
+
+/* Wide things take the whole row; numbers pair up. */
+.vfx-section-body > .vfx-asset-field,
+.vfx-section-body > .vfx-keys,
+.vfx-section-body > .vfx-muted,
+.vfx-section-body > .vfx-field:has(select, .vfx-field-inline) {
+  grid-column: 1 / -1;
+}
+
+.vfx-section-body-3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+/* ── Fields ──────────────────────────────────────────────────────────────── */
+
+.vfx-field {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--mod-space-2xs);
+  font-size: var(--mod-text-xs);
+  color: var(--mod-color-text-muted);
+}
+
+.vfx-field input,
+.vfx-field select {
+  min-width: 0;
+  padding: var(--mod-space-2xs) var(--mod-space-xs);
+  font: inherit;
+  font-size: var(--mod-text-sm);
+  color: var(--mod-color-text);
+  background: var(--mod-color-surface);
+  border: 1px solid var(--mod-color-border);
+  border-radius: var(--mod-radius-sm);
+}
+
+.vfx-field > input,
+.vfx-field > select {
+  width: 100%;
+}
+
+.vfx-field input:focus,
+.vfx-field select:focus,
+.vfx-key-row input:focus,
+.vfx-length-input:focus,
+.vfx-inspector-name:focus {
+  border-color: var(--mod-color-primary);
+  outline: none;
+}
+
+.vfx-field input[type='color'] {
+  width: 100%;
+  height: 1.75rem;
+  padding: 0 2px;
+  cursor: pointer;
+}
+
+.vfx-field-inline {
+  display: flex;
+  align-items: center;
+  gap: var(--mod-space-2xs);
+}
+
+.vfx-field-inline > input {
+  flex: 1 1 auto;
+}
+
+.vfx-asset-field
+  .vfx-text-button:not(.p-button):not(.p-component):not(.p-link) {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.vfx-muted {
+  margin: 0;
+  font-size: var(--mod-text-xs);
+  color: var(--mod-color-text-muted);
+}
+
+/* ── Keyframes ───────────────────────────────────────────────────────────── */
+
+.vfx-keys {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mod-space-2xs);
+}
+
+.vfx-key-row {
+  display: flex;
+  align-items: center;
+  gap: var(--mod-space-2xs);
+}
+
+.vfx-key-row input {
+  flex: 1 1 0;
+  width: 0;
+  min-width: 0;
+  padding: var(--mod-space-2xs) var(--mod-space-xs);
+  font: inherit;
+  font-size: var(--mod-text-sm);
+  color: var(--mod-color-text);
+  background: var(--mod-color-surface);
+  border: 1px solid var(--mod-color-border);
+  border-radius: var(--mod-radius-sm);
+}
+
+/* ── Asset picker ────────────────────────────────────────────────────────── */
+
+.vfx-picker {
+  margin-top: var(--mod-space-xs);
+  overflow: hidden;
+  background: var(--mod-color-surface-raised);
+  border: 1px solid var(--mod-color-border);
+  border-radius: var(--mod-radius-md);
+}
+
+.vfx-picker-header {
+  display: flex;
+  align-items: center;
+  gap: var(--mod-space-xs);
+  padding: var(--mod-space-xs);
+  border-bottom: 1px solid var(--mod-color-border);
+}
+
+.vfx-picker-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mod-space-2xs);
+  max-height: 16rem;
+  margin: 0;
+  padding: var(--mod-space-2xs);
+  overflow-y: auto;
+  list-style: none;
+}
+
+.vfx-picker-item:not(.p-button):not(.p-component):not(.p-link) {
+  display: flex;
+  align-items: center;
+  gap: var(--mod-space-xs);
+  width: 100%;
+  padding: var(--mod-space-2xs) var(--mod-space-xs);
+  font-size: var(--mod-text-sm);
+  color: var(--mod-color-text);
+  text-align: left;
+  background: transparent;
+  border: none;
+  border-radius: var(--mod-radius-sm);
+  cursor: pointer;
+}
+
+.vfx-picker-item:not(.p-button):not(.p-component):not(.p-link):hover {
+  background: var(--mod-color-surface-hover);
+}
+
+.vfx-picker-item:not(.p-button):not(.p-component):not(.p-link) img {
+  width: 2rem;
+  height: 2rem;
+  object-fit: cover;
+  border-radius: var(--mod-radius-sm);
+}
+
+.vfx-picker-empty {
+  padding: var(--mod-space-xs);
+  font-size: var(--mod-text-xs);
+  color: var(--mod-color-text-muted);
+}
+
+/* ── Save state ──────────────────────────────────────────────────────────── */
+
+.vfx-save-state {
+  font-size: var(--mod-text-xs);
+  color: var(--mod-color-text-muted);
+  white-space: nowrap;
+}
+
+.vfx-save-state.has-problems {
+  color: var(--mod-color-danger);
+}
+
+/* ── Timeline ────────────────────────────────────────────────────────────── */
+
+.vfx-timeline {
+  flex: 0 0 30%;
+  min-height: 9rem;
+  padding: 0 var(--mod-space-sm) var(--mod-space-sm);
+  overflow: auto;
+  background: var(--mod-color-surface);
+  border-top: 1px solid var(--mod-color-border);
+}
+
+.vfx-timeline-row {
+  display: flex;
+  align-items: center;
+  gap: var(--mod-space-xs);
+  min-height: 2rem;
+}
+
+.vfx-timeline-tracks {
+  position: relative;
+  padding-top: var(--mod-space-2xs);
+}
+
+/* Spans every track; lines up with the lanes (label column + gap). */
+.vfx-timeline-playhead-rail {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: calc(10rem + var(--mod-space-xs));
+  z-index: var(--mod-z-base);
+  pointer-events: none;
+}
+
+.vfx-timeline-ruler-row {
+  position: sticky;
+  top: 0;
+  z-index: var(--mod-z-base);
+  padding-top: var(--mod-space-xs);
+  background: var(--mod-color-surface);
+}
+
+.vfx-timeline-label:not(.p-button):not(.p-component):not(.p-link) {
+  display: inline-flex;
+  flex: 0 0 10rem;
+  gap: var(--mod-space-xs);
+  align-items: center;
+  width: 10rem;
+  padding: 0 var(--mod-space-xs);
+  align-self: stretch;
+  border-radius: var(--mod-radius-sm);
+  overflow: hidden;
+  font-size: var(--mod-text-xs);
+  color: var(--mod-color-text);
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+  background: transparent;
+  border: none;
+}
+
+.vfx-timeline-label span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.vfx-timeline-label:not(.p-button):not(.p-component):not(.p-link):hover {
+  background: var(--mod-color-surface-hover);
+}
+
+.vfx-timeline-time {
+  font-variant-numeric: tabular-nums;
+  color: var(--mod-color-text-muted);
+  cursor: default;
+}
+
+.vfx-timeline-time:hover {
+  background: transparent;
+}
+
+.vfx-timeline-row.is-selected
+  .vfx-timeline-label:not(.p-button):not(.p-component):not(.p-link) {
+  font-weight: var(--mod-font-weight-semibold);
+  background: var(--mod-color-info-bg);
+  box-shadow: inset 2px 0 0 var(--mod-color-primary);
+}
+
+.vfx-timeline-ruler {
+  position: relative;
+  flex: 1 1 auto;
+  height: 1.75rem;
+  cursor: crosshair;
+  border-bottom: 1px solid var(--mod-color-border);
+}
+
+.vfx-timeline-tick {
+  position: absolute;
+  top: 0;
+  font-size: var(--mod-text-xs);
+  color: var(--mod-color-text-muted);
+  user-select: none;
+  transform: translateX(-50%);
+}
+
+.vfx-timeline-empty {
+  margin: var(--mod-space-xs) 0 0;
+  font-size: var(--mod-text-xs);
+  color: var(--mod-color-text-muted);
+}
+
+.vfx-timeline-lane {
+  position: relative;
+  flex: 1 1 auto;
+  height: 1.5rem;
+  background: var(--mod-color-bg);
+  border-radius: var(--mod-radius-sm);
+}
+
+.vfx-timeline-row.is-selected .vfx-timeline-lane {
+  box-shadow: inset 0 0 0 1px var(--mod-color-primary);
+}
+
+.vfx-timeline-row.is-selected .vfx-timeline-bar {
+  opacity: 1;
+}
+
+.vfx-timeline-bar {
+  --vfx-accent: var(--mod-color-primary);
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  overflow: hidden;
+  cursor: grab;
+  background: var(--vfx-accent);
+  border-radius: var(--mod-radius-sm);
+  opacity: 0.85;
+}
+
+.vfx-timeline-bar.is-playing {
+  opacity: 1;
+  box-shadow: 0 0 0 1px var(--mod-color-surface);
+}
+
+.vfx-timeline-bar-handle {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 0.5rem;
+  cursor: ew-resize;
+  background: var(--mod-color-text-inverse);
+  opacity: 0;
+  transition: opacity var(--mod-transition-fast);
+}
+
+.vfx-timeline-bar:hover .vfx-timeline-bar-handle,
+.vfx-timeline-bar-handle:hover {
+  opacity: 0.55;
+}
+
+/* No token exists for the particle accent, so it stays literal here. */
+.vfx-timeline-bar-particles {
+  --vfx-accent: #f97316;
+}
+
+.vfx-timeline-bar-mesh {
+  --vfx-accent: var(--mod-color-info);
+}
+
+.vfx-timeline-bar-light {
+  --vfx-accent: var(--mod-color-warning);
+}
+
+.vfx-timeline-bar-sound {
+  --vfx-accent: var(--mod-color-success);
+}
+
+.vfx-timeline-playhead {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: var(--mod-z-base);
+  width: 2px;
+  pointer-events: none;
+  background: var(--mod-color-danger);
+  transform: translateX(-1px);
+}
+
+.vfx-timeline-key {
+  position: absolute;
+  top: 50%;
+  width: 0.375rem;
+  height: 0.375rem;
+  margin-left: -0.1875rem;
+  background: var(--mod-color-text-inverse);
+  border-radius: var(--mod-radius-pill);
+  box-shadow: 0 0 0 1px var(--mod-color-border-strong);
+  transform: translateY(-50%);
+}

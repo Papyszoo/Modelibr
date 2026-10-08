@@ -58,6 +58,10 @@ const getTabIcon = (tabType: Tab['type']): string => {
       return 'pi pi-box'
     case 'sceneEditor':
       return 'pi pi-box'
+    case 'vfxList':
+      return 'pi pi-sparkles'
+    case 'vfxEditor':
+      return 'pi pi-sparkles'
     default:
       return 'pi pi-file'
   }
@@ -115,6 +119,10 @@ const getTabTooltip = (tab: Tab): string => {
       return 'Scenes'
     case 'sceneEditor':
       return `Scene: ${tab.label || tab.sceneId || 'Unknown'}`
+    case 'vfxList':
+      return 'VFX'
+    case 'vfxEditor':
+      return `Effect: ${tab.label || tab.params.vfxId || 'Unknown'}`
     default:
       return tab.label || 'Unknown Tab'
   }

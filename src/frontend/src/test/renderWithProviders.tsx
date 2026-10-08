@@ -46,6 +46,7 @@ interface ProvidersOptions extends Omit<RenderOptions, 'wrapper'> {
   tabId?: string
   /** Records what the component asked the tab system to do. */
   onOpenSceneEditorTab?: (sceneId: string, name?: string) => void
+  onOpenVfxEditorTab?: (vfxId: string, name?: string) => void
 }
 
 export function renderWithProviders(
@@ -54,6 +55,7 @@ export function renderWithProviders(
     queryClient = createTestQueryClient(),
     tabId,
     onOpenSceneEditorTab,
+    onOpenVfxEditorTab,
     ...options
   }: ProvidersOptions = {}
 ) {
@@ -66,7 +68,11 @@ export function renderWithProviders(
     }
     return (
       <TabContext.Provider
-        value={createTestTabContext(tabId, onOpenSceneEditorTab)}
+        value={createTestTabContext(
+          tabId,
+          onOpenSceneEditorTab,
+          onOpenVfxEditorTab
+        )}
       >
         {inner}
       </TabContext.Provider>
@@ -87,7 +93,8 @@ export function renderWithProviders(
 export function createTestTabContext(
   tabId: string,
   onOpenSceneEditorTab: (sceneId: string, name?: string) => void = () =>
-    undefined
+    undefined,
+  onOpenVfxEditorTab: (vfxId: string, name?: string) => void = () => undefined
 ): TabContextValue {
   const noop = (): void => undefined
   return {
@@ -103,6 +110,7 @@ export function createTestTabContext(
     openProjectDetailsTab: noop,
     openScriptDetailsTab: noop,
     openSceneEditorTab: onOpenSceneEditorTab,
+    openVfxEditorTab: onOpenVfxEditorTab,
     openScenesList: noop,
     relabelTab: noop,
     openTab: noop,

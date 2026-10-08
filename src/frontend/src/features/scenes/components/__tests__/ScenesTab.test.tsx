@@ -124,6 +124,7 @@ function Harness({ initialSceneId }: { initialSceneId?: string }): JSX.Element {
     openTab: () => undefined,
     openScenesList: jest.fn(),
     relabelTab: jest.fn(),
+    openVfxEditorTab: () => undefined,
     openSceneEditorTab: (sceneId, name) => {
       const existing = tabs.find(
         tab => tab.type === 'sceneEditor' && tab.sceneId === sceneId

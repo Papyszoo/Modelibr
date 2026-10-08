@@ -26,6 +26,7 @@ export interface TabContextValue {
   openProjectDetailsTab: (projectId: string) => void
   openScriptDetailsTab: (scriptId: string, name?: string) => void
   openSceneEditorTab: (sceneId: string, name?: string) => void
+  openVfxEditorTab: (vfxId: string, name?: string) => void
   /**
    * Focuses the Scenes list tab, opening it if this window has none.
    *

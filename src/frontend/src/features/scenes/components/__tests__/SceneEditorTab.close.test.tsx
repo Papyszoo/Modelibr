@@ -85,6 +85,7 @@ function Harness({
     openProjectDetailsTab: () => undefined,
     openScriptDetailsTab: () => undefined,
     openSceneEditorTab: () => undefined,
+    openVfxEditorTab: () => undefined,
     openScenesList: jest.fn(),
     relabelTab: relabel,
     openTab: () => undefined,

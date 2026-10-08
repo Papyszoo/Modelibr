@@ -99,6 +99,16 @@ const SceneEditorTab = lazy(() =>
     default: module.SceneEditorTab,
   }))
 )
+const VfxList = lazy(() =>
+  import('@/features/vfx').then(module => ({
+    default: module.VfxList,
+  }))
+)
+const VfxEditor = lazy(() =>
+  import('@/features/vfx').then(module => ({
+    default: module.VfxEditor,
+  }))
+)
 const RecycledFilesList = lazy(() =>
   import('@/features/recycled-files').then(module => ({
     default: module.RecycledFilesList,
@@ -247,6 +257,12 @@ export function TabContent({ tab }: TabContentProps): JSX.Element {
 
       case 'sceneEditor':
         return <SceneEditorTab sceneId={tab.sceneId} />
+
+      case 'vfxList':
+        return <VfxList />
+
+      case 'vfxEditor':
+        return <VfxEditor vfxId={Number(tab.params.vfxId)} />
 
       case 'assetStore':
         return <AssetStorePage />
