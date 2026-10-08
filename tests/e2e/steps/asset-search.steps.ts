@@ -240,11 +240,11 @@ Given(
         for (const label of ["a", "b", "c"]) {
             await uploadModel(
                 page,
-                `${commonToken} decoy ${label}.glb`,
+                `${commonToken} item ${label}.glb`,
                 "test-cube.glb",
             );
         }
-        await uploadModel(page, `${rareToken} marker.stl`, "test-cube.stl");
+        await uploadModel(page, `${rareToken} item.stl`, "test-cube.stl");
         getScenarioState(page).setCustom(RANK_KEY, {
             commonToken,
             rareToken,
@@ -693,7 +693,10 @@ When(
         const result = await (await mcp(page)).callTool("search_many", {
             searches: [
                 { query: value, label: "match" },
-                { query: `empty${value}`, label: "empty" },
+                // A random token of its own, not the model's own token inside a
+                // longer word: "empty<token>" fuzzy-matches the model it contains
+                // and made the expected-empty search return it intermittently.
+                { query: `nomatch${token()}`, label: "empty" },
             ],
         });
         getScenarioState(page).setCustom(LAST_RESULT_KEY, result);
