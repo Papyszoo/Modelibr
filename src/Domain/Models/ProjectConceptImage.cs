@@ -13,7 +13,7 @@ public class ProjectConceptImage
 
     public Project Project { get; private set; } = null!;
     public File File { get; private set; } = null!;
-    public ICollection<ProductionNote> Notes { get; } = new List<ProductionNote>();
+    public ICollection<ProjectComment> Comments { get; } = new List<ProjectComment>();
 
     public ICollection<ProjectReferenceLink> Links
     {

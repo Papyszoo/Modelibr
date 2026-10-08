@@ -16,6 +16,8 @@ namespace Domain.Models;
 /// </summary>
 public class Vfx : AggregateRoot
 {
+    private readonly List<Project> _projects = new();
+
     public int Id { get; private set; }
     public string Name { get; private set; } = string.Empty;
     public string? Description { get; private set; }
@@ -25,6 +27,18 @@ public class Vfx : AggregateRoot
 
     public DateTime CreatedAt { get; private set; }
     public DateTime UpdatedAt { get; private set; }
+
+    // Navigation property for many-to-many relationship with Projects - EF Core requires this to be settable
+    public ICollection<Project> Projects
+    {
+        get => _projects;
+        set
+        {
+            _projects.Clear();
+            if (value != null)
+                _projects.AddRange(value);
+        }
+    }
 
     public static Vfx Create(string name, string? description, string definitionJson, DateTime now)
     {

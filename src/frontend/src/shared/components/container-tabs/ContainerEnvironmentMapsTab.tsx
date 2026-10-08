@@ -174,6 +174,11 @@ export function ContainerEnvironmentMapsTab({
                 <AssetTile
                   key={environmentMap.id}
                   name={environmentMap.name}
+                  accessory={adapter.renderAssetAccessory?.({
+                    type: 'environmentMap',
+                    id: environmentMap.id,
+                    name: environmentMap.name,
+                  })}
                   meta={`${environmentMap.variantCount} variant${environmentMap.variantCount === 1 ? '' : 's'}`}
                   variant="wide"
                   media={

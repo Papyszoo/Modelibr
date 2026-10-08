@@ -97,7 +97,7 @@ describe('ProjectReferenceBoard', () => {
     queries.useProjectCharactersQuery.mockReturnValue(
       query([{ id: 4, name: 'Ashen Warden' }]) as never
     )
-    queries.useProductionNotesQuery.mockReturnValue(
+    queries.useProjectCommentsQuery.mockReturnValue(
       query([
         {
           id: 5,
@@ -105,9 +105,17 @@ describe('ProjectReferenceBoard', () => {
           levelId: null,
           referenceImageId: 9,
           characterId: null,
+          modelId: null,
+          textureSetId: null,
+          spriteId: null,
+          soundId: null,
+          environmentMapId: null,
+          vfxId: null,
           title: 'Fog',
           body: 'Keep the horizon soft.',
           isPinned: false,
+          status: 'open',
+          resolution: null,
           createdAt: '2026-09-25T00:00:00Z',
           updatedAt: '2026-09-25T00:00:00Z',
         },
@@ -124,7 +132,7 @@ describe('ProjectReferenceBoard', () => {
     api.removeProjectReferenceLink.mockResolvedValue(undefined)
   })
 
-  it('shows every image with its level and character links and its notes', () => {
+  it('shows every image with its level and character links and its comments', () => {
     renderBoard()
 
     expect(screen.getByText('Reference Board')).toBeVisible()
@@ -156,23 +164,24 @@ describe('ProjectReferenceBoard', () => {
     expect(api.removeProjectReferenceLink).toHaveBeenCalledWith(7, 9, 31)
   })
 
-  it('adds a note that targets the image', async () => {
+  it('adds a comment that targets the image', async () => {
+    api.createProjectComment.mockResolvedValue({ id: 6 } as never)
     renderBoard()
 
     await userEvent.click(
-      screen.getByRole('button', { name: 'Add note to forest.png' })
+      screen.getByRole('button', { name: 'Add comment to Misty forest' })
     )
     await userEvent.type(
-      screen.getByLabelText('Note title for forest.png'),
+      screen.getByLabelText('Comment title for Misty forest'),
       'Silhouettes'
     )
     await userEvent.type(
-      screen.getByLabelText('Note body for forest.png'),
+      screen.getByLabelText('Comment for Misty forest'),
       'Read the trees at a glance.'
     )
-    await userEvent.click(screen.getByRole('button', { name: 'Save note' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Add comment' }))
 
-    expect(api.createProductionNote).toHaveBeenCalledWith(7, {
+    expect(api.createProjectComment).toHaveBeenCalledWith(7, {
       referenceImageId: 9,
       title: 'Silhouettes',
       body: 'Read the trees at a glance.',
@@ -180,24 +189,20 @@ describe('ProjectReferenceBoard', () => {
     })
   })
 
-  it('edits the note under a reference image in place', async () => {
-    api.updateProductionNote.mockResolvedValue({ id: 5 } as never)
+  it('edits the comment under a reference image in place', async () => {
+    api.updateProjectComment.mockResolvedValue({ id: 5 } as never)
     renderBoard()
 
-    await userEvent.click(screen.getByRole('button', { name: 'Edit note Fog' }))
-    const body = screen.getByLabelText('Edit note body')
+    await userEvent.click(screen.getByRole('button', { name: 'Edit Fog' }))
+    const body = screen.getByLabelText('Edit comment')
     expect(body).toHaveValue('Keep the horizon soft.')
     await userEvent.clear(body)
     await userEvent.type(body, 'Keep the horizon unreadable.')
-    await userEvent.click(
-      screen.getByRole('button', { name: 'Save note changes' })
-    )
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
 
     await waitFor(() =>
-      expect(api.updateProductionNote).toHaveBeenCalledWith(7, 5, {
-        levelId: null,
+      expect(api.updateProjectComment).toHaveBeenCalledWith(7, 5, {
         referenceImageId: 9,
-        characterId: null,
         title: 'Fog',
         body: 'Keep the horizon unreadable.',
         isPinned: false,

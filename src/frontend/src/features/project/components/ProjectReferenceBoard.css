@@ -8,8 +8,7 @@
 
 .project-reference-header,
 .project-reference-header-actions,
-.project-reference-link-head,
-.project-reference-note-actions {
+.project-reference-link-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -168,37 +167,7 @@
   font-size: var(--mod-text-xs);
 }
 
-.project-reference-notes {
-  display: flex;
-  flex-direction: column;
-  gap: var(--mod-space-2xs);
-  padding-top: var(--mod-space-2xs);
+.project-reference-comments {
+  padding-top: var(--mod-space-xs);
   border-top: 1px solid var(--surface-border);
-}
-
-.project-reference-note {
-  font-size: var(--mod-text-sm);
-}
-
-.project-reference-note p {
-  margin: var(--mod-space-2xs) 0 0;
-  color: var(--text-color-secondary);
-}
-
-.project-reference-note-form {
-  display: flex;
-  flex-direction: column;
-  gap: var(--mod-space-2xs);
-}
-
-.project-reference-note-form textarea {
-  width: 100%;
-  padding: var(--mod-space-2xs);
-  border: 1px solid var(--surface-border);
-  border-radius: var(--mod-radius-sm);
-  background: var(--surface-ground);
-  color: var(--text-color);
-  font-family: inherit;
-  font-size: var(--mod-text-sm);
-  resize: vertical;
 }

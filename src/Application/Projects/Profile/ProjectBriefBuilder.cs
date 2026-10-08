@@ -53,6 +53,7 @@ public static class ProjectBriefBuilder
             project.Sounds.Count,
             project.Scripts.Count,
             project.EnvironmentMaps.Count,
+            project.Vfx.Count,
             project.Scenes.Count);
 
         return new ProjectBriefDto(
@@ -82,6 +83,10 @@ public static class ProjectBriefBuilder
                 .ToList(),
             project.EnvironmentMaps
                 .Select(e => new ProjectEnvironmentMapBriefDto(e.Id, e.Name))
+                .ToList(),
+            project.Vfx
+                .OrderBy(v => v.Name)
+                .Select(v => new ProjectVfxBriefDto(v.Id, v.Name))
                 .ToList(),
             project.Scenes
                 .OrderByDescending(s => s.UpdatedAt)

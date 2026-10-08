@@ -13,10 +13,8 @@ import {
   addCharacterVariant,
   addProjectCharacterImage,
   addProjectCharacterModel,
-  createProductionNote,
   createProjectCharacter,
   deleteProjectCharacter,
-  type ProductionNoteDto,
   type ProjectCharacterDto,
   removeCharacterAbility,
   removeCharacterVariant,
@@ -24,13 +22,11 @@ import {
   removeProjectCharacterModel,
   updateCharacterAbility,
   updateCharacterVariant,
-  updateProductionNote,
   updateProjectCharacter,
   updateProjectCharacterImage,
   updateProjectCharacterModel,
 } from '@/features/project/api/projectStudioApi'
 import {
-  useProductionNotesQuery,
   useProjectCharactersQuery,
   useProjectLevelsQuery,
   useProjectMemberModelsQuery,
@@ -48,7 +44,8 @@ import {
   CharacterMedia,
   CharacterVariants,
 } from './CharacterChildSections'
-import { ProductionNoteItem } from './ProductionNoteItem'
+import { ProjectCommentsBadge } from './ProjectCommentsBadge'
+import { ProjectCommentThread } from './ProjectCommentThread'
 
 interface ProjectCharactersSectionProps {
   projectId: number
@@ -57,7 +54,7 @@ interface ProjectCharactersSectionProps {
 
 type CharacterSection =
   | 'identity'
-  | 'notes'
+  | 'comments'
   | 'media'
   | 'abilities'
   | 'variants'
@@ -69,7 +66,6 @@ export function ProjectCharactersSection({
   const queryClient = useQueryClient()
   const charactersQuery = useProjectCharactersQuery(projectId)
   const levelsQuery = useProjectLevelsQuery(projectId)
-  const notesQuery = useProductionNotesQuery(projectId)
   const modelsQuery = useProjectMemberModelsQuery(projectId)
   const [showCreate, setShowCreate] = useState(false)
   const [expandedId, setExpandedId] = useState<number | null>(null)
@@ -78,9 +74,6 @@ export function ProjectCharactersSection({
     await Promise.all([
       queryClient.invalidateQueries({
         queryKey: ['projects', projectId, 'characters'],
-      }),
-      queryClient.invalidateQueries({
-        queryKey: ['projects', projectId, 'production-notes'],
       }),
       onChanged?.(),
     ])
@@ -121,37 +114,6 @@ export function ProjectCharactersSection({
       setExpandedId(null)
       await invalidate()
     },
-  })
-
-  const createNote = useMutation({
-    mutationFn: (input: { characterId: number; title: string; body: string }) =>
-      createProductionNote(projectId, {
-        characterId: input.characterId,
-        title: input.title,
-        body: input.body,
-        isPinned: false,
-      }),
-    onSuccess: invalidate,
-  })
-
-  const updateNote = useMutation({
-    mutationFn: (input: {
-      note: ProductionNoteDto
-      title: string
-      body: string
-      isPinned: boolean
-    }) =>
-      updateProductionNote(projectId, input.note.id, {
-        // The update route replaces the whole note, so the character it belongs
-        // to has to be resent with the new text.
-        levelId: input.note.levelId,
-        referenceImageId: input.note.referenceImageId,
-        characterId: input.note.characterId,
-        title: input.title,
-        body: input.body,
-        isPinned: input.isPinned,
-      }),
-    onSuccess: invalidate,
   })
 
   const addImage = useMutation({
@@ -280,8 +242,7 @@ export function ProjectCharactersSection({
     onSuccess: invalidate,
   })
 
-  const queryError =
-    charactersQuery.error ?? levelsQuery.error ?? notesQuery.error
+  const queryError = charactersQuery.error ?? levelsQuery.error
   if (queryError) {
     return (
       <ErrorState
@@ -292,22 +253,17 @@ export function ProjectCharactersSection({
             : 'The character request failed.'
         }
         onRetry={() => {
-          void Promise.all([
-            charactersQuery.refetch(),
-            levelsQuery.refetch(),
-            notesQuery.refetch(),
-          ])
+          void Promise.all([charactersQuery.refetch(), levelsQuery.refetch()])
         }}
       />
     )
   }
-  if (charactersQuery.isLoading || notesQuery.isLoading) {
+  if (charactersQuery.isLoading) {
     return <LoadingState message="Loading characters…" />
   }
 
   const characters = charactersQuery.data ?? []
   const levels = levelsQuery.data ?? []
-  const notes = notesQuery.data ?? []
   const models = modelsQuery.data ?? []
 
   return (
@@ -398,7 +354,7 @@ export function ProjectCharactersSection({
               <CharacterCard
                 key={character.id}
                 character={character}
-                notes={notes.filter(note => note.characterId === character.id)}
+                projectId={projectId}
                 levels={levels}
                 models={models}
                 childEditor={childEditor}
@@ -411,16 +367,10 @@ export function ProjectCharactersSection({
                 onUpdate={values =>
                   updateCharacter.mutate({ id: character.id, ...values })
                 }
-                onAddNote={values =>
-                  createNote.mutate({ characterId: character.id, ...values })
-                }
-                onUpdateNote={(note, values) =>
-                  updateNote.mutate({ note, ...values })
-                }
                 onDelete={() => {
                   confirmDialog({
                     header: 'Delete character',
-                    message: `Delete ${character.name} and its production notes, abilities, and variants? Linked files and models stay in the library.`,
+                    message: `Delete ${character.name} and its abilities and variants? Its comments move to the project, and linked files and models stay in the library.`,
                     icon: 'pi pi-exclamation-triangle',
                     acceptLabel: 'Delete',
                     rejectLabel: 'Cancel',
@@ -439,19 +389,17 @@ export function ProjectCharactersSection({
 
 function CharacterCard({
   character,
-  notes,
+  projectId,
   levels,
   models,
   childEditor,
   expanded,
   onToggle,
   onUpdate,
-  onAddNote,
-  onUpdateNote,
   onDelete,
 }: {
   character: ProjectCharacterDto
-  notes: ProductionNoteDto[]
+  projectId: number
   levels: Array<{ id: number; name: string }>
   models: Array<{ id: string; name: string }>
   childEditor: CharacterChildEditor
@@ -462,11 +410,6 @@ function CharacterCard({
     description: string
     tags: string[]
   }) => void
-  onAddNote: (values: { title: string; body: string }) => void
-  onUpdateNote: (
-    note: ProductionNoteDto,
-    values: { title: string; body: string; isPinned: boolean }
-  ) => void
   onDelete: () => void
 }) {
   const isEnemy = character.tags.some(tag => tag.toLowerCase() === 'enemy')
@@ -497,16 +440,24 @@ function CharacterCard({
             )}
           </div>
         </div>
-        <Button
-          icon={expanded ? 'pi pi-chevron-up' : 'pi pi-chevron-down'}
-          text
-          rounded
-          aria-label={
-            expanded ? `Close ${character.name}` : `Edit ${character.name}`
-          }
-          title={expanded ? 'Close character' : 'Edit character'}
-          onClick={onToggle}
-        />
+        <div className="project-character-card-actions">
+          <ProjectCommentsBadge
+            projectId={projectId}
+            target={{ kind: 'characterId', id: character.id }}
+            targetName={character.name}
+            variant="inline"
+          />
+          <Button
+            icon={expanded ? 'pi pi-chevron-up' : 'pi pi-chevron-down'}
+            text
+            rounded
+            aria-label={
+              expanded ? `Close ${character.name}` : `Edit ${character.name}`
+            }
+            title={expanded ? 'Close character' : 'Edit character'}
+            onClick={onToggle}
+          />
+        </div>
       </div>
       {character.description ? (
         <p className="project-character-description">{character.description}</p>
@@ -524,7 +475,7 @@ function CharacterCard({
               {(
                 [
                   ['identity', 'Identity'],
-                  ['notes', isEnemy ? 'Enemy notes' : 'Notes'],
+                  ['comments', 'Comments'],
                   ['media', 'Media'],
                   ['abilities', 'Abilities'],
                   ['variants', 'Variants'],
@@ -568,14 +519,22 @@ function CharacterCard({
               onSubmit={onUpdate}
             />
           ) : null}
-          {section === 'notes' ? (
-            <CharacterNotes
-              character={character}
-              notes={notes}
-              isEnemy={isEnemy}
-              onAdd={onAddNote}
-              onUpdateNote={onUpdateNote}
-            />
+          {section === 'comments' ? (
+            <div className="project-character-editor-section">
+              <ProjectCommentThread
+                projectId={projectId}
+                target={{ kind: 'characterId', id: character.id }}
+                targetName={character.name}
+                heading={isEnemy ? 'Enemy weaknesses and comments' : 'Comments'}
+                itemTestId="project-character-comment"
+                titlePlaceholder={isEnemy ? 'Weakness' : 'Comment title'}
+                bodyPlaceholder={
+                  isEnemy
+                    ? 'What should the player know?'
+                    : 'What should change, or what was decided?'
+                }
+              />
+            </div>
           ) : null}
           {section === 'media' ? (
             <CharacterMedia
@@ -680,87 +639,5 @@ function CharacterForm({
         />
       </div>
     </form>
-  )
-}
-
-function CharacterNotes({
-  character,
-  notes,
-  isEnemy,
-  onAdd,
-  onUpdateNote,
-}: {
-  character: ProjectCharacterDto
-  notes: ProductionNoteDto[]
-  isEnemy: boolean
-  onAdd: (values: { title: string; body: string }) => void
-  onUpdateNote: (
-    note: ProductionNoteDto,
-    values: { title: string; body: string; isPinned: boolean }
-  ) => void
-}) {
-  const [title, setTitle] = useState('')
-  const [body, setBody] = useState('')
-  const [showAdd, setShowAdd] = useState(false)
-
-  return (
-    <div className="project-character-editor-section">
-      <div className="project-character-section-header">
-        <h5>{isEnemy ? 'Enemy notes and weaknesses' : 'Character notes'}</h5>
-        <Button
-          icon="pi pi-plus"
-          text
-          rounded
-          aria-label={`Add note to ${character.name}`}
-          title="Add note"
-          onClick={() => setShowAdd(current => !current)}
-        />
-      </div>
-      {notes.map(note => (
-        <ProductionNoteItem
-          key={note.id}
-          note={note}
-          testId="project-character-note"
-          className="project-character-note"
-          onSave={values => onUpdateNote(note, values)}
-        />
-      ))}
-      {showAdd ? (
-        <form
-          className="project-character-form"
-          onSubmit={event => {
-            event.preventDefault()
-            if (title.trim() && body.trim()) {
-              onAdd({ title: title.trim(), body: body.trim() })
-              setTitle('')
-              setBody('')
-              setShowAdd(false)
-            }
-          }}
-        >
-          <InputText
-            aria-label={`Note title for ${character.name}`}
-            value={title}
-            onChange={event => setTitle(event.target.value)}
-            placeholder={isEnemy ? 'Weakness' : 'Note title'}
-          />
-          <InputTextarea
-            aria-label={`Note body for ${character.name}`}
-            value={body}
-            onChange={event => setBody(event.target.value)}
-            rows={2}
-            placeholder={
-              isEnemy ? 'What should the player know?' : 'Production context'
-            }
-          />
-          <Button
-            type="submit"
-            label="Save note"
-            aria-label="Save note"
-            disabled={!title.trim() || !body.trim()}
-          />
-        </form>
-      ) : null}
-    </div>
   )
 }

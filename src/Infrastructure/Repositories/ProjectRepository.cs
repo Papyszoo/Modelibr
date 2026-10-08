@@ -30,9 +30,15 @@ internal sealed class ProjectRepository : IProjectRepository
             .Include(p => p.Sounds)
             .Include(p => p.Scripts)
             .Include(p => p.EnvironmentMaps)
+            .Include(p => p.Vfx)
             .Include(p => p.CustomThumbnailFile)
             .Include(p => p.ConceptImages)
                 .ThenInclude(ci => ci.File)
+            // The summary reads each project's styles and platforms from its
+            // profile values; without the option the names resolve to nothing
+            // and every summary reported an empty profile.
+            .Include(p => p.ProfileValues)
+                .ThenInclude(v => v.Option)
             .AsSplitQuery()
             .ToListAsync(cancellationToken);
     }
@@ -46,6 +52,7 @@ internal sealed class ProjectRepository : IProjectRepository
             .Include(p => p.Sounds)
             .Include(p => p.Scripts)
             .Include(p => p.EnvironmentMaps)
+            .Include(p => p.Vfx)
             .Include(p => p.CustomThumbnailFile)
             .Include(p => p.ConceptImages)
                 .ThenInclude(ci => ci.File)
@@ -65,6 +72,7 @@ internal sealed class ProjectRepository : IProjectRepository
             .Include(p => p.Sounds)
             .Include(p => p.Scripts)
             .Include(p => p.EnvironmentMaps)
+            .Include(p => p.Vfx)
             .Include(p => p.CustomThumbnailFile)
             .Include(p => p.ConceptImages)
                 .ThenInclude(ci => ci.File)

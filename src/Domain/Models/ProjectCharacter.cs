@@ -74,7 +74,7 @@ public class ProjectCharacter : AggregateRoot
         }
     }
 
-    public ICollection<ProductionNote> Notes { get; } = new List<ProductionNote>();
+    public ICollection<ProjectComment> Comments { get; } = new List<ProjectComment>();
 
     /// <summary>Project reference images linked to this character.</summary>
     public ICollection<ProjectReferenceLink> ReferenceLinks

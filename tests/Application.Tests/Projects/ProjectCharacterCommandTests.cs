@@ -2,6 +2,7 @@ using Application.Abstractions;
 using Application.Abstractions.Repositories;
 using Application.Projects;
 using Domain.Models;
+using Domain.Projects;
 using Domain.Services;
 using Application.Tests;
 using Domain.ValueObjects;
@@ -264,58 +265,52 @@ public class ProjectCharacterCommandTests
     }
 
     [Fact]
-    public async Task CreateProductionNote_WhenCharacterIsNotInRouteProject_RefusesTheTarget()
+    public async Task CreateProjectComment_WhenCharacterIsNotInRouteProject_RefusesTheTarget()
     {
         var projects = new Mock<IProjectRepository>();
         projects.Setup(r => r.GetByIdAsync(1, It.IsAny<CancellationToken>()))
             .ReturnsAsync(Project.Create("Nightfall", null, Now));
-        var characters = new Mock<IProjectCharacterRepository>();
-        characters.Setup(r => r.GetByIdAsync(1, 7, It.IsAny<CancellationToken>()))
-            .ReturnsAsync((ProjectCharacter?)null);
-        var handler = new CreateProductionNoteCommandHandler(
+        var comments = new Mock<IProjectCommentRepository>();
+        comments.Setup(r => r.TargetExistsAsync(1, It.Is<ProjectCommentTarget>(t => t.CharacterId == 7 && t.Count == 1), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(false);
+        var handler = new CreateProjectCommentCommandHandler(
             projects.Object,
-            new Mock<IProjectLevelRepository>().Object,
-            new Mock<IProjectReferenceRepository>().Object,
-            characters.Object,
-            new Mock<IProductionNoteRepository>().Object,
+            comments.Object,
             Clock(),
             new Mock<IUnitOfWork>().Object);
 
         var result = await handler.Handle(
-            new CreateProductionNoteCommand(1, null, null, 7, "Weakness", "Fire breaks its guard.", false),
+            new CreateProjectCommentCommand(1, new ProjectCommentTarget(CharacterId: 7), "Weakness", "Fire breaks its guard.", false),
             CancellationToken.None);
 
         Assert.True(result.IsFailure);
-        Assert.Equal("ProductionNoteCharacterNotFound", result.Error.Code);
+        Assert.Equal("ProjectCommentTargetNotFound", result.Error.Code);
+        Assert.Contains("Character 7", result.Error.Message);
     }
 
     [Fact]
-    public async Task CreateProductionNote_WhenCharacterIsOwnedByRouteProject_PersistsTheTarget()
+    public async Task CreateProjectComment_WhenCharacterIsOwnedByRouteProject_PersistsTheTarget()
     {
         var projects = new Mock<IProjectRepository>();
         projects.Setup(r => r.GetByIdAsync(1, It.IsAny<CancellationToken>()))
             .ReturnsAsync(Project.Create("Nightfall", null, Now));
-        var character = ProjectCharacter.Create(1, "Ashen Warden", null, Now).WithId(7);
-        var characters = new Mock<IProjectCharacterRepository>();
-        characters.Setup(r => r.GetByIdAsync(1, 7, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(character);
-        var notes = new Mock<IProductionNoteRepository>();
-        var handler = new CreateProductionNoteCommandHandler(
+        var comments = new Mock<IProjectCommentRepository>();
+        comments.Setup(r => r.TargetExistsAsync(1, It.Is<ProjectCommentTarget>(t => t.CharacterId == 7 && t.Count == 1), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
+        var handler = new CreateProjectCommentCommandHandler(
             projects.Object,
-            new Mock<IProjectLevelRepository>().Object,
-            new Mock<IProjectReferenceRepository>().Object,
-            characters.Object,
-            notes.Object,
+            comments.Object,
             Clock(),
             new Mock<IUnitOfWork>().Object);
 
         var result = await handler.Handle(
-            new CreateProductionNoteCommand(1, null, null, 7, "Weakness", "Fire breaks its guard.", false),
+            new CreateProjectCommentCommand(1, new ProjectCommentTarget(CharacterId: 7), "Weakness", "Fire breaks its guard.", false),
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         Assert.Equal(7, result.Value.CharacterId);
-        notes.Verify(r => r.AddAsync(It.Is<ProductionNote>(note => note.CharacterId == 7), It.IsAny<CancellationToken>()), Times.Once);
+        Assert.Equal("open", result.Value.Status);
+        comments.Verify(r => r.AddAsync(It.Is<ProjectComment>(comment => comment.CharacterId == 7), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     private static IDateTimeProvider Clock()

@@ -6,6 +6,7 @@ using Application.EnvironmentMaps;
 using Application.Metadata;
 using Application.Models;
 using Application.Packs;
+using Application.Projects;
 using Application.Scenes;
 using Application.Sounds;
 using Application.Sprites;
@@ -115,6 +116,7 @@ internal sealed class AgentOperationReverser : IAgentOperationReverser
     private readonly ICommandHandler<RestoreSceneRecommendationsCommand, SceneRecommendationsResponse> _restoreSceneRecommendations;
     private readonly ICommandHandler<SetSceneProjectCommand, SetSceneProjectResponse> _setSceneProject;
     private readonly ICommandHandler<SetAssetMetadataCommand, AssetMetadataResponse> _setAssetMetadata;
+    private readonly ICommandHandler<RemoveAssetFromProjectCommand> _removeFromProject;
 
     public AgentOperationReverser(
         IAgentAudit audit,
@@ -144,7 +146,8 @@ internal sealed class AgentOperationReverser : IAgentOperationReverser
         ICommandHandler<RestoreSceneSlotCommand, SceneSummary> restoreSceneSlot,
         ICommandHandler<RestoreSceneRecommendationsCommand, SceneRecommendationsResponse> restoreSceneRecommendations,
         ICommandHandler<SetSceneProjectCommand, SetSceneProjectResponse> setSceneProject,
-        ICommandHandler<SetAssetMetadataCommand, AssetMetadataResponse> setAssetMetadata)
+        ICommandHandler<SetAssetMetadataCommand, AssetMetadataResponse> setAssetMetadata,
+        ICommandHandler<RemoveAssetFromProjectCommand> removeFromProject)
     {
         _audit = audit;
         _unitOfWork = unitOfWork;
@@ -174,6 +177,7 @@ internal sealed class AgentOperationReverser : IAgentOperationReverser
         _restoreSceneRecommendations = restoreSceneRecommendations;
         _setSceneProject = setSceneProject;
         _setAssetMetadata = setAssetMetadata;
+        _removeFromProject = removeFromProject;
     }
 
     public async Task<Result<ReversalPlan>> PlanAsync(
@@ -399,6 +403,10 @@ internal sealed class AgentOperationReverser : IAgentOperationReverser
         "add-to-pack" => Step(entry, $"Remove model {entry.AssetId} from the pack it was added to.", destructive: false,
             supported: entry.PayloadAfter is not null,
             blocker: "The pack this model was added to was not recorded."),
+
+        "add-to-project" => Step(entry, $"Remove {entry.AssetType} {entry.AssetId} from the project it was added to.", destructive: false,
+            supported: entry.PayloadAfter is not null,
+            blocker: "The project this asset was added to was not recorded."),
 
         "create-pack" => Step(entry, $"Delete pack {entry.AssetId}.", destructive: true,
             supported: entry.AssetId is > 0,
@@ -855,6 +863,33 @@ internal sealed class AgentOperationReverser : IAgentOperationReverser
                 return result.IsFailure
                     ? Result.Failure<string>(result.Error)
                     : Result.Success($"Removed model {entry.AssetId} from pack {packId}.");
+            }
+
+            case "add-to-project":
+            {
+                var after = Read(entry.PayloadAfter);
+                var projectId = after is null ? null : ReadInt(after.Value, "projectId");
+                var assetType = after is null ? null : ReadString(after.Value, "assetType");
+                if (projectId is null || assetType is null)
+                {
+                    return Result.Failure<string>(new Error(
+                        "NoProjectRecorded", "The project this asset was added to was not recorded."));
+                }
+
+                // An asset that was already in the project stays: the write added nothing,
+                // so its inverse removes nothing.
+                var before = Read(entry.PayloadBefore);
+                if (before is not null && ReadBool(before.Value, "wasMember") == true)
+                {
+                    return Result.Success($"{assetType} {entry.AssetId} was already in project {projectId} beforehand - left in place.");
+                }
+
+                var result = await _removeFromProject.Handle(
+                    new RemoveAssetFromProjectCommand(projectId.Value, assetType, entry.AssetId!.Value), cancellationToken);
+
+                return result.IsFailure
+                    ? Result.Failure<string>(result.Error)
+                    : Result.Success($"Removed {assetType} {entry.AssetId} from project {projectId}.");
             }
 
             case "create-pack":

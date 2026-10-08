@@ -9,8 +9,9 @@
  */
 import { type DBSchema, type IDBPDatabase, openDB } from 'idb'
 
-import { buildBaseMeshSeed } from './baseMeshesSeed'
 import { type UvStatus } from '@/shared/types/uvStatus'
+
+import { buildBaseMeshSeed } from './baseMeshesSeed'
 
 // ─── Schema ─────────────────────────────────────────────────────────────
 
@@ -302,15 +303,24 @@ export interface DemoProjectLevel {
   updatedAt: string
 }
 
-export interface DemoProductionNote {
+/** A project comment. Stored under `productionNotes`, its name before comments had a status. */
+export interface DemoProjectComment {
   id: number
   projectId: number
   levelId: number | null
   referenceImageId: number | null
   characterId?: number | null
+  modelId?: number | null
+  textureSetId?: number | null
+  spriteId?: number | null
+  soundId?: number | null
+  environmentMapId?: number | null
+  vfxId?: number | null
   title: string
   body: string
   isPinned: boolean
+  status?: 'open' | 'resolved'
+  resolution?: string | null
   createdAt: string
   updatedAt: string
 }
@@ -389,7 +399,7 @@ export interface DemoProject {
   customThumbnailUrl?: string | null
   conceptImages: DemoConceptImage[]
   levels?: DemoProjectLevel[]
-  productionNotes?: DemoProductionNote[]
+  productionNotes?: DemoProjectComment[]
   characters?: DemoProjectCharacter[]
   referenceLinks?: DemoProjectReferenceLink[]
   models: { id: number; name: string }[]
@@ -398,6 +408,7 @@ export interface DemoProject {
   sounds: { id: number; name: string }[]
   scripts: { id: number; name: string }[]
   environmentMaps?: { id: number; name: string }[]
+  vfx?: { id: number; name: string }[]
   /**
    * The project profile as the demo stores it (v0.6 prompt 13). Optional, because
    * every seeded project predates it and a project with no profile is a real and

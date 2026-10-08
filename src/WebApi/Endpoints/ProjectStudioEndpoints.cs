@@ -7,7 +7,7 @@ using SharedKernel;
 
 namespace WebApi.Endpoints;
 
-/// <summary>Project level, reference, and production-note HTTP surface.</summary>
+/// <summary>Project level, reference, and comment HTTP surface.</summary>
 public static class ProjectStudioEndpoints
 {
     public static void MapProjectStudioEndpoints(this IEndpointRouteBuilder app)
@@ -28,21 +28,21 @@ public static class ProjectStudioEndpoints
             .WithName("Delete Project Level")
             .WithSummary("Delete a level without deleting its scenes");
 
-        app.MapGet("/projects/{projectId:int}/production-notes", GetProductionNotes)
-            .WithName("Get Production Notes")
-            .WithSummary("List project notes, optionally filtered by level, reference image, character, or pinned state");
-        app.MapGet("/projects/{projectId:int}/production-notes/{noteId:int}", GetProductionNote)
-            .WithName("Get Production Note")
-            .WithSummary("Get one production note owned by the route project");
-        app.MapPost("/projects/{projectId:int}/production-notes", CreateProductionNote)
-            .WithName("Create Production Note")
-            .WithSummary("Create a project, level, reference-image, or character note");
-        app.MapPut("/projects/{projectId:int}/production-notes/{noteId:int}", UpdateProductionNote)
-            .WithName("Update Production Note")
-            .WithSummary("Update a production note and its optional target");
-        app.MapDelete("/projects/{projectId:int}/production-notes/{noteId:int}", DeleteProductionNote)
-            .WithName("Delete Production Note")
-            .WithSummary("Delete a production note");
+        app.MapGet("/projects/{projectId:int}/comments", GetProjectComments)
+            .WithName("Get Project Comments")
+            .WithSummary("List project comments, optionally filtered by target, pinned state, or status");
+        app.MapGet("/projects/{projectId:int}/comments/{commentId:int}", GetProjectComment)
+            .WithName("Get Project Comment")
+            .WithSummary("Get one comment owned by the route project");
+        app.MapPost("/projects/{projectId:int}/comments", CreateProjectComment)
+            .WithName("Create Project Comment")
+            .WithSummary("Comment on a project, or on one of its levels, references, characters, or assets");
+        app.MapPut("/projects/{projectId:int}/comments/{commentId:int}", UpdateProjectComment)
+            .WithName("Update Project Comment")
+            .WithSummary("Update a comment, its optional target, and its open or resolved status");
+        app.MapDelete("/projects/{projectId:int}/comments/{commentId:int}", DeleteProjectComment)
+            .WithName("Delete Project Comment")
+            .WithSummary("Delete a comment");
 
         app.MapGet("/projects/{projectId:int}/references", GetProjectReferences)
             .WithName("Get Project References")
@@ -121,66 +121,63 @@ public static class ProjectStudioEndpoints
         return result.IsSuccess ? Results.NoContent() : Respond(result);
     }
 
-    private static async Task<IResult> GetProductionNotes(
+    private static async Task<IResult> GetProjectComments(
         int projectId,
-        int? levelId,
-        int? referenceImageId,
-        int? characterId,
+        [AsParameters] ProjectCommentTargetQuery target,
         bool? isPinned,
-        IQueryHandler<GetProductionNotesQuery, IReadOnlyList<ProductionNoteDto>> handler,
+        string? status,
+        IQueryHandler<GetProjectCommentsQuery, IReadOnlyList<ProjectCommentDto>> handler,
         CancellationToken cancellationToken)
         => Respond(await handler.Handle(
-            new GetProductionNotesQuery(projectId, levelId, referenceImageId, characterId, isPinned), cancellationToken));
+            new GetProjectCommentsQuery(projectId, target.ToTarget(), isPinned, status), cancellationToken));
 
-    private static async Task<IResult> GetProductionNote(
+    private static async Task<IResult> GetProjectComment(
         int projectId,
-        int noteId,
-        IQueryHandler<GetProductionNoteByIdQuery, ProductionNoteDto> handler,
+        int commentId,
+        IQueryHandler<GetProjectCommentByIdQuery, ProjectCommentDto> handler,
         CancellationToken cancellationToken)
-        => Respond(await handler.Handle(new GetProductionNoteByIdQuery(projectId, noteId), cancellationToken));
+        => Respond(await handler.Handle(new GetProjectCommentByIdQuery(projectId, commentId), cancellationToken));
 
-    private static async Task<IResult> CreateProductionNote(
+    private static async Task<IResult> CreateProjectComment(
         int projectId,
-        [FromBody] ProductionNoteRequest request,
-        ICommandHandler<CreateProductionNoteCommand, ProductionNoteDto> handler,
+        [FromBody] ProjectCommentRequest request,
+        ICommandHandler<CreateProjectCommentCommand, ProjectCommentDto> handler,
         CancellationToken cancellationToken)
     {
-        var result = await handler.Handle(new CreateProductionNoteCommand(
+        var result = await handler.Handle(new CreateProjectCommentCommand(
             projectId,
-            request.LevelId,
-            request.ReferenceImageId,
-            request.CharacterId,
+            request.ToTarget(),
             request.Title,
             request.Body,
             request.IsPinned), cancellationToken);
         return result.IsSuccess
-            ? Results.Created($"/projects/{projectId}/production-notes/{result.Value.Id}", result.Value)
+            ? Results.Created($"/projects/{projectId}/comments/{result.Value.Id}", result.Value)
             : Respond(result.Error);
     }
 
-    private static async Task<IResult> UpdateProductionNote(
+    private static async Task<IResult> UpdateProjectComment(
         int projectId,
-        int noteId,
-        [FromBody] ProductionNoteRequest request,
-        ICommandHandler<UpdateProductionNoteCommand, ProductionNoteDto> handler,
+        int commentId,
+        [FromBody] ProjectCommentRequest request,
+        ICommandHandler<UpdateProjectCommentCommand, ProjectCommentDto> handler,
         CancellationToken cancellationToken)
-        => Respond(await handler.Handle(new UpdateProductionNoteCommand(
+        => Respond(await handler.Handle(new UpdateProjectCommentCommand(
             projectId,
-            noteId,
-            request.LevelId,
-            request.ReferenceImageId,
-            request.CharacterId,
+            commentId,
+            request.ToTarget(),
             request.Title,
             request.Body,
-            request.IsPinned), cancellationToken));
+            request.IsPinned,
+            request.Status,
+            request.Resolution), cancellationToken));
 
-    private static async Task<IResult> DeleteProductionNote(
+    private static async Task<IResult> DeleteProjectComment(
         int projectId,
-        int noteId,
-        ICommandHandler<DeleteProductionNoteCommand> handler,
+        int commentId,
+        ICommandHandler<DeleteProjectCommentCommand> handler,
         CancellationToken cancellationToken)
     {
-        var result = await handler.Handle(new DeleteProductionNoteCommand(projectId, noteId), cancellationToken);
+        var result = await handler.Handle(new DeleteProjectCommentCommand(projectId, commentId), cancellationToken);
         return result.IsSuccess ? Results.NoContent() : Respond(result);
     }
 
@@ -252,7 +249,7 @@ public static class ProjectStudioEndpoints
         var body = new { error = error.Code, message = error.Message };
         return error.Code is "ProjectNotFound"
             or "ProjectLevelNotFound"
-            or "ProductionNoteNotFound"
+            or "ProjectCommentNotFound"
             or "ProjectReferenceNotFound"
             or "ProjectReferenceLinkNotFound"
             or "ProjectCharacterNotFound"
@@ -268,13 +265,47 @@ public sealed record ProjectLevelRequest(
     string? ProductionStatus = null,
     int? SortOrder = null);
 
-public sealed record ProductionNoteRequest(
+/// <summary>
+/// A comment's content and target. On update, <see cref="Status"/> null keeps the current
+/// status and resolution.
+/// </summary>
+public sealed record ProjectCommentRequest(
     int? LevelId,
     int? ReferenceImageId,
     int? CharacterId,
     string Title,
     string Body,
-    bool IsPinned);
+    bool IsPinned,
+    int? ModelId = null,
+    int? TextureSetId = null,
+    int? SpriteId = null,
+    int? SoundId = null,
+    int? EnvironmentMapId = null,
+    int? VfxId = null,
+    string? Status = null,
+    string? Resolution = null)
+{
+    public ProjectCommentTarget ToTarget() => new(
+        LevelId, ReferenceImageId, CharacterId, ModelId, TextureSetId,
+        SpriteId, SoundId, EnvironmentMapId, VfxId);
+}
+
+/// <summary>The optional target filters of a comment list, bound from the query string.</summary>
+public sealed record ProjectCommentTargetQuery(
+    int? LevelId,
+    int? ReferenceImageId,
+    int? CharacterId,
+    int? ModelId,
+    int? TextureSetId,
+    int? SpriteId,
+    int? SoundId,
+    int? EnvironmentMapId,
+    int? VfxId)
+{
+    public ProjectCommentTarget ToTarget() => new(
+        LevelId, ReferenceImageId, CharacterId, ModelId, TextureSetId,
+        SpriteId, SoundId, EnvironmentMapId, VfxId);
+}
 
 public sealed record ProjectReferenceRequest(string? Title);
 

@@ -1,6 +1,6 @@
 import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { useState, type JSX } from 'react'
+import { type JSX, useState } from 'react'
 
 import { TabContext, type TabContextValue } from '@/contexts/TabContext'
 import { useScenesQuery } from '@/features/scenes/api/queries'
@@ -35,7 +35,7 @@ jest.mock('../../api/projectStudioQueries', () => ({
   useProjectLevelsQuery: jest.fn(),
   useProjectMemberModelsQuery: jest.fn(() => ({ data: [] })),
   useProjectCharactersQuery: jest.fn(() => ({ data: [] })),
-  useProductionNotesQuery: jest.fn(() => ({ data: [] })),
+  useProjectCommentsQuery: jest.fn(() => ({ data: [] })),
   useProjectReferencesQuery: jest.fn(() => ({ data: [] })),
   useUseCategoryMutations: jest.fn(() => ({})),
 }))
@@ -132,7 +132,7 @@ function Harness({
 beforeEach(() => {
   jest.clearAllMocks()
   tabId = registerTab()
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
+
   const queries = require('../../api/projectStudioQueries')
   queries.useProjectLevelsQuery.mockReturnValue({ data: [LEVEL] })
   scenes.mockReturnValue({
@@ -220,7 +220,6 @@ describe('ProjectLevelWorkspace', () => {
   })
 
   it('reports a level deleted while the workspace was open', async () => {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const queries = require('../../api/projectStudioQueries')
     queries.useProjectLevelsQuery.mockReturnValue({ data: [] })
     const onExit = jest.fn()

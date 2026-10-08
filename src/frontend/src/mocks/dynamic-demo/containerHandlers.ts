@@ -20,6 +20,56 @@ import {
   toPackDto,
   toProjectDto,
 } from './shared'
+import { findDemoVfx } from './vfxHandlers'
+
+const COMMENT_TARGET_KINDS = [
+  'levelId',
+  'referenceImageId',
+  'characterId',
+  'modelId',
+  'textureSetId',
+  'spriteId',
+  'soundId',
+  'environmentMapId',
+  'vfxId',
+] as const
+
+type DemoCommentTargetIds = Record<
+  (typeof COMMENT_TARGET_KINDS)[number],
+  number | null
+>
+
+type DemoCommentRequest = Partial<DemoCommentTargetIds> & {
+  title: string
+  body: string
+  isPinned: boolean
+  status?: 'open' | 'resolved'
+  resolution?: string | null
+}
+
+type DemoComment = NonNullable<DemoProject['productionNotes']>[number]
+
+function commentTargetIds(
+  source: Partial<DemoCommentTargetIds>
+): DemoCommentTargetIds {
+  return Object.fromEntries(
+    COMMENT_TARGET_KINDS.map(kind => [kind, source[kind] ?? null])
+  ) as DemoCommentTargetIds
+}
+
+function commentTargetCount(source: Partial<DemoCommentTargetIds>): number {
+  return COMMENT_TARGET_KINDS.filter(kind => source[kind] != null).length
+}
+
+/** A stored comment in the API's shape; rows from before comments had a status are open. */
+function toDemoComment(comment: DemoComment) {
+  return {
+    ...comment,
+    ...commentTargetIds(comment),
+    status: comment.status ?? 'open',
+    resolution: comment.resolution ?? null,
+  }
+}
 
 /**
  * The link rows of one reference image, resolved to the level/character names
@@ -685,9 +735,12 @@ export const containerHandlers = [
     project.characters = (project.characters ?? []).filter(
       character => character.id !== Number(params.characterId)
     )
-    project.productionNotes = (project.productionNotes ?? [])
-      .filter(note => note.characterId !== Number(params.characterId))
-      .map(note => ({ ...note, characterId: null }))
+    // As on the server: the character's comments stay, as project comments.
+    project.productionNotes = (project.productionNotes ?? []).map(comment =>
+      comment.characterId === Number(params.characterId)
+        ? { ...comment, characterId: null }
+        : comment
+    )
     await put('projects', project)
     return new HttpResponse(null, { status: 204 })
   }),
@@ -1206,121 +1259,102 @@ export const containerHandlers = [
     return new HttpResponse(null, { status: 204 })
   }),
 
-  http.get('*/projects/:id/production-notes', async ({ params, request }) => {
+  http.get('*/projects/:id/comments', async ({ params, request }) => {
     const project = await getById('projects', Number(params.id))
     if (!project) return new HttpResponse(null, { status: 404 })
     const url = new URL(request.url)
-    const levelId = url.searchParams.get('levelId')
-    const referenceImageId = url.searchParams.get('referenceImageId')
-    const characterId = url.searchParams.get('characterId')
+    let comments = (project.productionNotes ?? []).map(toDemoComment)
+    for (const kind of COMMENT_TARGET_KINDS) {
+      const value = url.searchParams.get(kind)
+      if (value !== null)
+        comments = comments.filter(comment => comment[kind] === Number(value))
+    }
     const isPinned = url.searchParams.get('isPinned')
-    let notes = project.productionNotes ?? []
-    if (levelId !== null)
-      notes = notes.filter(note => note.levelId === Number(levelId))
-    if (referenceImageId !== null)
-      notes = notes.filter(
-        note => note.referenceImageId === Number(referenceImageId)
-      )
-    if (characterId !== null)
-      notes = notes.filter(note => note.characterId === Number(characterId))
     if (isPinned !== null)
-      notes = notes.filter(note => String(note.isPinned) === isPinned)
-    return HttpResponse.json(notes)
+      comments = comments.filter(
+        comment => String(comment.isPinned) === isPinned
+      )
+    const status = url.searchParams.get('status')
+    if (status !== null)
+      comments = comments.filter(
+        comment => comment.status === status.toLowerCase()
+      )
+    return HttpResponse.json(comments)
   }),
 
-  http.post('*/projects/:id/production-notes', async ({ params, request }) => {
+  http.post('*/projects/:id/comments', async ({ params, request }) => {
     const project = await getById('projects', Number(params.id))
     if (!project) return new HttpResponse(null, { status: 404 })
-    const body = (await request.json()) as {
-      levelId?: number | null
-      referenceImageId?: number | null
-      characterId?: number | null
-      title: string
-      body: string
-      isPinned: boolean
-    }
-    const targetCount = [
-      body.levelId,
-      body.referenceImageId,
-      body.characterId,
-    ].filter(value => value != null).length
-    if (targetCount > 1) {
+    const body = (await request.json()) as DemoCommentRequest
+    if (commentTargetCount(body) > 1) {
       return HttpResponse.json(
-        { error: 'ProductionNoteTargetConflict' },
+        { error: 'ProjectCommentTargetConflict' },
         { status: 400 }
       )
     }
-    const note = {
+    const comment = {
       id: await nextId('productionNotes'),
       projectId: project.id,
-      levelId: body.levelId ?? null,
-      referenceImageId: body.referenceImageId ?? null,
-      characterId: body.characterId ?? null,
+      ...commentTargetIds(body),
       title: body.title,
       body: body.body,
       isPinned: body.isPinned,
+      status: 'open' as const,
+      resolution: null,
       createdAt: now(),
       updatedAt: now(),
     }
-    project.productionNotes = [...(project.productionNotes ?? []), note]
+    project.productionNotes = [...(project.productionNotes ?? []), comment]
     await put('projects', project)
-    return HttpResponse.json(note, { status: 201 })
+    return HttpResponse.json(comment, { status: 201 })
   }),
 
-  http.get('*/projects/:id/production-notes/:noteId', async ({ params }) => {
+  http.get('*/projects/:id/comments/:commentId', async ({ params }) => {
     const project = await getById('projects', Number(params.id))
-    const note = project?.productionNotes?.find(
-      item => item.id === Number(params.noteId)
+    const comment = project?.productionNotes?.find(
+      item => item.id === Number(params.commentId)
     )
-    if (!note) return new HttpResponse(null, { status: 404 })
-    return HttpResponse.json(note)
+    if (!comment) return new HttpResponse(null, { status: 404 })
+    return HttpResponse.json(toDemoComment(comment))
   }),
 
   http.put(
-    '*/projects/:id/production-notes/:noteId',
+    '*/projects/:id/comments/:commentId',
     async ({ params, request }) => {
       const project = await getById('projects', Number(params.id))
       if (!project) return new HttpResponse(null, { status: 404 })
-      const note = project.productionNotes?.find(
-        item => item.id === Number(params.noteId)
+      const comment = project.productionNotes?.find(
+        item => item.id === Number(params.commentId)
       )
-      if (!note) return new HttpResponse(null, { status: 404 })
-      const body = (await request.json()) as {
-        levelId?: number | null
-        referenceImageId?: number | null
-        characterId?: number | null
-        title: string
-        body: string
-        isPinned: boolean
-      }
-      const targetCount = [
-        body.levelId,
-        body.referenceImageId,
-        body.characterId,
-      ].filter(value => value != null).length
-      if (targetCount > 1) {
+      if (!comment) return new HttpResponse(null, { status: 404 })
+      const body = (await request.json()) as DemoCommentRequest
+      if (commentTargetCount(body) > 1) {
         return HttpResponse.json(
-          { error: 'ProductionNoteTargetConflict' },
+          { error: 'ProjectCommentTargetConflict' },
           { status: 400 }
         )
       }
-      note.levelId = body.levelId ?? null
-      note.referenceImageId = body.referenceImageId ?? null
-      note.characterId = body.characterId ?? null
-      note.title = body.title
-      note.body = body.body
-      note.isPinned = body.isPinned
-      note.updatedAt = now()
+      Object.assign(comment, commentTargetIds(body))
+      comment.title = body.title
+      comment.body = body.body
+      comment.isPinned = body.isPinned
+      if (body.status) {
+        // A resolution belongs to a resolved comment; reopening clears it.
+        comment.status = body.status
+        comment.resolution =
+          body.status === 'resolved' ? body.resolution?.trim() || null : null
+      }
+      comment.updatedAt = now()
       await put('projects', project)
-      return HttpResponse.json(note)
+      return HttpResponse.json(toDemoComment(comment))
     }
   ),
 
-  http.delete('*/projects/:id/production-notes/:noteId', async ({ params }) => {
+  http.delete('*/projects/:id/comments/:commentId', async ({ params }) => {
     const project = await getById('projects', Number(params.id))
     if (!project) return new HttpResponse(null, { status: 404 })
     project.productionNotes = (project.productionNotes ?? []).filter(
-      note => note.id !== Number(params.noteId)
+      comment => comment.id !== Number(params.commentId)
     )
     await put('projects', project)
     return new HttpResponse(null, { status: 204 })
@@ -1714,6 +1748,33 @@ export const containerHandlers = [
       return new HttpResponse(null, { status: 204 })
     }
   ),
+
+  // Project ↔ VFX
+  http.post('*/projects/:projectId/vfx/:vfxId', async ({ params }) => {
+    const project = await getById('projects', Number(params.projectId))
+    const effect = findDemoVfx(Number(params.vfxId))
+    if (!project || !effect) return new HttpResponse(null, { status: 404 })
+    if (!project.vfx?.some(item => item.id === effect.id)) {
+      project.vfx = [
+        ...(project.vfx ?? []),
+        { id: effect.id, name: effect.name },
+      ]
+      project.updatedAt = now()
+      await put('projects', project)
+    }
+    return new HttpResponse(null, { status: 204 })
+  }),
+
+  http.delete('*/projects/:projectId/vfx/:vfxId', async ({ params }) => {
+    const project = await getById('projects', Number(params.projectId))
+    if (!project) return new HttpResponse(null, { status: 404 })
+    project.vfx = (project.vfx ?? []).filter(
+      item => item.id !== Number(params.vfxId)
+    )
+    project.updatedAt = now()
+    await put('projects', project)
+    return new HttpResponse(null, { status: 204 })
+  }),
 
   // Project texture with file upload
   http.post(

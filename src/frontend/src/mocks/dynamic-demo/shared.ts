@@ -891,6 +891,8 @@ export function toProjectDto(project: DemoProject) {
     multiModelTextureCount: project.multiModelTextureCount ?? 0,
     environmentMapCount: project.environmentMapCount ?? 0,
     environmentMaps: project.environmentMaps ?? [],
+    vfx: project.vfx ?? [],
+    vfxCount: project.vfx?.length ?? 0,
     customThumbnailFileId: project.customThumbnailFileId ?? null,
     customThumbnailUrl: project.customThumbnailUrl ?? null,
     conceptImages,

@@ -8,6 +8,7 @@ import {
   addSpriteToProject,
   addTextureSetToProject,
   addTextureToProjectWithFile,
+  addVfxToProject,
   getEnvironmentMapsByProject,
   getModelsByProject,
   getProjectById,
@@ -21,14 +22,18 @@ import {
   removeSoundFromProject,
   removeSpriteFromProject,
   removeTextureSetFromProject,
+  removeVfxFromProject,
 } from '@/features/project/api/projectApi'
+import { type ProjectCommentTargetKind } from '@/features/project/api/projectStudioApi'
 import { ContainerViewer } from '@/shared/components/ContainerViewer'
 import {
   type ContainerAdapter,
+  type ContainerAssetType,
   type ContainerDto,
 } from '@/shared/types/ContainerTypes'
 import { type ProjectDetailDto } from '@/types'
 
+import { ProjectCommentsBadge } from './ProjectCommentsBadge'
 import { ProjectDetailsPanel } from './ProjectDetailsPanel'
 
 interface ProjectViewerProps {
@@ -59,7 +64,22 @@ function toContainerDto(project: ProjectDetailDto): ContainerDto {
     textureSets: project.textureSets,
     sprites: project.sprites,
     environmentMaps: project.environmentMaps ?? [],
+    vfxCount: project.vfxCount ?? 0,
+    vfx: project.vfx ?? [],
   }
+}
+
+/** Which comment target field each asset family is addressed by. */
+const COMMENT_TARGET_BY_ASSET: Record<
+  ContainerAssetType,
+  ProjectCommentTargetKind
+> = {
+  model: 'modelId',
+  textureSet: 'textureSetId',
+  sprite: 'spriteId',
+  sound: 'soundId',
+  environmentMap: 'environmentMapId',
+  vfx: 'vfxId',
 }
 
 export function ProjectViewer({ projectId, tabId }: ProjectViewerProps) {
@@ -112,6 +132,15 @@ export function ProjectViewer({ projectId, tabId }: ProjectViewerProps) {
       createSpriteOptions: cId => ({ projectId: cId }),
       createSoundOptions: cId => ({ projectId: cId }),
       createScriptOptions: cId => ({ projectId: cId }),
+      addVfx: (cId, vfxId) => addVfxToProject(cId, vfxId),
+      removeVfx: (cId, vfxId) => removeVfxFromProject(cId, vfxId),
+      renderAssetAccessory: asset => (
+        <ProjectCommentsBadge
+          projectId={projectId}
+          target={{ kind: COMMENT_TARGET_BY_ASSET[asset.type], id: asset.id }}
+          targetName={asset.name}
+        />
+      ),
     }),
     [projectId]
   )

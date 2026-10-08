@@ -32,6 +32,12 @@ export interface AssetTileProps {
    * PrimeReact <Checkbox> used inside add-dialogs.
    */
   checkbox?: ReactNode
+  /**
+   * Optional node in the top-left corner - a small control of the caller's,
+   * such as a comments count. It must stop its own events from reaching the
+   * tile; the tile does not know what it is.
+   */
+  accessory?: ReactNode
   onClick?: (e: React.MouseEvent) => void
   onContextMenu?: (e: React.MouseEvent) => void
   className?: string
@@ -50,6 +56,7 @@ export function AssetTile({
   variant = 'square',
   selected = false,
   checkbox,
+  accessory,
   onClick,
   onContextMenu,
   className,
@@ -95,6 +102,9 @@ export function AssetTile({
       {...dataAttributes}
     >
       {checkbox ? <div className="asset-tile-checkbox">{checkbox}</div> : null}
+      {accessory ? (
+        <div className="asset-tile-accessory">{accessory}</div>
+      ) : null}
 
       <div className="asset-tile-media">{media}</div>
 

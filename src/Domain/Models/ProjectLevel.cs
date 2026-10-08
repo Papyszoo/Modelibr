@@ -6,7 +6,7 @@ namespace Domain.Models;
 public class ProjectLevel : AggregateRoot
 {
     private readonly List<Scene> _scenes = new();
-    private readonly List<ProductionNote> _notes = new();
+    private readonly List<ProjectComment> _comments = new();
     private readonly List<CharacterVariant> _characterVariants = new();
     private readonly List<ProjectReferenceLink> _referenceLinks = new();
 
@@ -42,13 +42,13 @@ public class ProjectLevel : AggregateRoot
         }
     }
 
-    public ICollection<ProductionNote> Notes
+    public ICollection<ProjectComment> Comments
     {
-        get => _notes;
+        get => _comments;
         set
         {
-            _notes.Clear();
-            if (value is not null) _notes.AddRange(value);
+            _comments.Clear();
+            if (value is not null) _comments.AddRange(value);
         }
     }
 

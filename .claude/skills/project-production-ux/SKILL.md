@@ -1,6 +1,6 @@
 ---
 name: project-production-ux
-description: Use when designing or editing Modelibr Project, Level, character, variant, reference, or production-note UX. Enforce a dense local-first game-production workspace where entities are described through useful content, not name-only forms.
+description: Use when designing or editing Modelibr Project, Level, character, variant, reference, or comment UX. Enforce a dense local-first game-production workspace where entities are described through useful content, not name-only forms.
 ---
 
 # Project production UX
@@ -9,8 +9,8 @@ description: Use when designing or editing Modelibr Project, Level, character, v
 
 - Modelibr is a game-production workspace, not a generic DAM or document editor.
 - The primary hierarchy is Project → Level → production entities and references.
-- Levels are not name-only rows. A level needs a useful description, reference images, notes, and links to the entities/assets used there.
-- Characters and similar production entities need more than a label: identity, role/tags such as player/enemy/NPC, linked models/images, notes, abilities, and variants.
+- Levels are not name-only rows. A level needs a useful description, reference images, comments, and links to the entities/assets used there.
+- Characters and similar production entities need more than a label: identity, role/tags such as player/enemy/NPC, linked models/images, comments, abilities, and variants.
 - Variants can be level-related; do not force every entity into a rigid level hierarchy.
 
 ## Information hierarchy
@@ -31,7 +31,7 @@ description: Use when designing or editing Modelibr Project, Level, character, v
 
 ## Entity editing
 
-- A character/entity editor should expose meaningful sections: identity, tags, linked media/models, notes, abilities, and variants.
+- A character/entity editor should expose meaningful sections: identity, tags, linked media/models, comments, abilities, and variants.
 - Enemy-specific fields should be contextual: weakness, threat, behavior, and abilities should not be shown for every entity type.
 - Use plain text and compact structured fields before introducing rich text, custom schemas, or a plugin system.
 - Preserve user-authored descriptions and notes; do not replace them with generated summaries.

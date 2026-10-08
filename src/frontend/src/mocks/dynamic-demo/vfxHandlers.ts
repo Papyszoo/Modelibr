@@ -138,6 +138,12 @@ function ensureSeeded(): void {
   nextDemoVfxId = 2
 }
 
+/** One demo effect by id, for the project membership handlers. */
+export function findDemoVfx(id: number): DemoVfx | undefined {
+  ensureSeeded()
+  return demoVfx.get(id)
+}
+
 function toSummary(effect: DemoVfx) {
   const { definition } = effect
   return {

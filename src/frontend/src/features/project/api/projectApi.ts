@@ -17,8 +17,8 @@ import {
   type ProjectDto,
   type ProjectProfileOptionDto,
   type ScriptDto,
-  type SoundDto,
   type SetProjectProfileRequest,
+  type SoundDto,
   type SpriteDto,
   type TextureSetDto,
   type UpdateProjectRequest,
@@ -241,6 +241,20 @@ export async function removeEnvironmentMapFromProject(
   await client.delete(
     `/projects/${projectId}/environment-maps/${environmentMapId}`
   )
+}
+
+export async function addVfxToProject(
+  projectId: number,
+  vfxId: number
+): Promise<void> {
+  await client.post(`/projects/${projectId}/vfx/${vfxId}`)
+}
+
+export async function removeVfxFromProject(
+  projectId: number,
+  vfxId: number
+): Promise<void> {
+  await client.delete(`/projects/${projectId}/vfx/${vfxId}`)
 }
 
 export async function getEnvironmentMapsByProject(

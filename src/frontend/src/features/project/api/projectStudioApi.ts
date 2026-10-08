@@ -35,26 +35,53 @@ export interface ProjectLevelRequest {
   sortOrder?: number
 }
 
-export interface ProductionNoteDto {
+export type ProjectCommentStatus = 'open' | 'resolved'
+
+/**
+ * The one thing a comment can be about, by the id field the API names it with.
+ * A comment with no target is about the project itself.
+ */
+export type ProjectCommentTargetKind =
+  | 'levelId'
+  | 'referenceImageId'
+  | 'characterId'
+  | 'modelId'
+  | 'textureSetId'
+  | 'spriteId'
+  | 'soundId'
+  | 'environmentMapId'
+  | 'vfxId'
+
+export interface ProjectCommentTarget {
+  kind: ProjectCommentTargetKind
+  id: number
+}
+
+export type ProjectCommentTargetIds = Record<
+  ProjectCommentTargetKind,
+  number | null
+>
+
+export interface ProjectCommentDto extends ProjectCommentTargetIds {
   id: number
   projectId: number
-  levelId: number | null
-  referenceImageId: number | null
-  characterId: number | null
   title: string
   body: string
   isPinned: boolean
+  status: ProjectCommentStatus
+  resolution: string | null
   createdAt: string
   updatedAt: string
 }
 
-export interface ProductionNoteRequest {
-  levelId?: number | null
-  referenceImageId?: number | null
-  characterId?: number | null
+export interface ProjectCommentRequest
+  extends Partial<ProjectCommentTargetIds> {
   title: string
   body: string
   isPinned: boolean
+  /** Omit to keep the current status and resolution on update. */
+  status?: ProjectCommentStatus
+  resolution?: string | null
 }
 
 export interface ProjectCharacterImageDto {
@@ -231,63 +258,52 @@ export async function deleteProjectLevel(
   await client.delete(`/projects/${projectId}/levels/${levelId}`)
 }
 
-export async function getProductionNotes(
+export async function getProjectComments(
   projectId: number,
-  options: {
-    levelId?: number
-    referenceImageId?: number
-    characterId?: number
+  options: Partial<Record<ProjectCommentTargetKind, number>> & {
     isPinned?: boolean
+    status?: ProjectCommentStatus
   } = {}
-): Promise<ProductionNoteDto[]> {
+): Promise<ProjectCommentDto[]> {
   const params = new URLSearchParams()
-  if (options.levelId !== undefined) {
-    params.set('levelId', String(options.levelId))
-  }
-  if (options.referenceImageId !== undefined) {
-    params.set('referenceImageId', String(options.referenceImageId))
-  }
-  if (options.characterId !== undefined) {
-    params.set('characterId', String(options.characterId))
-  }
-  if (options.isPinned !== undefined) {
-    params.set('isPinned', String(options.isPinned))
+  for (const [key, value] of Object.entries(options)) {
+    if (value !== undefined) params.set(key, String(value))
   }
   const query = params.toString()
-  const response = await client.get<ProductionNoteDto[]>(
-    `/projects/${projectId}/production-notes${query ? `?${query}` : ''}`
+  const response = await client.get<ProjectCommentDto[]>(
+    `/projects/${projectId}/comments${query ? `?${query}` : ''}`
   )
   return response.data
 }
 
-export async function createProductionNote(
+export async function createProjectComment(
   projectId: number,
-  request: ProductionNoteRequest
-): Promise<ProductionNoteDto> {
-  const response = await client.post<ProductionNoteDto>(
-    `/projects/${projectId}/production-notes`,
+  request: ProjectCommentRequest
+): Promise<ProjectCommentDto> {
+  const response = await client.post<ProjectCommentDto>(
+    `/projects/${projectId}/comments`,
     request
   )
   return response.data
 }
 
-export async function updateProductionNote(
+export async function updateProjectComment(
   projectId: number,
-  noteId: number,
-  request: ProductionNoteRequest
-): Promise<ProductionNoteDto> {
-  const response = await client.put<ProductionNoteDto>(
-    `/projects/${projectId}/production-notes/${noteId}`,
+  commentId: number,
+  request: ProjectCommentRequest
+): Promise<ProjectCommentDto> {
+  const response = await client.put<ProjectCommentDto>(
+    `/projects/${projectId}/comments/${commentId}`,
     request
   )
   return response.data
 }
 
-export async function deleteProductionNote(
+export async function deleteProjectComment(
   projectId: number,
-  noteId: number
+  commentId: number
 ): Promise<void> {
-  await client.delete(`/projects/${projectId}/production-notes/${noteId}`)
+  await client.delete(`/projects/${projectId}/comments/${commentId}`)
 }
 
 export async function getProjectReferences(

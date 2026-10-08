@@ -36,30 +36,32 @@ public class ProjectStudioCommandTests
     }
 
     [Fact]
-    public async Task CreateProductionNote_WhenBothTargetsArePresent_IsRefused()
+    public async Task CreateProjectComment_WhenBothTargetsArePresent_IsRefused()
     {
-        var handler = CreateNoteHandler(out _, out _, out _);
+        var handler = CreateCommentHandler(out _, out var comments);
 
-        var result = await handler.Handle(new CreateProductionNoteCommand(
-            1, 2, 3, null, "Conflicting target", "A note can only have one target.", false), CancellationToken.None);
+        var result = await handler.Handle(new CreateProjectCommentCommand(
+            1, new ProjectCommentTarget(LevelId: 2, ReferenceImageId: 3), "Conflicting target", "A comment can only have one target.", false),
+            CancellationToken.None);
 
         Assert.True(result.IsFailure);
-        Assert.Equal("ProductionNoteTargetConflict", result.Error.Code);
+        Assert.Equal("ProjectCommentTargetConflict", result.Error.Code);
+        comments.Verify(r => r.AddAsync(It.IsAny<ProjectComment>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
-    public async Task CreateProductionNote_WhenLevelBelongsToAnotherProject_IsRefused()
+    public async Task CreateProjectComment_WhenLevelBelongsToAnotherProject_IsRefused()
     {
-        var handler = CreateNoteHandler(out _, out var levels, out _);
+        var handler = CreateCommentHandler(out _, out var comments);
+        comments.Setup(r => r.TargetExistsAsync(1, It.Is<ProjectCommentTarget>(t => t.LevelId == 2 && t.Count == 1), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(false);
 
-        var result = await handler.Handle(new CreateProductionNoteCommand(
-            1, 2, null, null, "Crossing beat", "Keep the path readable.", false), CancellationToken.None);
+        var result = await handler.Handle(new CreateProjectCommentCommand(
+            1, new ProjectCommentTarget(LevelId: 2), "Crossing beat", "Keep the path readable.", false), CancellationToken.None);
 
         Assert.True(result.IsFailure);
-        Assert.Equal("ProductionNoteLevelNotFound", result.Error.Code);
-        levels.Verify(
-            r => r.GetByIdAsync(1, 2, It.IsAny<CancellationToken>()),
-            Times.Once);
+        Assert.Equal("ProjectCommentTargetNotFound", result.Error.Code);
+        Assert.Contains("Level 2", result.Error.Message);
     }
 
     [Fact]
@@ -174,22 +176,17 @@ public class ProjectStudioCommandTests
         Assert.Equal("InvalidProjectReferenceLink", result.Error.Code);
     }
 
-    private static CreateProductionNoteCommandHandler CreateNoteHandler(
+    private static CreateProjectCommentCommandHandler CreateCommentHandler(
         out Mock<IProjectRepository> projects,
-        out Mock<IProjectLevelRepository> levels,
-        out Mock<IProductionNoteRepository> notes)
+        out Mock<IProjectCommentRepository> comments)
     {
         projects = new Mock<IProjectRepository>();
-        levels = new Mock<IProjectLevelRepository>();
-        notes = new Mock<IProductionNoteRepository>();
+        comments = new Mock<IProjectCommentRepository>();
         projects.Setup(r => r.GetByIdAsync(1, It.IsAny<CancellationToken>()))
-            .ReturnsAsync(Project.Create("Nightfall", null, Now));
-        return new CreateProductionNoteCommandHandler(
+            .ReturnsAsync(Project.Create("Sample project", null, Now));
+        return new CreateProjectCommentCommandHandler(
             projects.Object,
-            levels.Object,
-            new Mock<IProjectReferenceRepository>().Object,
-            new Mock<IProjectCharacterRepository>().Object,
-            notes.Object,
+            comments.Object,
             Clock(),
             new Mock<IUnitOfWork>().Object);
     }

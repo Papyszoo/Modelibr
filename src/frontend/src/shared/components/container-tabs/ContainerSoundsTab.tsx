@@ -165,6 +165,11 @@ export function ContainerSoundsTab({
               <AssetTile
                 key={sound.id}
                 name={sound.name}
+                accessory={adapter.renderAssetAccessory?.({
+                  type: 'sound',
+                  id: sound.id,
+                  name: sound.name,
+                })}
                 meta={formatDuration(sound.duration)}
                 media={<AssetTilePlaceholder icon="pi pi-volume-up" />}
                 onClick={() => sn.openModal(sound)}

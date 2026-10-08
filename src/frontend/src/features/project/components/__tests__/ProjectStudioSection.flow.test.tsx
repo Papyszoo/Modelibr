@@ -28,6 +28,28 @@ const query = <T,>(data: T) => ({
   refetch: jest.fn(),
 })
 
+const comment = (overrides: Record<string, unknown> = {}) => ({
+  id: 11,
+  projectId: 7,
+  levelId: null,
+  referenceImageId: null,
+  characterId: null,
+  modelId: null,
+  textureSetId: null,
+  spriteId: null,
+  soundId: null,
+  environmentMapId: null,
+  vfxId: null,
+  title: 'Bell tower mood',
+  body: 'Cold, thin light.',
+  isPinned: true,
+  status: 'open',
+  resolution: null,
+  createdAt: '2026-09-25T00:00:00Z',
+  updatedAt: '2026-09-25T00:00:00Z',
+  ...overrides,
+})
+
 describe('ProjectStudioSection flow', () => {
   beforeEach(() => {
     jest.clearAllMocks()
@@ -35,7 +57,7 @@ describe('ProjectStudioSection flow', () => {
       query([{ id: 3, name: 'Forest Crossing' }]) as never
     )
     queries.useProjectCharactersQuery.mockReturnValue(query([]) as never)
-    queries.useProductionNotesQuery.mockReturnValue(query([]) as never)
+    queries.useProjectCommentsQuery.mockReturnValue(query([]) as never)
     // The level asset view's two reads: the project's explicit members and the
     // scene list. Both empty here - this flow is about creating a level.
     queries.useProjectMemberModelsQuery.mockReturnValue(query([]) as never)
@@ -53,9 +75,11 @@ describe('ProjectStudioSection flow', () => {
       ]) as never
     )
     api.createProjectLevel.mockResolvedValue({ id: 4 } as never)
-    api.createProductionNote.mockResolvedValue({ id: 5 } as never)
+    api.createProjectComment.mockResolvedValue({ id: 5 } as never)
+    api.updateProjectComment.mockResolvedValue({ id: 11 } as never)
   })
-  it('creates a level and a reference-targeted pinned idea', async () => {
+
+  it('creates a level and a pinned project decision', async () => {
     const onChanged = jest.fn()
     renderWithProviders(
       <ProjectStudioSection projectId={7} onChanged={onChanged} />,
@@ -77,77 +101,126 @@ describe('ProjectStudioSection flow', () => {
         productionStatus: 'planned',
       })
     )
+    await waitFor(() => expect(onChanged).toHaveBeenCalled())
 
-    await userEvent.click(screen.getByRole('button', { name: 'Add note' }))
-    await userEvent.type(screen.getByLabelText('New note or idea'), 'Fog idea')
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Add comment to the project' })
+    )
     await userEvent.type(
-      screen.getByLabelText('Note body'),
+      screen.getByLabelText('Comment title for the project'),
+      'Fog idea'
+    )
+    await userEvent.type(
+      screen.getByLabelText('Comment for the project'),
       'Keep the horizon unreadable.'
     )
-    await userEvent.selectOptions(
-      screen.getByLabelText('Note target'),
-      'reference:9'
-    )
-    await userEvent.click(screen.getByLabelText('Pin as idea'))
-    await userEvent.click(screen.getByRole('button', { name: 'Create note' }))
+    await userEvent.click(screen.getByLabelText('Pin as decision'))
+    await userEvent.click(screen.getByRole('button', { name: 'Add comment' }))
 
+    // A project-wide comment carries no target field at all.
     await waitFor(() =>
-      expect(api.createProductionNote).toHaveBeenCalledWith(7, {
+      expect(api.createProjectComment).toHaveBeenCalledWith(7, {
         title: 'Fog idea',
         body: 'Keep the horizon unreadable.',
         isPinned: true,
-        referenceImageId: 9,
       })
     )
-    await waitFor(() => expect(onChanged).toHaveBeenCalled())
   })
 
-  // A production note that was create-only is the maintainer's exact complaint:
-  // the body has to be correctable in place, and the save must not detach the
-  // note from the level it belongs to.
-  it('edits a note body in place and keeps its target', async () => {
-    queries.useProductionNotesQuery.mockReturnValue(
-      query([
-        {
-          id: 11,
-          projectId: 7,
-          levelId: 3,
-          referenceImageId: null,
-          characterId: null,
-          title: 'Bell tower mood',
-          body: 'Cold, thin light.',
-          isPinned: true,
-          createdAt: '2026-09-25T00:00:00Z',
-          updatedAt: '2026-09-25T00:00:00Z',
-        },
-      ]) as never
+  // A comment that was create-only is the maintainer's exact complaint: the
+  // body has to be correctable in place, and the save must not detach the
+  // comment from the level it belongs to - nor change its status.
+  it('edits a comment body in place and keeps its target and status', async () => {
+    queries.useProjectCommentsQuery.mockReturnValue(
+      query([comment({ levelId: 3 })]) as never
     )
-    api.updateProductionNote.mockResolvedValue({ id: 11 } as never)
-    const onChanged = jest.fn()
-    renderWithProviders(
-      <ProjectStudioSection projectId={7} onChanged={onChanged} />,
-      { tabId: 'project-7' }
-    )
+    renderWithProviders(<ProjectStudioSection projectId={7} />, {
+      tabId: 'project-7',
+    })
 
-    await userEvent.click(
-      screen.getByRole('button', { name: 'Edit note Bell tower mood' })
+    expect(screen.getByTestId('project-comment-row')).toHaveTextContent(
+      'Level: Forest Crossing'
     )
-    const body = screen.getByLabelText('Edit note body')
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Edit Bell tower mood' })
+    )
+    const body = screen.getByLabelText('Edit comment')
     expect(body).toHaveValue('Cold, thin light.')
     await userEvent.clear(body)
     await userEvent.type(body, 'Cold light, long shadows.')
-    await userEvent.click(
-      screen.getByRole('button', { name: 'Save note changes' })
-    )
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
 
     await waitFor(() =>
-      expect(api.updateProductionNote).toHaveBeenCalledWith(7, 11, {
+      expect(api.updateProjectComment).toHaveBeenCalledWith(7, 11, {
         levelId: 3,
-        referenceImageId: null,
-        characterId: null,
         title: 'Bell tower mood',
         body: 'Cold light, long shadows.',
         isPinned: true,
+      })
+    )
+  })
+
+  // Resolving must send the status with the optional resolution, and the
+  // target must ride along or the comment would fall off the level.
+  it('resolves a comment with a resolution and reopens a resolved one', async () => {
+    queries.useProjectCommentsQuery.mockReturnValue(
+      query([
+        comment({ levelId: 3 }),
+        comment({
+          id: 12,
+          title: 'Fog density',
+          isPinned: false,
+          status: 'resolved',
+          resolution: 'Halved the fog.',
+        }),
+      ]) as never
+    )
+    renderWithProviders(<ProjectStudioSection projectId={7} />, {
+      tabId: 'project-7',
+    })
+
+    const rows = screen.getAllByTestId('project-comment-row')
+    // Open first, resolved after it and visibly quieter.
+    expect(rows.map(row => row.getAttribute('data-status'))).toEqual([
+      'open',
+      'resolved',
+    ])
+    expect(rows[1]).toHaveClass('is-resolved')
+    expect(rows[1]).toHaveTextContent('Halved the fog.')
+    expect(screen.getByTestId('project-comment-open-count')).toHaveTextContent(
+      '1 open'
+    )
+
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Resolve Bell tower mood' })
+    )
+    await userEvent.type(
+      screen.getByLabelText('Resolution for Bell tower mood'),
+      'Moved the light source.'
+    )
+    await userEvent.click(screen.getByRole('button', { name: 'Resolve' }))
+
+    await waitFor(() =>
+      expect(api.updateProjectComment).toHaveBeenCalledWith(7, 11, {
+        levelId: 3,
+        title: 'Bell tower mood',
+        body: 'Cold, thin light.',
+        isPinned: true,
+        status: 'resolved',
+        resolution: 'Moved the light source.',
+      })
+    )
+
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Reopen Fog density' })
+    )
+    await waitFor(() =>
+      expect(api.updateProjectComment).toHaveBeenCalledWith(7, 12, {
+        title: 'Fog density',
+        body: 'Cold, thin light.',
+        isPinned: false,
+        status: 'open',
+        resolution: null,
       })
     )
   })

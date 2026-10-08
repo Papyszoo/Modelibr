@@ -18,6 +18,11 @@ export interface ProjectEnvironmentMapDto {
   name: string
 }
 
+export interface ProjectVfxDto {
+  id: number
+  name: string
+}
+
 export interface ProjectDto {
   id: number
   name: string
@@ -55,6 +60,8 @@ export interface ProjectConceptImageDto {
 
 export interface ProjectDetailDto extends ProjectDto {
   conceptImages: ProjectConceptImageDto[]
+  vfxCount?: number
+  vfx?: ProjectVfxDto[]
 }
 
 export interface GetAllProjectsResponse {

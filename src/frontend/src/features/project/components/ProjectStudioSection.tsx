@@ -7,85 +7,114 @@ import { InputTextarea } from 'primereact/inputtextarea'
 import { useState } from 'react'
 
 import {
-  createProductionNote,
   createProjectLevel,
-  type ProductionNoteDto,
-  type ProductionNoteRequest,
   type ProjectCharacterDto,
+  type ProjectCommentDto,
+  type ProjectCommentTargetKind,
   type ProjectLevelDto,
   type ProjectLevelStatus,
   type ProjectReferenceDto,
-  updateProductionNote,
 } from '@/features/project/api/projectStudioApi'
 import {
-  useProductionNotesQuery,
   useProjectCharactersQuery,
+  useProjectCommentsQuery,
   useProjectLevelsQuery,
   useProjectReferencesQuery,
 } from '@/features/project/api/projectStudioQueries'
+import { commentTarget } from '@/features/project/commentTargets'
+import { useScenesQuery } from '@/features/scenes/api/queries'
+import { useTabUiState } from '@/hooks/useTabUiState'
 import {
   EmptyState,
   ErrorState,
   LoadingState,
 } from '@/shared/components/feedback'
-import { useScenesQuery } from '@/features/scenes/api/queries'
-
-import { useTabUiState } from '@/hooks/useTabUiState'
 
 import { LEVEL_STATUSES, levelStatusLabel } from '../levelStatus'
-
 import { ProjectCharactersSection } from './ProjectCharactersSection'
+import { ProjectCommentsBadge } from './ProjectCommentsBadge'
+import { ProjectCommentThread } from './ProjectCommentThread'
 import { ProjectLevelAssetsSection } from './ProjectLevelAssetsSection'
 import { ProjectLevelSceneButton } from './ProjectLevelSceneButton'
 import { ProjectLevelWorkspace } from './ProjectLevelWorkspace'
-import { ProductionNoteItem } from './ProductionNoteItem'
 import { ProjectReferenceBoard } from './ProjectReferenceBoard'
 import {
   ProjectWorkspaceShell,
   type ProjectWorkspaceView,
 } from './ProjectWorkspaceShell'
 
+/** Names of the project's own assets, for saying what a comment is about. */
+export type ProjectAssetNames = Partial<
+  Record<
+    'models' | 'textureSets' | 'sprites' | 'environmentMaps' | 'vfx',
+    Array<{ id: number; name: string }>
+  >
+>
+
 interface ProjectStudioSectionProps {
   projectId: number
   tabId?: string
   onChanged?: () => void
+  assets?: ProjectAssetNames
+}
+
+const TARGET_LABELS: Record<ProjectCommentTargetKind, string> = {
+  levelId: 'Level',
+  referenceImageId: 'Reference',
+  characterId: 'Character',
+  modelId: 'Model',
+  textureSetId: 'Texture set',
+  spriteId: 'Sprite',
+  soundId: 'Sound',
+  environmentMapId: 'Environment map',
+  vfxId: 'VFX',
 }
 
 /**
- * What a note is attached to, in words rather than ids.
+ * What a comment is about, in words rather than ids.
  *
- * Resolving the names needs the levels, characters and references the studio has
- * already loaded, so a note that pointed at "Level #4" said nothing a user could
- * act on - and the target is the whole point of a production note.
+ * Resolving the names needs the levels, characters, references and assets the
+ * studio already has, so a comment that pointed at "Level #4" said nothing a
+ * user could act on - and the target is the whole point of a comment.
  */
-function noteTargetLabel(
-  note: ProductionNoteDto,
+function commentTargetLabel(
+  comment: ProjectCommentDto,
   levels: ProjectLevelDto[],
   characters: ProjectCharacterDto[],
-  references: ProjectReferenceDto[]
+  references: ProjectReferenceDto[],
+  assets: ProjectAssetNames
 ): string {
-  if (note.levelId) {
-    return `Level: ${levels.find(level => level.id === note.levelId)?.name ?? note.levelId}`
+  const target = commentTarget(comment)
+  if (!target) return 'Project'
+
+  const named = (items?: Array<{ id: number; name: string }>) =>
+    items?.find(item => item.id === target.id)?.name
+  const name: Partial<Record<ProjectCommentTargetKind, string | undefined>> = {
+    levelId: named(levels),
+    characterId: named(characters),
+    referenceImageId: (() => {
+      const reference = references.find(item => item.id === target.id)
+      return reference ? reference.title || reference.fileName : undefined
+    })(),
+    modelId: named(assets.models),
+    textureSetId: named(assets.textureSets),
+    spriteId: named(assets.sprites),
+    environmentMapId: named(assets.environmentMaps),
+    vfxId: named(assets.vfx),
   }
-  if (note.characterId) {
-    return `Character: ${characters.find(character => character.id === note.characterId)?.name ?? note.characterId}`
-  }
-  if (note.referenceImageId) {
-    const reference = references.find(item => item.id === note.referenceImageId)
-    return `Reference: ${reference ? reference.title || reference.fileName : note.referenceImageId}`
-  }
-  return 'Project'
+  return `${TARGET_LABELS[target.kind]}: ${name[target.kind] ?? `#${target.id}`}`
 }
 
 export function ProjectStudioSection({
   projectId,
   tabId,
   onChanged,
+  assets = {},
 }: ProjectStudioSectionProps) {
   const queryClient = useQueryClient()
   const levelsQuery = useProjectLevelsQuery(projectId)
   const charactersQuery = useProjectCharactersQuery(projectId)
-  const notesQuery = useProductionNotesQuery(projectId)
+  const commentsQuery = useProjectCommentsQuery(projectId)
   const referencesQuery = useProjectReferencesQuery(projectId)
   const scenesQuery = useScenesQuery()
 
@@ -113,11 +142,6 @@ export function ProjectStudioSection({
     'projectOpenLevelId',
     null
   )
-  const [showNoteForm, setShowNoteForm] = useState(false)
-  const [noteTitle, setNoteTitle] = useState('')
-  const [noteBody, setNoteBody] = useState('')
-  const [noteTarget, setNoteTarget] = useState('project')
-  const [notePinned, setNotePinned] = useState(false)
 
   const invalidateStudio = async () => {
     await Promise.all([
@@ -126,9 +150,6 @@ export function ProjectStudioSection({
       }),
       queryClient.invalidateQueries({
         queryKey: ['projects', projectId, 'characters'],
-      }),
-      queryClient.invalidateQueries({
-        queryKey: ['projects', projectId, 'production-notes'],
       }),
       queryClient.invalidateQueries({
         queryKey: ['projects', projectId, 'references'],
@@ -155,55 +176,10 @@ export function ProjectStudioSection({
     },
   })
 
-  const createNote = useMutation({
-    mutationFn: () => {
-      const request: ProductionNoteRequest = {
-        title: noteTitle.trim(),
-        body: noteBody.trim(),
-        isPinned: notePinned,
-      }
-      if (noteTarget.startsWith('level:')) {
-        request.levelId = Number(noteTarget.slice('level:'.length))
-      } else if (noteTarget.startsWith('reference:')) {
-        request.referenceImageId = Number(noteTarget.slice('reference:'.length))
-      } else if (noteTarget.startsWith('character:')) {
-        request.characterId = Number(noteTarget.slice('character:'.length))
-      }
-      return createProductionNote(projectId, request)
-    },
-    onSuccess: async () => {
-      setNoteTitle('')
-      setNoteBody('')
-      setNoteTarget('project')
-      setNotePinned(false)
-      await invalidateStudio()
-    },
-  })
-
-  const updateNote = useMutation({
-    mutationFn: (input: {
-      note: ProductionNoteDto
-      title: string
-      body: string
-      isPinned: boolean
-    }) =>
-      updateProductionNote(projectId, input.note.id, {
-        // The update route replaces the whole note, so the target it was
-        // written for has to be resent or it would be detached.
-        levelId: input.note.levelId,
-        referenceImageId: input.note.referenceImageId,
-        characterId: input.note.characterId,
-        title: input.title,
-        body: input.body,
-        isPinned: input.isPinned,
-      }),
-    onSuccess: invalidateStudio,
-  })
-
   const queryError =
     levelsQuery.error ??
     charactersQuery.error ??
-    notesQuery.error ??
+    commentsQuery.error ??
     referencesQuery.error
   if (queryError) {
     return (
@@ -217,7 +193,7 @@ export function ProjectStudioSection({
         onRetry={() => {
           void Promise.all([
             levelsQuery.refetch(),
-            notesQuery.refetch(),
+            commentsQuery.refetch(),
             referencesQuery.refetch(),
           ])
         }}
@@ -228,7 +204,7 @@ export function ProjectStudioSection({
   if (
     levelsQuery.isLoading ||
     charactersQuery.isLoading ||
-    notesQuery.isLoading ||
+    commentsQuery.isLoading ||
     referencesQuery.isLoading
   ) {
     return <LoadingState message="Loading production context…" />
@@ -236,92 +212,20 @@ export function ProjectStudioSection({
 
   const levels = levelsQuery.data ?? []
   const characters = charactersQuery.data ?? []
-  const notes = notesQuery.data ?? []
+  const comments = commentsQuery.data ?? []
   const references = referencesQuery.data ?? []
-  const pinnedNotes = notes.filter(note => note.isPinned)
+  const decisions = comments.filter(comment => comment.isPinned)
+  const openComments = comments.filter(comment => comment.status !== 'resolved')
 
   /*
-   * Two of the three counts on a level row, derived from data the studio already
-   * has rather than from three more requests: the workspace loads the notes and
-   * the scene list anyway, so a level's note and scene counts are a filter over
-   * what is in hand. The variant count comes from the level DTO itself.
+   * The scene count on a level row is derived from the scene list the
+   * workspace loads anyway, rather than from a request per level. The variant
+   * count comes from the level DTO itself, and the comments badge counts its
+   * own open comments.
    */
   const sceneCountForLevel = (levelId: number): number =>
     (scenesQuery.data ?? []).filter(scene => scene.projectLevelId === levelId)
       .length
-  const noteCountForLevel = (levelId: number): number =>
-    notes.filter(note => note.levelId === levelId).length
-
-  /*
-   * Hoisted out of the JSX because the note form is reachable from two views and
-   * duplicated markup drifts. Not a component: it closes over five pieces of
-   * local draft state, and lifting that out would be a bigger change than the
-   * duplication it replaces.
-   */
-  const noteForm = (
-    <form
-      className="project-studio-form"
-      onSubmit={event => {
-        event.preventDefault()
-        if (noteTitle.trim() && noteBody.trim()) createNote.mutate()
-      }}
-    >
-      <label htmlFor="new-project-note">New note or idea</label>
-      <InputText
-        id="new-project-note"
-        value={noteTitle}
-        onChange={event => setNoteTitle(event.target.value)}
-        placeholder="Lighting mood"
-      />
-      <InputTextarea
-        aria-label="Note body"
-        value={noteBody}
-        onChange={event => setNoteBody(event.target.value)}
-        rows={2}
-        placeholder="What should the team remember?"
-      />
-      <div className="project-studio-form-row">
-        <select
-          aria-label="Note target"
-          value={noteTarget}
-          onChange={event => setNoteTarget(event.target.value)}
-        >
-          <option value="project">Project</option>
-          {levels.map(level => (
-            <option key={level.id} value={`level:${level.id}`}>
-              Level: {level.name}
-            </option>
-          ))}
-          {characters.map(character => (
-            <option key={character.id} value={`character:${character.id}`}>
-              Character: {character.name}
-            </option>
-          ))}
-          {references.map(reference => (
-            <option key={reference.id} value={`reference:${reference.id}`}>
-              Reference: {reference.title || reference.fileName}
-            </option>
-          ))}
-        </select>
-        <label className="project-studio-checkbox">
-          <input
-            type="checkbox"
-            checked={notePinned}
-            onChange={event => setNotePinned(event.target.checked)}
-          />
-          Pin as idea
-        </label>
-        <Button
-          type="submit"
-          icon="pi pi-arrow-up"
-          aria-label="Create note"
-          disabled={
-            !noteTitle.trim() || !noteBody.trim() || createNote.isPending
-          }
-        />
-      </div>
-    </form>
-  )
 
   const levelCard = (
     <section
@@ -389,14 +293,14 @@ export function ProjectStudioSection({
                           : 'scenes'}
                       </span>
                     )}
-                  {noteCountForLevel(level.id) > 0 && (
-                    <span data-testid="project-level-row-notes">
-                      {noteCountForLevel(level.id)}{' '}
-                      {noteCountForLevel(level.id) === 1 ? 'note' : 'notes'}
-                    </span>
-                  )}
                 </span>
               </button>
+              <ProjectCommentsBadge
+                projectId={projectId}
+                target={{ kind: 'levelId', id: level.id }}
+                targetName={level.name}
+                variant="inline"
+              />
               <ProjectLevelSceneButton
                 projectId={projectId}
                 levelId={level.id}
@@ -466,7 +370,8 @@ export function ProjectStudioSection({
         </div>
         <span className="project-studio-summary">
           {levels.length} {levels.length === 1 ? 'level' : 'levels'} ·{' '}
-          {pinnedNotes.length} pinned notes
+          {openComments.length} open comments · {decisions.length}{' '}
+          {decisions.length === 1 ? 'decision' : 'decisions'}
         </span>
       </div>
 
@@ -500,51 +405,25 @@ export function ProjectStudioSection({
               {levelCard}
               <section
                 className="project-studio-card"
-                aria-labelledby="project-notes-title"
+                aria-label="Comments and decisions"
               >
-                <div className="project-studio-card-header">
-                  <div className="project-studio-card-title">
-                    <h4 id="project-notes-title">Notes & ideas</h4>
-                    <span className="project-studio-count">{notes.length}</span>
-                  </div>
-                  <Button
-                    icon="pi pi-plus"
-                    text
-                    rounded
-                    aria-label="Add note"
-                    title="Add note"
-                    onClick={() => setShowNoteForm(current => !current)}
-                  />
-                </div>
-                {notes.length === 0 ? (
-                  <EmptyState
-                    icon="pi pi-file-edit"
-                    title="No notes yet"
-                    message="Record what the team should remember, or pin an idea."
-                  />
-                ) : (
-                  <div className="project-note-list">
-                    {notes.map(note => (
-                      <ProductionNoteItem
-                        key={note.id}
-                        note={note}
-                        testId="project-note-row"
-                        className="project-note-row"
-                        pending={updateNote.isPending}
-                        meta={noteTargetLabel(
-                          note,
-                          levels,
-                          characters,
-                          references
-                        )}
-                        onSave={values =>
-                          updateNote.mutate({ note, ...values })
-                        }
-                      />
-                    ))}
-                  </div>
-                )}
-                {showNoteForm ? noteForm : null}
+                <ProjectCommentThread
+                  projectId={projectId}
+                  target={null}
+                  targetName="the project"
+                  heading="Comments & decisions"
+                  listAll
+                  itemTestId="project-comment-row"
+                  describeTarget={comment =>
+                    commentTargetLabel(
+                      comment,
+                      levels,
+                      characters,
+                      references,
+                      assets
+                    )
+                  }
+                />
               </section>
             </div>
           ) : null}

@@ -2,8 +2,8 @@ import { useQuery } from '@tanstack/react-query'
 
 import { getModelsByProject } from './projectApi'
 import {
-  getProductionNotes,
   getProjectCharacters,
+  getProjectComments,
   getProjectLevels,
   getProjectReferences,
 } from './projectStudioApi'
@@ -39,18 +39,15 @@ export function useProjectCharactersQuery(projectId: number) {
   })
 }
 
-export function useProductionNotesQuery(
-  projectId: number,
-  options: {
-    levelId?: number
-    referenceImageId?: number
-    characterId?: number
-    isPinned?: boolean
-  } = {}
-) {
+/**
+ * Every comment in the project, under one key. Each comments badge and thread
+ * filters this list by its own target rather than asking for its own slice -
+ * a project page shows dozens of badges, and one request answers all of them.
+ */
+export function useProjectCommentsQuery(projectId: number) {
   return useQuery({
-    queryKey: ['projects', projectId, 'production-notes', options],
-    queryFn: () => getProductionNotes(projectId, options),
+    queryKey: ['projects', projectId, 'comments'],
+    queryFn: () => getProjectComments(projectId),
   })
 }
 

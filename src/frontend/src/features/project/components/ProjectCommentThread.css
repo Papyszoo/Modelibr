@@ -1,0 +1,234 @@
+/*
+ * The project comment thread - one component for every surface that shows
+ * comments (asset panels, characters, references, the overview), so it is
+ * styled here rather than in any caller's stylesheet.
+ */
+.project-comment-thread {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mod-space-xs);
+  min-width: 0;
+}
+
+.project-comment-thread-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--mod-space-xs);
+}
+
+.project-comment-thread-title {
+  display: flex;
+  align-items: baseline;
+  gap: var(--mod-space-xs);
+  min-width: 0;
+}
+
+.project-comment-thread-title h5 {
+  margin: 0;
+  font-size: var(--mod-text-sm);
+  font-weight: var(--mod-font-weight-semibold);
+}
+
+.project-comment-thread-count {
+  color: var(--mod-color-text-muted);
+  font-size: var(--mod-text-xs);
+}
+
+.project-comment-thread-empty {
+  margin: 0;
+  color: var(--mod-color-text-muted);
+  font-size: var(--mod-text-sm);
+}
+
+.project-comment-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mod-space-xs);
+}
+
+/* ── One comment ───────────────────────────────────────────────── */
+
+.project-comment {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mod-space-2xs);
+  padding: var(--mod-space-xs) var(--mod-space-sm);
+  border: 1px solid var(--mod-color-border);
+  border-left: 3px solid var(--mod-color-primary);
+  border-radius: var(--mod-radius-sm);
+  background: var(--mod-color-surface);
+  transition: opacity var(--mod-transition-fast);
+}
+
+.project-comment.is-resolved {
+  border-left-color: var(--mod-color-border);
+  background: transparent;
+  opacity: 0.62;
+}
+
+.project-comment.is-resolved:hover,
+.project-comment.is-resolved:focus-within {
+  opacity: 1;
+}
+
+.project-comment-heading {
+  display: flex;
+  align-items: center;
+  gap: var(--mod-space-xs);
+  min-width: 0;
+}
+
+.project-comment-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--mod-text-sm);
+}
+
+.project-comment.is-resolved .project-comment-title {
+  color: var(--mod-color-text-muted);
+  font-weight: var(--mod-font-weight-medium);
+}
+
+.project-comment-chip {
+  flex: 0 0 auto;
+  padding: 0 var(--mod-space-2xs);
+  border-radius: var(--mod-radius-pill);
+  font-size: var(--mod-text-xs);
+  line-height: 1.4;
+}
+
+.project-comment-chip.is-decision {
+  background: rgba(var(--primary-color-rgb), 0.12);
+  color: var(--mod-color-primary);
+}
+
+.project-comment-chip.is-resolved {
+  background: var(--mod-color-success-bg);
+  color: var(--mod-color-success);
+}
+
+.project-comment-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--mod-space-2xs);
+  margin-left: auto;
+}
+
+/* The :not() chain outranks the global native-button rule in index.css. */
+.project-comment-icon:not(.p-button):not(.p-component):not(.p-link) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  padding: 0;
+  border: 0;
+  border-radius: var(--mod-radius-sm);
+  background: none;
+  color: var(--mod-color-text-muted);
+  cursor: pointer;
+  font-size: var(--mod-text-xs);
+  transition:
+    color var(--mod-transition-fast),
+    background var(--mod-transition-fast);
+}
+
+.project-comment-icon:not(.p-button):not(.p-component):not(.p-link):hover,
+.project-comment-icon:not(.p-button):not(.p-component):not(
+    .p-link
+  ):focus-visible {
+  background: var(--mod-color-surface-hover);
+  color: var(--mod-color-primary);
+}
+
+.project-comment-icon:not(.p-button):not(.p-component):not(
+    .p-link
+  ).is-resolve:hover,
+.project-comment-icon:not(.p-button):not(.p-component):not(
+    .p-link
+  ).is-resolve:focus-visible {
+  color: var(--mod-color-success);
+}
+
+.project-comment-icon:not(.p-button):not(.p-component):not(.p-link):disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.project-comment.is-pinned
+  .project-comment-icon:not(.p-button):not(.p-component):not(
+    .p-link
+  ):first-child {
+  color: var(--mod-color-primary);
+}
+
+.project-comment-body {
+  margin: 0;
+  color: var(--mod-color-text);
+  font-size: var(--mod-text-sm);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.project-comment.is-resolved .project-comment-body {
+  color: var(--mod-color-text-muted);
+}
+
+.project-comment-resolution {
+  display: flex;
+  align-items: baseline;
+  gap: var(--mod-space-2xs);
+  margin: 0;
+  color: var(--mod-color-success);
+  font-size: var(--mod-text-sm);
+  overflow-wrap: anywhere;
+}
+
+.project-comment-resolution i {
+  font-size: var(--mod-text-xs);
+}
+
+.project-comment-meta {
+  color: var(--mod-color-text-muted);
+  font-size: var(--mod-text-xs);
+}
+
+/* ── Composer, edit and resolve forms ─────────────────────────── */
+
+.project-comment-form,
+.project-comment-resolve-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mod-space-xs);
+}
+
+.project-comment-form .p-inputtext,
+.project-comment-resolve-form .p-inputtext {
+  width: 100%;
+  font-size: var(--mod-text-sm);
+}
+
+.project-comment-resolve-form {
+  margin-top: var(--mod-space-2xs);
+}
+
+.project-comment-form-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--mod-space-xs);
+}
+
+.project-comment-pin-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--mod-space-2xs);
+  margin-right: auto;
+  color: var(--mod-color-text-muted);
+  font-size: var(--mod-text-sm);
+  white-space: nowrap;
+  cursor: pointer;
+}

@@ -10,12 +10,18 @@
 .project-characters-header,
 .project-character-card-header,
 .project-character-header-actions,
+.project-character-card-actions,
 .project-character-link-row,
 .project-character-form-actions {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--mod-space-xs);
+}
+
+.project-character-card-actions {
+  flex: 0 0 auto;
+  gap: var(--mod-space-2xs);
 }
 
 .project-characters-header h3,
@@ -160,14 +166,12 @@
   justify-content: flex-end;
 }
 
-.project-character-note,
 .project-character-link-row {
   padding: var(--mod-space-xs) 0;
   border-bottom: 1px solid var(--surface-border);
   font-size: var(--mod-text-sm);
 }
 
-.project-character-note p,
 .project-character-link-row small {
   display: block;
   margin: var(--mod-space-2xs) 0 0;

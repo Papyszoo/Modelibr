@@ -77,7 +77,7 @@ describe('ProjectCharactersSection', () => {
     queries.useProjectLevelsQuery.mockReturnValue(
       query([{ id: 5, name: 'Forest Crossing' }]) as never
     )
-    queries.useProductionNotesQuery.mockReturnValue(query([]) as never)
+    queries.useProjectCommentsQuery.mockReturnValue(query([]) as never)
     // The linked-model picker reads the project's explicit members.
     queries.useProjectMemberModelsQuery.mockReturnValue(query([]) as never)
     api.createProjectCharacter.mockResolvedValue(character)
@@ -108,8 +108,8 @@ describe('ProjectCharactersSection', () => {
       screen.queryByLabelText('New ability for Ashen Warden')
     ).not.toBeInTheDocument()
 
-    await userEvent.click(screen.getByRole('tab', { name: 'Enemy notes' }))
-    expect(screen.getByText('Enemy notes and weaknesses')).toBeVisible()
+    await userEvent.click(screen.getByRole('tab', { name: 'Comments' }))
+    expect(screen.getByText('Enemy weaknesses and comments')).toBeVisible()
   })
 
   it('creates a character with parsed tags from a compact form', async () => {
@@ -435,8 +435,8 @@ describe('ProjectCharactersSection', () => {
     })
   })
 
-  it('edits a character note in place', async () => {
-    queries.useProductionNotesQuery.mockReturnValue(
+  it('edits a character comment in place', async () => {
+    queries.useProjectCommentsQuery.mockReturnValue(
       query([
         {
           id: 8,
@@ -444,37 +444,44 @@ describe('ProjectCharactersSection', () => {
           levelId: null,
           referenceImageId: null,
           characterId: 3,
+          modelId: null,
+          textureSetId: null,
+          spriteId: null,
+          soundId: null,
+          environmentMapId: null,
+          vfxId: null,
           title: 'Weakness',
           body: 'Fears water.',
           isPinned: false,
+          status: 'open',
+          resolution: null,
           createdAt: '2026-09-25T00:00:00Z',
           updatedAt: '2026-09-25T00:00:00Z',
         },
       ]) as never
     )
-    api.updateProductionNote.mockResolvedValue({ id: 8 } as never)
+    api.updateProjectComment.mockResolvedValue({ id: 8 } as never)
 
     renderSection()
+    // The collapsed card already says how many comments are open.
+    expect(screen.getByTestId('project-comments-badge')).toHaveAttribute(
+      'data-open-count',
+      '1'
+    )
     await userEvent.click(
       screen.getByRole('button', { name: 'Edit Ashen Warden' })
     )
-    await userEvent.click(screen.getByRole('tab', { name: 'Enemy notes' }))
+    await userEvent.click(screen.getByRole('tab', { name: 'Comments' }))
 
-    await userEvent.click(
-      screen.getByRole('button', { name: 'Edit note Weakness' })
-    )
-    const body = screen.getByLabelText('Edit note body')
+    await userEvent.click(screen.getByRole('button', { name: 'Edit Weakness' }))
+    const body = screen.getByLabelText('Edit comment')
     expect(body).toHaveValue('Fears water.')
     await userEvent.clear(body)
     await userEvent.type(body, 'Fears fire.')
-    await userEvent.click(
-      screen.getByRole('button', { name: 'Save note changes' })
-    )
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
 
     await waitFor(() =>
-      expect(api.updateProductionNote).toHaveBeenCalledWith(7, 8, {
-        levelId: null,
-        referenceImageId: null,
+      expect(api.updateProjectComment).toHaveBeenCalledWith(7, 8, {
         characterId: 3,
         title: 'Weakness',
         body: 'Fears fire.',

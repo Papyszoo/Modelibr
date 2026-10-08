@@ -2,6 +2,7 @@ using System.ComponentModel;
 using Application.Abstractions.Messaging;
 using Application.Projects;
 using Application.Projects.Profile;
+using Domain.Projects;
 using ModelContextProtocol.Server;
 
 namespace WebApi.Mcp;
@@ -55,23 +56,34 @@ public sealed class ProjectReadMcpTools
             : new { options = result.Value };
     }
 
-    [McpServerTool(Name = "list_project_notes")]
-    [Description("A project's production notes. pinnedOnly=true returns just the ideas. Filter by levelId or referenceImageId to read one target's notes.")]
-    public static async Task<object> ListProjectNotes(
-        IQueryHandler<GetProductionNotesQuery, IReadOnlyList<ProductionNoteDto>> handler,
+    [McpServerTool(Name = "list_project_comments")]
+    [Description("A project's comments, pinned ones (the project's decisions) first. Each is open or resolved, a resolved one may carry a resolution saying what changed, and each names at most one target: a level, reference image, character, model, texture set, sprite, sound, environment map or VFX. Filter by status, pinnedOnly, or any target id to read one thing's comments.")]
+    public static async Task<object> ListProjectComments(
+        IQueryHandler<GetProjectCommentsQuery, IReadOnlyList<ProjectCommentDto>> handler,
         [Description("Project id.")] int projectId,
+        [Description("open or resolved; omit for both.")] string? status = null,
+        [Description("Only pinned comments, the project's decisions (default false = all comments).")] bool pinnedOnly = false,
         [Description("Optional level filter.")] int? levelId = null,
         [Description("Optional reference-image filter.")] int? referenceImageId = null,
-        [Description("Only notes pinned as ideas (default false = all notes).")] bool pinnedOnly = false,
+        [Description("Optional character filter.")] int? characterId = null,
+        [Description("Optional model filter.")] int? modelId = null,
+        [Description("Optional texture-set filter.")] int? textureSetId = null,
+        [Description("Optional sprite filter.")] int? spriteId = null,
+        [Description("Optional sound filter.")] int? soundId = null,
+        [Description("Optional environment-map filter.")] int? environmentMapId = null,
+        [Description("Optional VFX filter.")] int? vfxId = null,
         CancellationToken cancellationToken = default)
     {
+        var target = new ProjectCommentTarget(
+            levelId, referenceImageId, characterId, modelId, textureSetId,
+            spriteId, soundId, environmentMapId, vfxId);
         var result = await handler.Handle(
-            new GetProductionNotesQuery(projectId, levelId, referenceImageId, pinnedOnly ? true : (bool?)null),
+            new GetProjectCommentsQuery(projectId, target, pinnedOnly ? true : null, status),
             cancellationToken);
 
         return result.IsFailure
             ? new { error = result.Error.Code, message = result.Error.Message }
-            : new { notes = result.Value };
+            : new { comments = result.Value };
     }
 
     [McpServerTool(Name = "list_project_levels")]

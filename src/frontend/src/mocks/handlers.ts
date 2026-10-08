@@ -449,34 +449,38 @@ export const handlers = [
     `${BASE_URL}/projects/:id/levels/:levelId`,
     () => new HttpResponse(null, { status: 204 })
   ),
-  http.get(`${BASE_URL}/projects/:id/production-notes`, () =>
-    HttpResponse.json([])
-  ),
+  http.get(`${BASE_URL}/projects/:id/comments`, () => HttpResponse.json([])),
   http.get(
-    `${BASE_URL}/projects/:id/production-notes/:noteId`,
+    `${BASE_URL}/projects/:id/comments/:commentId`,
     () => new HttpResponse(null, { status: 404 })
   ),
   http.post(
-    `${BASE_URL}/projects/:id/production-notes`,
+    `${BASE_URL}/projects/:id/comments`,
     async ({ request, params }) => {
       const body = (await request.json()) as {
-        levelId?: number | null
-        referenceImageId?: number | null
-        characterId?: number | null
         title: string
         body: string
         isPinned: boolean
-      }
+      } & Record<string, number | null | undefined>
+      const target = (key: string) => (body[key] as number | undefined) ?? null
       return HttpResponse.json(
         {
           id: 1,
           projectId: Number(params.id),
-          levelId: body.levelId ?? null,
-          referenceImageId: body.referenceImageId ?? null,
-          characterId: body.characterId ?? null,
+          levelId: target('levelId'),
+          referenceImageId: target('referenceImageId'),
+          characterId: target('characterId'),
+          modelId: target('modelId'),
+          textureSetId: target('textureSetId'),
+          spriteId: target('spriteId'),
+          soundId: target('soundId'),
+          environmentMapId: target('environmentMapId'),
+          vfxId: target('vfxId'),
           title: body.title,
           body: body.body,
           isPinned: body.isPinned,
+          status: 'open',
+          resolution: null,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
         },
@@ -485,11 +489,19 @@ export const handlers = [
     }
   ),
   http.put(
-    `${BASE_URL}/projects/:id/production-notes/:noteId`,
+    `${BASE_URL}/projects/:id/comments/:commentId`,
     () => new HttpResponse(null, { status: 404 })
   ),
   http.delete(
-    `${BASE_URL}/projects/:id/production-notes/:noteId`,
+    `${BASE_URL}/projects/:id/comments/:commentId`,
+    () => new HttpResponse(null, { status: 204 })
+  ),
+  http.post(
+    `${BASE_URL}/projects/:projectId/vfx/:vfxId`,
+    () => new HttpResponse(null, { status: 204 })
+  ),
+  http.delete(
+    `${BASE_URL}/projects/:projectId/vfx/:vfxId`,
     () => new HttpResponse(null, { status: 204 })
   ),
   http.get(`${BASE_URL}/projects/:id/references`, () => HttpResponse.json([])),

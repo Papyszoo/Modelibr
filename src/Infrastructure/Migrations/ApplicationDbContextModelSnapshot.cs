@@ -1738,69 +1738,6 @@ namespace Infrastructure.Migrations
                     b.ToTable("Packs");
                 });
 
-            modelBuilder.Entity("Domain.Models.ProductionNote", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<string>("Body")
-                        .IsRequired()
-                        .HasMaxLength(10000)
-                        .HasColumnType("character varying(10000)");
-
-                    b.Property<int?>("CharacterId")
-                        .HasColumnType("integer");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<bool>("IsPinned")
-                        .HasColumnType("boolean");
-
-                    b.Property<int?>("LevelId")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("ProjectId")
-                        .HasColumnType("integer");
-
-                    b.Property<int?>("ReferenceImageId")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("Title")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("CharacterId");
-
-                    b.HasIndex("LevelId");
-
-                    b.HasIndex("ReferenceImageId");
-
-                    b.HasIndex("ProjectId", "CharacterId");
-
-                    b.HasIndex("ProjectId", "IsPinned");
-
-                    b.HasIndex("ProjectId", "LevelId");
-
-                    b.HasIndex("ProjectId", "ReferenceImageId");
-
-                    b.HasIndex("ProjectId", "UpdatedAt");
-
-                    b.ToTable("ProductionNotes", null, t =>
-                        {
-                            t.HasCheckConstraint("CK_ProductionNotes_OneTarget", "(CASE WHEN \"LevelId\" IS NOT NULL THEN 1 ELSE 0 END) + (CASE WHEN \"ReferenceImageId\" IS NOT NULL THEN 1 ELSE 0 END) + (CASE WHEN \"CharacterId\" IS NOT NULL THEN 1 ELSE 0 END) <= 1");
-                        });
-                });
-
             modelBuilder.Entity("Domain.Models.Project", b =>
                 {
                     b.Property<int>("Id")
@@ -2030,6 +1967,114 @@ namespace Infrastructure.Migrations
                         .IsUnique();
 
                     b.ToTable("ProjectCharacterTags");
+                });
+
+            modelBuilder.Entity("Domain.Models.ProjectComment", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Body")
+                        .IsRequired()
+                        .HasMaxLength(10000)
+                        .HasColumnType("character varying(10000)");
+
+                    b.Property<int?>("CharacterId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("EnvironmentMapId")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("IsPinned")
+                        .HasColumnType("boolean");
+
+                    b.Property<int?>("LevelId")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("ModelId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("ProjectId")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("ReferenceImageId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Resolution")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<int?>("SoundId")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("SpriteId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasDefaultValue("open");
+
+                    b.Property<int?>("TextureSetId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("VfxId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CharacterId");
+
+                    b.HasIndex("EnvironmentMapId");
+
+                    b.HasIndex("LevelId");
+
+                    b.HasIndex("ModelId");
+
+                    b.HasIndex("ReferenceImageId");
+
+                    b.HasIndex("SoundId");
+
+                    b.HasIndex("SpriteId");
+
+                    b.HasIndex("TextureSetId");
+
+                    b.HasIndex("VfxId");
+
+                    b.HasIndex("ProjectId", "CharacterId");
+
+                    b.HasIndex("ProjectId", "IsPinned");
+
+                    b.HasIndex("ProjectId", "LevelId");
+
+                    b.HasIndex("ProjectId", "ReferenceImageId");
+
+                    b.HasIndex("ProjectId", "Status");
+
+                    b.HasIndex("ProjectId", "UpdatedAt");
+
+                    b.ToTable("ProductionNotes", null, t =>
+                        {
+                            t.HasCheckConstraint("CK_ProductionNotes_OneTarget", "(CASE WHEN \"LevelId\" IS NOT NULL THEN 1 ELSE 0 END) + (CASE WHEN \"ReferenceImageId\" IS NOT NULL THEN 1 ELSE 0 END) + (CASE WHEN \"CharacterId\" IS NOT NULL THEN 1 ELSE 0 END) + (CASE WHEN \"ModelId\" IS NOT NULL THEN 1 ELSE 0 END) + (CASE WHEN \"TextureSetId\" IS NOT NULL THEN 1 ELSE 0 END) + (CASE WHEN \"SpriteId\" IS NOT NULL THEN 1 ELSE 0 END) + (CASE WHEN \"SoundId\" IS NOT NULL THEN 1 ELSE 0 END) + (CASE WHEN \"EnvironmentMapId\" IS NOT NULL THEN 1 ELSE 0 END) + (CASE WHEN \"VfxId\" IS NOT NULL THEN 1 ELSE 0 END) <= 1");
+
+                            t.HasCheckConstraint("CK_ProductionNotes_Status", "\"Status\" IN ('open', 'resolved')");
+                        });
                 });
 
             modelBuilder.Entity("Domain.Models.ProjectConceptImage", b =>
@@ -3627,6 +3672,21 @@ namespace Infrastructure.Migrations
                     b.ToTable("ProjectTextureSets", (string)null);
                 });
 
+            modelBuilder.Entity("ProjectVfx", b =>
+                {
+                    b.Property<int>("ProjectsId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("VfxId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("ProjectsId", "VfxId");
+
+                    b.HasIndex("VfxId");
+
+                    b.ToTable("ProjectVfx", (string)null);
+                });
+
             modelBuilder.Entity("SoundTagAssignment", b =>
                 {
                     b.Property<int>("SoundId")
@@ -4056,38 +4116,6 @@ namespace Infrastructure.Migrations
                     b.Navigation("CustomThumbnailFile");
                 });
 
-            modelBuilder.Entity("Domain.Models.ProductionNote", b =>
-                {
-                    b.HasOne("Domain.Models.ProjectCharacter", "Character")
-                        .WithMany("Notes")
-                        .HasForeignKey("CharacterId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
-                    b.HasOne("Domain.Models.ProjectLevel", "Level")
-                        .WithMany("Notes")
-                        .HasForeignKey("LevelId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
-                    b.HasOne("Domain.Models.Project", "Project")
-                        .WithMany("ProductionNotes")
-                        .HasForeignKey("ProjectId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("Domain.Models.ProjectConceptImage", "ReferenceImage")
-                        .WithMany("Notes")
-                        .HasForeignKey("ReferenceImageId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
-                    b.Navigation("Character");
-
-                    b.Navigation("Level");
-
-                    b.Navigation("Project");
-
-                    b.Navigation("ReferenceImage");
-                });
-
             modelBuilder.Entity("Domain.Models.Project", b =>
                 {
                     b.HasOne("Domain.Models.File", "CustomThumbnailFile")
@@ -4170,6 +4198,68 @@ namespace Infrastructure.Migrations
                         .IsRequired();
 
                     b.Navigation("Project");
+                });
+
+            modelBuilder.Entity("Domain.Models.ProjectComment", b =>
+                {
+                    b.HasOne("Domain.Models.ProjectCharacter", "Character")
+                        .WithMany("Comments")
+                        .HasForeignKey("CharacterId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("Domain.Models.EnvironmentMap", null)
+                        .WithMany()
+                        .HasForeignKey("EnvironmentMapId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("Domain.Models.ProjectLevel", "Level")
+                        .WithMany("Comments")
+                        .HasForeignKey("LevelId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("Domain.Models.Model", null)
+                        .WithMany()
+                        .HasForeignKey("ModelId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("Domain.Models.Project", "Project")
+                        .WithMany("Comments")
+                        .HasForeignKey("ProjectId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Domain.Models.ProjectConceptImage", "ReferenceImage")
+                        .WithMany("Comments")
+                        .HasForeignKey("ReferenceImageId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("Domain.Models.Sound", null)
+                        .WithMany()
+                        .HasForeignKey("SoundId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("Domain.Models.Sprite", null)
+                        .WithMany()
+                        .HasForeignKey("SpriteId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("Domain.Models.TextureSet", null)
+                        .WithMany()
+                        .HasForeignKey("TextureSetId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("Domain.Models.Vfx", null)
+                        .WithMany()
+                        .HasForeignKey("VfxId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("Character");
+
+                    b.Navigation("Level");
+
+                    b.Navigation("Project");
+
+                    b.Navigation("ReferenceImage");
                 });
 
             modelBuilder.Entity("Domain.Models.ProjectConceptImage", b =>
@@ -4746,6 +4836,21 @@ namespace Infrastructure.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("ProjectVfx", b =>
+                {
+                    b.HasOne("Domain.Models.Project", null)
+                        .WithMany()
+                        .HasForeignKey("ProjectsId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Domain.Models.Vfx", null)
+                        .WithMany()
+                        .HasForeignKey("VfxId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("SoundTagAssignment", b =>
                 {
                     b.HasOne("Domain.Models.ModelTag", null)
@@ -4836,11 +4941,11 @@ namespace Infrastructure.Migrations
 
                     b.Navigation("Characters");
 
+                    b.Navigation("Comments");
+
                     b.Navigation("ConceptImages");
 
                     b.Navigation("Levels");
-
-                    b.Navigation("ProductionNotes");
 
                     b.Navigation("ProfileValues");
 
@@ -4851,11 +4956,11 @@ namespace Infrastructure.Migrations
                 {
                     b.Navigation("Abilities");
 
+                    b.Navigation("Comments");
+
                     b.Navigation("Images");
 
                     b.Navigation("Models");
-
-                    b.Navigation("Notes");
 
                     b.Navigation("ReferenceLinks");
 
@@ -4864,16 +4969,16 @@ namespace Infrastructure.Migrations
 
             modelBuilder.Entity("Domain.Models.ProjectConceptImage", b =>
                 {
-                    b.Navigation("Links");
+                    b.Navigation("Comments");
 
-                    b.Navigation("Notes");
+                    b.Navigation("Links");
                 });
 
             modelBuilder.Entity("Domain.Models.ProjectLevel", b =>
                 {
                     b.Navigation("CharacterVariants");
 
-                    b.Navigation("Notes");
+                    b.Navigation("Comments");
 
                     b.Navigation("ReferenceLinks");
 

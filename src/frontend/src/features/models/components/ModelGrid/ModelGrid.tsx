@@ -84,6 +84,7 @@ export function ModelGrid({
   textureSetId,
   viewStateScope,
   onTotalCountChange,
+  renderCardAccessory,
 }: ModelGridProps) {
   const [scrollParent, setScrollParent] = useState<HTMLDivElement | null>(null)
   const contextMenuRef = useRef<ModelContextMenuHandle>(null)
@@ -850,6 +851,11 @@ export function ModelGrid({
                             modelId={model.id}
                             modelName={model.name}
                           />
+                          {renderCardAccessory ? (
+                            <div className="model-card-accessory">
+                              {renderCardAccessory(model)}
+                            </div>
+                          ) : null}
                           {(model.animationCount ?? 0) > 0 ? (
                             <span
                               className="model-card-badge model-card-badge-animated"

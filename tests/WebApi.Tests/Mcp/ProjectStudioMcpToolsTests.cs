@@ -4,6 +4,7 @@ using Application.Agents;
 using Application.Files;
 using Application.Projects;
 using Domain.Models;
+using Domain.Projects;
 using Moq;
 using SharedKernel;
 using WebApi.Mcp;
@@ -12,7 +13,7 @@ using Xunit;
 namespace WebApi.Tests.Mcp;
 
 /// <summary>
-/// Unit tests for the project-studio MCP tools - notes, reference-board images, levels and
+/// Unit tests for the project-studio MCP tools - comments, project membership, reference-board images, levels and
 /// characters. The tools are thin pass-throughs over the command handlers the UI uses, so
 /// these verify the tool's own logic: the audit claim, the partial-update merge, and the
 /// image-source branches of <c>add_project_reference</c>.
@@ -42,16 +43,20 @@ public class ProjectStudioMcpToolsTests
         return audit;
     }
 
-    private static ProductionNoteDto Note(
+    private static ProjectCommentDto Comment(
         int id = 7,
         int projectId = 1,
         int? levelId = null,
         int? referenceImageId = null,
         int? characterId = null,
+        int? modelId = null,
         string title = "Idea",
-        string body = "A stealth level in a flooded temple.",
-        bool isPinned = true) =>
-        new(id, projectId, levelId, referenceImageId, characterId, title, body, isPinned, Now, Now);
+        string body = "Keep the opening area readable.",
+        bool isPinned = true,
+        string status = "open",
+        string? resolution = null) =>
+        new(id, projectId, levelId, referenceImageId, characterId, modelId, null, null, null, null, null,
+            title, body, isPinned, status, resolution, Now, Now);
 
     private static ProjectReferenceDto Reference(
         int id, int fileId, string title = "Hero", int projectId = 1) =>
@@ -81,74 +86,179 @@ public class ProjectStudioMcpToolsTests
             0, 0, 0, 0, Now, Now);
 
     [Fact]
-    public async Task AddProjectNote_Claims_The_Key_Then_Creates()
+    public async Task AddProjectComment_Claims_The_Key_Then_Creates_With_Its_Asset_Target()
     {
-        var handler = new Mock<ICommandHandler<CreateProductionNoteCommand, ProductionNoteDto>>();
-        handler.Setup(h => h.Handle(It.IsAny<CreateProductionNoteCommand>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(Result.Success(Note()));
+        var handler = new Mock<ICommandHandler<CreateProjectCommentCommand, ProjectCommentDto>>();
+        handler.Setup(h => h.Handle(It.IsAny<CreateProjectCommentCommand>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result.Success(Comment(modelId: 12)));
         var audit = ClaimGranted();
 
-        var result = await ProjectWriteMcpTools.AddProjectNote(
-            handler.Object, audit.Object, Caller(), projectId: 1, title: "Idea", body: "Flooded temple",
-            idempotencyKey: "key-1", pinned: true, levelId: 2);
+        var result = await ProjectWriteMcpTools.AddProjectComment(
+            handler.Object, audit.Object, Caller(), projectId: 1, title: "Idea", body: "Too glossy",
+            idempotencyKey: "key-1", pinned: true, modelId: 12);
 
         Assert.Contains("\"ok\"", Json(result));
         handler.Verify(h => h.Handle(
-            It.Is<CreateProductionNoteCommand>(c =>
-                c.ProjectId == 1 && c.Title == "Idea" && c.Body == "Flooded temple" && c.IsPinned && c.LevelId == 2),
+            It.Is<CreateProjectCommentCommand>(c =>
+                c.ProjectId == 1 && c.Title == "Idea" && c.Body == "Too glossy" && c.IsPinned
+                && c.Target == new ProjectCommentTarget(null, null, null, 12, null, null, null, null, null)),
             It.IsAny<CancellationToken>()), Times.Once);
         audit.Verify(a => a.CompleteAsync(
-            "key-1", "gen-1", "ProductionNote", 7, It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()),
+            "key-1", "gen-1", "ProjectComment", 7, It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()),
             Times.Once);
     }
 
     [Fact]
-    public async Task UpdateProjectNote_Keeps_Omitted_Fields_And_Records_What_It_Replaced()
+    public async Task UpdateProjectComment_Keeps_Omitted_Fields_And_Records_What_It_Replaced()
     {
-        // UpdateProductionNote replaces the whole note, so an omitted title/pinned must come
-        // back from the note being edited rather than resetting to defaults.
-        var existing = Note(id: 7, levelId: 2, title: "Old title", body: "Old body", isPinned: true);
-        var query = new Mock<IQueryHandler<GetProductionNoteByIdQuery, ProductionNoteDto>>();
-        query.Setup(h => h.Handle(It.IsAny<GetProductionNoteByIdQuery>(), It.IsAny<CancellationToken>()))
+        // The update command replaces the whole comment, so an omitted title/pinned/status
+        // must come back from the comment being edited rather than resetting to defaults.
+        var existing = Comment(id: 7, levelId: 2, title: "Old title", body: "Old body", isPinned: true);
+        var query = new Mock<IQueryHandler<GetProjectCommentByIdQuery, ProjectCommentDto>>();
+        query.Setup(h => h.Handle(It.IsAny<GetProjectCommentByIdQuery>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result.Success(existing));
-        var handler = new Mock<ICommandHandler<UpdateProductionNoteCommand, ProductionNoteDto>>();
-        handler.Setup(h => h.Handle(It.IsAny<UpdateProductionNoteCommand>(), It.IsAny<CancellationToken>()))
+        var handler = new Mock<ICommandHandler<UpdateProjectCommentCommand, ProjectCommentDto>>();
+        handler.Setup(h => h.Handle(It.IsAny<UpdateProjectCommentCommand>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result.Success(existing with { Body = "New body" }));
         var audit = ClaimGranted();
 
-        var result = await ProjectWriteMcpTools.UpdateProjectNote(
-            query.Object, handler.Object, audit.Object, Caller(), projectId: 1, noteId: 7,
+        var result = await ProjectWriteMcpTools.UpdateProjectComment(
+            query.Object, handler.Object, audit.Object, Caller(), projectId: 1, commentId: 7,
             idempotencyKey: "key-2", body: "New body");
 
         Assert.Contains("\"ok\"", Json(result));
         handler.Verify(h => h.Handle(
-            It.Is<UpdateProductionNoteCommand>(c =>
-                c.Title == "Old title" && c.Body == "New body" && c.IsPinned && c.LevelId == 2),
+            It.Is<UpdateProjectCommentCommand>(c =>
+                c.Title == "Old title" && c.Body == "New body" && c.IsPinned && c.Target.LevelId == 2
+                && c.Status == "open" && c.Resolution == null),
             It.IsAny<CancellationToken>()), Times.Once);
-        // The prior note is what makes the write undoable.
+        // The prior comment is what makes the write undoable.
         audit.Verify(a => a.CompleteAsync(
-            "key-2", "gen-1", "ProductionNote", 7, It.IsAny<string>(),
+            "key-2", "gen-1", "ProjectComment", 7, It.IsAny<string>(),
             It.Is<string>(before => before.Contains("Old title")), It.IsAny<CancellationToken>()),
             Times.Once);
     }
 
     [Fact]
-    public async Task ListProjectNotes_PinnedOnly_Asks_For_Pinned_Notes()
+    public async Task UpdateProjectComment_Resolve_Sends_The_Status_And_Resolution()
     {
-        var handler = new Mock<IQueryHandler<GetProductionNotesQuery, IReadOnlyList<ProductionNoteDto>>>();
-        handler.Setup(h => h.Handle(It.IsAny<GetProductionNotesQuery>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(Result.Success<IReadOnlyList<ProductionNoteDto>>(new[] { Note() }));
+        var existing = Comment(id: 7, modelId: 12);
+        var query = new Mock<IQueryHandler<GetProjectCommentByIdQuery, ProjectCommentDto>>();
+        query.Setup(h => h.Handle(It.IsAny<GetProjectCommentByIdQuery>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result.Success(existing));
+        var handler = new Mock<ICommandHandler<UpdateProjectCommentCommand, ProjectCommentDto>>();
+        handler.Setup(h => h.Handle(It.IsAny<UpdateProjectCommentCommand>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result.Success(existing with { Status = "resolved", Resolution = "Matte now." }));
 
-        var result = await ProjectReadMcpTools.ListProjectNotes(handler.Object, projectId: 1, pinnedOnly: true);
+        await ProjectWriteMcpTools.UpdateProjectComment(
+            query.Object, handler.Object, ClaimGranted().Object, Caller(), projectId: 1, commentId: 7,
+            idempotencyKey: "key-3", status: "resolved", resolution: "Matte now.");
 
-        Assert.Contains("notes", Json(result));
         handler.Verify(h => h.Handle(
-            It.Is<GetProductionNotesQuery>(q => q.ProjectId == 1 && q.IsPinned == true),
+            It.Is<UpdateProjectCommentCommand>(c =>
+                c.Status == "resolved" && c.Resolution == "Matte now." && c.Target.ModelId == 12),
             It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
-    public async Task AddProjectReference_From_FileId_Adds_A_Titled_Reference_And_A_Linked_Note()
+    public async Task UpdateProjectComment_Reopen_Without_A_Resolution_Drops_The_Old_One()
+    {
+        // The stored resolution described the resolved state; carrying it into a reopen
+        // would make the domain refuse the update.
+        var existing = Comment(id: 7, status: "resolved", resolution: "Matte now.");
+        var query = new Mock<IQueryHandler<GetProjectCommentByIdQuery, ProjectCommentDto>>();
+        query.Setup(h => h.Handle(It.IsAny<GetProjectCommentByIdQuery>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result.Success(existing));
+        var handler = new Mock<ICommandHandler<UpdateProjectCommentCommand, ProjectCommentDto>>();
+        handler.Setup(h => h.Handle(It.IsAny<UpdateProjectCommentCommand>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result.Success(existing with { Status = "open", Resolution = null }));
+
+        await ProjectWriteMcpTools.UpdateProjectComment(
+            query.Object, handler.Object, ClaimGranted().Object, Caller(), projectId: 1, commentId: 7,
+            idempotencyKey: "key-3b", status: "open");
+
+        handler.Verify(h => h.Handle(
+            It.Is<UpdateProjectCommentCommand>(c => c.Status == "open" && c.Resolution == null),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task ListProjectComments_Passes_Status_Pinned_And_Target_Filters()
+    {
+        var handler = new Mock<IQueryHandler<GetProjectCommentsQuery, IReadOnlyList<ProjectCommentDto>>>();
+        handler.Setup(h => h.Handle(It.IsAny<GetProjectCommentsQuery>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result.Success<IReadOnlyList<ProjectCommentDto>>(new[] { Comment() }));
+
+        var result = await ProjectReadMcpTools.ListProjectComments(
+            handler.Object, projectId: 1, status: "open", pinnedOnly: true, vfxId: 4);
+
+        Assert.Contains("comments", Json(result));
+        handler.Verify(h => h.Handle(
+            It.Is<GetProjectCommentsQuery>(q =>
+                q.ProjectId == 1 && q.IsPinned == true && q.Status == "open" && q.Target!.VfxId == 4 && q.Target.Count == 1),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task AddToProject_Records_Membership_So_Undo_Knows_What_It_Added()
+    {
+        var handler = new Mock<ICommandHandler<AddAssetToProjectCommand, AddAssetToProjectResponse>>();
+        handler.Setup(h => h.Handle(new AddAssetToProjectCommand(1, "vfx", 4), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result.Success(new AddAssetToProjectResponse(1, "vfx", 4, WasMember: false)));
+        var audit = ClaimGranted();
+
+        var result = await ProjectWriteMcpTools.AddToProject(
+            handler.Object, audit.Object, Caller(), projectId: 1, assetType: "vfx", assetId: 4, idempotencyKey: "key-p");
+
+        Assert.Contains("\"ok\"", Json(result));
+        audit.Verify(a => a.CompleteAsync(
+            "key-p", "gen-1", "vfx", 4,
+            It.Is<string>(after => after.Contains("\"projectId\":1") && after.Contains("\"assetType\":\"vfx\"")),
+            It.Is<string>(before => before.Contains("\"wasMember\":false")),
+            It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task AddToProject_Reports_A_Refused_Type_As_A_Failure()
+    {
+        var handler = new Mock<ICommandHandler<AddAssetToProjectCommand, AddAssetToProjectResponse>>();
+        handler.Setup(h => h.Handle(It.IsAny<AddAssetToProjectCommand>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result.Failure<AddAssetToProjectResponse>(new Error("UnknownProjectAssetType", "no")));
+        var audit = ClaimGranted();
+
+        var result = await ProjectWriteMcpTools.AddToProject(
+            handler.Object, audit.Object, Caller(), projectId: 1, assetType: "script", assetId: 4, idempotencyKey: "key-q");
+
+        Assert.Contains("UnknownProjectAssetType", Json(result));
+        audit.Verify(a => a.CompleteAsync(
+            It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int?>(),
+            It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task LinkCharacterModel_Links_With_The_Label()
+    {
+        var handler = new Mock<ICommandHandler<AddProjectCharacterModelCommand, ProjectCharacterModelDto>>();
+        handler.Setup(h => h.Handle(It.IsAny<AddProjectCharacterModelCommand>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result.Success(new ProjectCharacterModelDto(21, 12, "Courier rig", "Default outfit", 0)));
+        var audit = ClaimGranted();
+
+        var result = await ProjectWriteMcpTools.LinkCharacterModel(
+            handler.Object, audit.Object, Caller(), projectId: 1, characterId: 5, modelId: 12,
+            idempotencyKey: "key-l", label: "Default outfit");
+
+        Assert.Contains("\"ok\"", Json(result));
+        handler.Verify(h => h.Handle(
+            new AddProjectCharacterModelCommand(1, 5, 12, "Default outfit", null),
+            It.IsAny<CancellationToken>()), Times.Once);
+        audit.Verify(a => a.CompleteAsync(
+            "key-l", "gen-1", "ProjectCharacter", 5, It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task AddProjectReference_From_FileId_Adds_A_Titled_Reference_And_A_Linked_Comment()
     {
         const int fileId = 42;
         var concept = new Mock<ICommandHandler<AddProjectConceptImageCommand>>();
@@ -165,16 +275,16 @@ public class ProjectStudioMcpToolsTests
         update.Setup(h => h.Handle(It.IsAny<UpdateProjectReferenceCommand>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result.Success(Reference(11, fileId)));
 
-        var note = new Mock<ICommandHandler<CreateProductionNoteCommand, ProductionNoteDto>>();
-        note.Setup(h => h.Handle(It.IsAny<CreateProductionNoteCommand>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(Result.Success(Note(id: 9, referenceImageId: 11, title: "Hero", body: "The diver", isPinned: false)));
+        var comment = new Mock<ICommandHandler<CreateProjectCommentCommand, ProjectCommentDto>>();
+        comment.Setup(h => h.Handle(It.IsAny<CreateProjectCommentCommand>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result.Success(Comment(id: 9, referenceImageId: 11, title: "Hero", body: "The diver", isPinned: false)));
         var upload = new Mock<ICommandHandler<UploadFileCommand, UploadFileCommandResponse>>();
         var audit = ClaimGranted();
 
         var result = await ProjectWriteMcpTools.AddProjectReference(
-            concept.Object, references.Object, update.Object, note.Object, upload.Object,
+            concept.Object, references.Object, update.Object, comment.Object, upload.Object,
             audit.Object, Caller(), projectId: 1, title: "Hero", idempotencyKey: "key-4",
-            note: "The diver", fileId: fileId);
+            comment: "The diver", fileId: fileId);
 
         var json = Json(result);
         Assert.Contains("\"ok\"", json);
@@ -186,8 +296,8 @@ public class ProjectStudioMcpToolsTests
         update.Verify(h => h.Handle(
             It.Is<UpdateProjectReferenceCommand>(c => c.ReferenceId == 11 && c.Title == "Hero"),
             It.IsAny<CancellationToken>()), Times.Once);
-        note.Verify(h => h.Handle(
-            It.Is<CreateProductionNoteCommand>(c => c.ProjectId == 1 && c.ReferenceImageId == 11 && c.Body == "The diver"),
+        comment.Verify(h => h.Handle(
+            It.Is<CreateProjectCommentCommand>(c => c.ProjectId == 1 && c.Target.ReferenceImageId == 11 && c.Body == "The diver"),
             It.IsAny<CancellationToken>()), Times.Once);
         // A fileId means no bytes are read or uploaded.
         upload.Verify(h => h.Handle(It.IsAny<UploadFileCommand>(), It.IsAny<CancellationToken>()), Times.Never);
@@ -199,12 +309,12 @@ public class ProjectStudioMcpToolsTests
         var concept = new Mock<ICommandHandler<AddProjectConceptImageCommand>>();
         var references = new Mock<IQueryHandler<GetProjectReferencesQuery, IReadOnlyList<ProjectReferenceDto>>>();
         var update = new Mock<ICommandHandler<UpdateProjectReferenceCommand, ProjectReferenceDto>>();
-        var note = new Mock<ICommandHandler<CreateProductionNoteCommand, ProductionNoteDto>>();
+        var comment = new Mock<ICommandHandler<CreateProjectCommentCommand, ProjectCommentDto>>();
         var upload = new Mock<ICommandHandler<UploadFileCommand, UploadFileCommandResponse>>();
         var audit = new Mock<IAgentAudit>();
 
         var result = await ProjectWriteMcpTools.AddProjectReference(
-            concept.Object, references.Object, update.Object, note.Object, upload.Object,
+            concept.Object, references.Object, update.Object, comment.Object, upload.Object,
             audit.Object, Caller(), projectId: 1, title: "Hero", idempotencyKey: "key-5");
 
         var json = Json(result);

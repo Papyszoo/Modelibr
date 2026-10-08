@@ -42,9 +42,9 @@ ordinary Modelibr API endpoint - there is no separate search or extraction path:
 | `get_import_suggestions` | What the import automation categorized and tagged on its own and nobody has confirmed yet. Each entry says what it decided and the folder it decided it from. Settle them with `review_import_suggestions`. |
 | `get_duplicate_assets` | Groups of models that ARE each other: the same meshes under two ids, found by geometry fingerprint rather than by name. A real library import produces these by the hundred - an FBX and an OBJ of one prop land as two assets, and their part names differ so nothing keyed on names could match them. `search_assets` already collapses duplicates within a page of results, so this is for library hygiene: deciding which copy is the real one. |
 | `list_projects` | Every project, one line each: name, style, platforms, the per-asset triangle budget, and how many scenes and models it has. Start here when a request names a project rather than a scene. |
-| `get_project` | A project's full brief - engines and their roles, platforms, genres, styles, camera perspective, the fidelity budget, the world convention and what it converts to in each engine, the palette, concept images, the project's own environment maps, its scenes, and `guidance`: the constraints in plain sentences. |
+| `get_project` | A project's full brief - engines and their roles, platforms, genres, styles, camera perspective, the fidelity budget, the world convention and what it converts to in each engine, the palette, concept images, the project's own environment maps and VFX, its scenes, its asset counts, and `guidance`: the constraints in plain sentences. |
 | `list_project_profile_options` | The profile vocabulary a project can be assigned from. Built-ins first; a user may have added their own. |
-| `list_project_notes` | A project's production notes, each pinned or not, with the level, reference image or character it is about. Filter by any of those to read one target's notes. |
+| `list_project_comments` | A project's comments, pinned ones (the project's decisions) first. Each is open or resolved, a resolved one may carry a resolution saying what changed, and each names at most one target: a level, reference image, character, model, texture set, sprite, sound, environment map or VFX. Filter by `status`, `pinnedOnly`, or any target id. |
 | `list_project_levels` | A project's levels in production order, with their status, description and variant counts. |
 | `list_project_characters` | A project's characters, with their tags, images, linked models, abilities and variants. |
 | `get_agent_setup` | Hands a harness the Modelibr agent definitions - a main agent and its subagents, with their instructions and their own MCP paths - so the harness's model can create them in its native format. Say "set up the Modelibr agents" in your harness and the agent calls this. |
@@ -120,7 +120,7 @@ and look.
 
 ## What the agent can change (opt-in)
 
-Set `MCP_WRITE_ENABLED=true` in your root `.env` and fifty-six more tools appear,
+Set `MCP_WRITE_ENABLED=true` in your root `.env` and fifty-eight more tools appear,
 letting an agent curate the library the way you would in the app. They are a thin
 pass-through over the same command handlers the UI uses, so there is one source
 of truth for what a change means:
@@ -211,18 +211,20 @@ is never called off-style - silence about an asset is not evidence against it.
 
 A project also carries its own production record, and an agent can write it the way the
 project studio does. These capture what the user decided rather than anything inferred -
-notes, levels, characters and reference images - and every one reports the ids it wrote so
+comments, levels, characters, reference images and the assets the project uses - and every one reports the ids it wrote so
 the decision can be found again:
 
-| Tool                       | What it does                                                                                                                                                                                                   |
-| -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `add_project_note`         | Record a production note, optionally pinned as an idea the team must remember, targeting at most one level, reference image or character.                                                                      |
-| `update_project_note`      | Change a note's title, body or pinned flag; an omitted field keeps its current value.                                                                                                                          |
-| `add_project_reference`    | Add an image to the project's Reference Board and title it, optionally with a note linked to it. Takes a server-readable `path` or an uploaded `fileId`; with neither it says how to upload one over HTTP.      |
-| `add_project_level`        | Create a level, with an optional description and production status.                                                                                                                                            |
-| `update_project_level`     | Change a level's name, description, status or sort order; an omitted field keeps its current value.                                                                                                             |
-| `add_project_character`    | Create a character, with an optional description and tags.                                                                                                                                                      |
-| `update_project_character` | Change a character's name, description or tags; an omitted field keeps its current value.                                                                                                                       |
+| Tool                       | What it does                                                                                                                                                                                                            |
+| -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `add_project_comment`      | Comment on the project, or on one level, reference image, character, model, texture set, sprite, sound, environment map or VFX in it. A new comment is open; `pinned` records it as a project decision.                 |
+| `update_project_comment`   | Change a comment's title, body, pinned flag or status. `status=resolved` closes it, optionally with a short `resolution`; `status=open` reopens it and clears the resolution. An omitted field keeps its current value. |
+| `add_project_reference`    | Add an image to the project's Reference Board and title it, optionally with a comment on it. Takes a server-readable `path` or an uploaded `fileId`; with neither it says how to upload one over HTTP.                  |
+| `add_to_project`           | Add a library asset to the project: `assetType` is `model`, `textureSet`, `sprite`, `sound`, `environmentMap` or `vfx`. Adding an asset that is already there changes nothing. Undo with `reverse_operation`.           |
+| `link_character_model`     | Link a library model to a character, with an optional label; the model also joins the project's models.                                                                                                                 |
+| `add_project_level`        | Create a level, with an optional description and production status.                                                                                                                                                     |
+| `update_project_level`     | Change a level's name, description, status or sort order; an omitted field keeps its current value.                                                                                                                     |
+| `add_project_character`    | Create a character, with an optional description and tags.                                                                                                                                                              |
+| `update_project_character` | Change a character's name, description or tags; an omitted field keeps its current value.                                                                                                                               |
 
 #### What an asset can say about itself
 

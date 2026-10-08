@@ -4,7 +4,7 @@ sidebar_position: 8
 
 # Projects
 
-Projects in Modelibr let you group related assets together for organized workflows. A project can contain models, texture sets, environment maps, sprites, sounds, and scripts - everything needed for a game level, scene, or creative work.
+Projects in Modelibr let you group related assets together for organized workflows. A project can contain models, texture sets, environment maps, sprites, sounds, scripts, and visual effects - everything needed for a game level, scene, or creative work.
 
 <div className="feature-video-container">
   <video controls width="100%" autoPlay muted loop>
@@ -32,6 +32,7 @@ Click any project card to open the Project Viewer, which shows all assets organi
 | **Sprites**          | 2D image assets                                             |
 | **Sounds**           | Audio files                                                 |
 | **Scripts**          | Source code and shader assets                               |
+| **VFX**              | Visual effects added to this project                        |
 
 ### Adding Assets
 
@@ -43,6 +44,16 @@ Within the Project Viewer:
 4. Click **Confirm** to add them to the project
 
 Environment maps are managed as their own asset type inside projects, so scene lighting references can live beside the models, textures, sprites, and sounds used by that project.
+
+### Comments on assets
+
+Every model, texture set, sprite, sound, environment map and VFX card in a project
+carries a comments badge: a count of its open comments that opens the asset's
+comment thread. Write what should change, resolve a comment once it has been acted
+on - optionally with a short resolution saying what changed - and reopen it if it
+comes back. Resolved comments stay in the thread, quieter, so the reason for a
+change is still there to read. Levels, characters and reference images have the
+same thread.
 
 ### Removing Assets
 
@@ -79,24 +90,29 @@ The production context itself:
   [Level assets](#level-assets) below.
 - **Characters** are first-class production entities. Each one has a name, a
   description, tags such as `player`, `enemy`, `npc` or `boss`, linked reference
-  images, linked library models, production notes, abilities, and variants that
-  can be scoped to a Level. A character tagged `enemy` shows an
-  **Enemy notes and weaknesses** area instead of the generic notes area, so
-  weaknesses, behaviour, and threat are written where they are read.
-- **Notes & ideas** are plain-text notes. Pinning a note marks it as an idea;
-  a note can target the Project, one Level, one reference image, or one
-  Character, and each note names its target rather than printing an id.
+  images, linked library models, comments, abilities, and variants that can be
+  scoped to a Level. Linking a library model to a character also adds it to the
+  project's models. A character tagged `enemy` titles its comments area
+  **Enemy weaknesses and comments**, so weaknesses, behaviour, and threat are
+  written where they are read.
+- **Comments & decisions** are plain-text comments. Each one is open or
+  resolved, and a resolved comment can carry a short resolution saying what
+  changed. Pinning a comment marks it as a project decision. A comment can
+  target the Project, one Level, one reference image, one Character, or one
+  asset in the project, and each comment names its target rather than printing
+  an id.
 - **References** are the project's concept images, gathered on one Reference
   Board. Every image can be titled, linked to any number of Levels and
-  Characters, annotated with its own notes, and removed from the project while
+  Characters, annotated with its own comments, and removed from the project while
   the underlying file stays in your library. The old single "level scope" per
   image is now a set of links, so one mood board can serve several levels and
   several characters at once.
 
-Character editors open one section at a time - identity, notes, media, abilities,
+Character editors open one section at a time - identity, comments, media, abilities,
 variants - and each create action sits behind a `+`, so the default view stays a
-scannable list of the cast. Deleting a character removes its production links
-and notes; the linked files, models, and levels stay in the library.
+scannable list of the cast. Deleting a character removes its production links;
+its comments move to the project, and the linked files, models, and levels stay
+in the library.
 
 Everything a character already has is edited in place, not re-created: an
 ability or a variant opens a small inline form pre-filled with its current

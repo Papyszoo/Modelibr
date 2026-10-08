@@ -6,6 +6,7 @@ using Application.EnvironmentMaps;
 using Application.Metadata;
 using Application.Models;
 using Application.Packs;
+using Application.Projects;
 using Application.Scenes;
 using Application.Sounds;
 using Application.Sprites;
@@ -54,6 +55,7 @@ public class AgentOperationReverserTests
     private readonly Mock<ICommandHandler<RestoreSceneRecommendationsCommand, SceneRecommendationsResponse>> _restoreSceneRecommendations = new();
     private readonly Mock<ICommandHandler<SetSceneProjectCommand, SetSceneProjectResponse>> _setSceneProject = new();
     private readonly Mock<ICommandHandler<SetAssetMetadataCommand, AssetMetadataResponse>> _setAssetMetadata = new();
+    private readonly Mock<ICommandHandler<RemoveAssetFromProjectCommand>> _removeFromProject = new();
 
     private readonly FakeUnitOfWork _unitOfWork = new();
 
@@ -68,7 +70,8 @@ public class AgentOperationReverserTests
             _deleteSprite.Object, _deleteEnvironmentMap.Object, _deleteTextureSet.Object,
             _removeSceneNode.Object, _restoreSceneNode.Object, _moveSceneNode.Object, _setSceneLight.Object,
             _applySceneMaterial.Object, _updateSceneDocument.Object, _setSceneStage.Object, _deleteScene.Object, _createScene.Object, _restoreSceneLights.Object, _restoreSceneSlot.Object,
-            _restoreSceneRecommendations.Object, _setSceneProject.Object, _setAssetMetadata.Object);
+            _restoreSceneRecommendations.Object, _setSceneProject.Object, _setAssetMetadata.Object,
+            _removeFromProject.Object);
 
         // The default: this caller wins the reversal claim, applies the inverse, and
         // records it afterwards. The claim and the record are two calls now, because they
@@ -231,6 +234,45 @@ public class AgentOperationReverserTests
         Assert.True(result.Value.Single().Reversed);
         _removeFromPack.Verify(
             h => h.Handle(It.IsAny<RemoveModelFromPackCommand>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task AddToProject_Is_Reversed_By_Removing_The_Asset_It_Added()
+    {
+        var entry = Completed(
+            "key-p1", "add-to-project", "vfx", 4,
+            before: "{\"projectId\":9,\"wasMember\":false}",
+            after: "{\"projectId\":9,\"assetType\":\"vfx\",\"assetId\":4}");
+        Records(entry);
+        RemoveAssetFromProjectCommand? applied = null;
+        _removeFromProject.Setup(h => h.Handle(It.IsAny<RemoveAssetFromProjectCommand>(), It.IsAny<CancellationToken>()))
+            .Callback<RemoveAssetFromProjectCommand, CancellationToken>((c, _) => applied = c)
+            .ReturnsAsync(Result.Success());
+
+        var plan = await _reverser.PlanAsync("key-p1", null);
+        var result = await _reverser.ApplyAsync(plan.Value);
+
+        Assert.True(result.Value.Single().Reversed);
+        Assert.Equal(new RemoveAssetFromProjectCommand(9, "vfx", 4), applied);
+    }
+
+    [Fact]
+    public async Task AddToProject_Of_An_Existing_Member_Is_Reversed_Without_Removing_It()
+    {
+        // The asset was in the project before the agent's add, so undoing the add must not
+        // take out a membership the user made.
+        var entry = Completed(
+            "key-p2", "add-to-project", "model", 7,
+            before: "{\"projectId\":9,\"wasMember\":true}",
+            after: "{\"projectId\":9,\"assetType\":\"model\",\"assetId\":7}");
+        Records(entry);
+
+        var plan = await _reverser.PlanAsync("key-p2", null);
+        var result = await _reverser.ApplyAsync(plan.Value);
+
+        Assert.True(result.Value.Single().Reversed);
+        _removeFromProject.Verify(
+            h => h.Handle(It.IsAny<RemoveAssetFromProjectCommand>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]

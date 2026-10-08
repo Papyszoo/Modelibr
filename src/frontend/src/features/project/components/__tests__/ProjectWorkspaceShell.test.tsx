@@ -23,7 +23,7 @@ jest.mock('@/features/project/api/projectStudioQueries')
 jest.mock('@/features/project/api/projectStudioApi', () => ({
   ...jest.requireActual('@/features/project/api/projectStudioApi'),
   createProjectLevel: jest.fn(),
-  createProductionNote: jest.fn(),
+  createProjectComment: jest.fn(),
 }))
 
 const queries = projectStudioQueries as jest.Mocked<typeof projectStudioQueries>
@@ -77,7 +77,7 @@ beforeEach(() => {
     ]) as never
   )
   queries.useProjectCharactersQuery.mockReturnValue(settled([]) as never)
-  queries.useProductionNotesQuery.mockReturnValue(
+  queries.useProjectCommentsQuery.mockReturnValue(
     settled([
       {
         id: 11,
@@ -85,9 +85,17 @@ beforeEach(() => {
         levelId: null,
         referenceImageId: null,
         characterId: null,
+        modelId: null,
+        textureSetId: null,
+        spriteId: null,
+        soundId: null,
+        environmentMapId: null,
+        vfxId: null,
         title: 'Bell tower mood',
         body: 'Cold, thin light.',
         isPinned: true,
+        status: 'open',
+        resolution: null,
         createdAt: '2026-09-01T00:00:00Z',
         updatedAt: '2026-09-01T00:00:00Z',
       },
@@ -114,7 +122,7 @@ beforeEach(() => {
 })
 
 describe('ProjectStudioSection workspace navigation', () => {
-  it('opens on Overview and shows the level and the notes, not the whole studio', async () => {
+  it('opens on Overview and shows the level and the comments, not the whole studio', async () => {
     const tabId = registerTab()
     renderWithProviders(<ProjectStudioSection projectId={7} tabId={tabId} />, {
       tabId,
@@ -124,7 +132,7 @@ describe('ProjectStudioSection workspace navigation', () => {
       screen.getByTestId('project-workspace-tab-overview')
     ).toHaveAttribute('aria-selected', 'true')
     expect(screen.getByTestId('project-level-row')).toBeVisible()
-    expect(screen.getByTestId('project-note-row')).toBeVisible()
+    expect(screen.getByTestId('project-comment-row')).toBeVisible()
     // The other surfaces are one click away, not rendered underneath.
     expect(
       screen.queryByTestId('project-reference-board')
@@ -179,9 +187,9 @@ describe('ProjectStudioSection workspace navigation', () => {
     expect(screen.getByTestId('project-reference-board')).toBeVisible()
   })
 
-  it("names a note's target instead of printing an id", async () => {
+  it("names a comment's target instead of printing an id", async () => {
     const tabId = registerTab()
-    queries.useProductionNotesQuery.mockReturnValue(
+    queries.useProjectCommentsQuery.mockReturnValue(
       settled([
         {
           id: 12,
@@ -189,9 +197,17 @@ describe('ProjectStudioSection workspace navigation', () => {
           levelId: 3,
           referenceImageId: null,
           characterId: null,
+          modelId: null,
+          textureSetId: null,
+          spriteId: null,
+          soundId: null,
+          environmentMapId: null,
+          vfxId: null,
           title: 'Bell tower mood',
           body: 'Cold, thin light.',
           isPinned: false,
+          status: 'open',
+          resolution: null,
           createdAt: '2026-09-01T00:00:00Z',
           updatedAt: '2026-09-01T00:00:00Z',
         },

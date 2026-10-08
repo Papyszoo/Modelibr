@@ -1,16 +1,21 @@
+import {
+  commentTarget,
+  commentTargetFields,
+} from '@/features/project/commentTargets'
 import { client } from '@/lib/apiBase'
 
 import {
   addCharacterAbility,
   addProjectReferenceLink,
-  createProductionNote,
   createProjectCharacter,
+  createProjectComment,
   createProjectLevel,
-  getProductionNotes,
   getProjectCharacters,
+  getProjectComments,
   getProjectReferences,
   removeProjectReferenceLink,
   updateCharacterVariant,
+  updateProjectComment,
   updateProjectReference,
 } from '../projectStudioApi'
 
@@ -28,29 +33,31 @@ beforeEach(() => {
 })
 
 describe('Project Studio API', () => {
-  it('uses project-scoped level and production-note routes', async () => {
+  it('uses project-scoped level and comment routes', async () => {
     await createProjectLevel(7, { name: 'Forest Crossing' })
     expect(mockPost).toHaveBeenCalledWith('/projects/7/levels', {
       name: 'Forest Crossing',
     })
 
-    await createProductionNote(7, {
+    await createProjectComment(7, {
       title: 'Reference note',
       body: 'Keep the silhouettes soft.',
       isPinned: true,
     })
-    expect(mockPost).toHaveBeenCalledWith('/projects/7/production-notes', {
+    expect(mockPost).toHaveBeenCalledWith('/projects/7/comments', {
       title: 'Reference note',
       body: 'Keep the silhouettes soft.',
       isPinned: true,
     })
   })
 
-  it('serializes production filters and unwraps responses', async () => {
+  it('serializes comment filters and unwraps responses', async () => {
     mockGet.mockResolvedValueOnce({ data: [{ id: 4 }] })
-    await getProductionNotes(7, { levelId: 3, isPinned: true })
+    await expect(
+      getProjectComments(7, { levelId: 3, isPinned: true, status: 'open' })
+    ).resolves.toEqual([{ id: 4 }])
     expect(mockGet).toHaveBeenCalledWith(
-      '/projects/7/production-notes?levelId=3&isPinned=true'
+      '/projects/7/comments?levelId=3&isPinned=true&status=open'
     )
 
     mockGet.mockResolvedValueOnce({ data: [{ id: 9 }] })
@@ -116,24 +123,61 @@ describe('Project Studio API', () => {
     )
   })
 
-  it('sends the character note target in production-note routes', async () => {
+  it('sends an asset target and a resolution through the comment routes', async () => {
     mockGet.mockResolvedValueOnce({ data: [] })
-    await getProductionNotes(7, { characterId: 3 })
-    expect(mockGet).toHaveBeenCalledWith(
-      '/projects/7/production-notes?characterId=3'
-    )
+    await getProjectComments(7, { vfxId: 3 })
+    expect(mockGet).toHaveBeenCalledWith('/projects/7/comments?vfxId=3')
 
-    await createProductionNote(7, {
-      characterId: 3,
-      title: 'Weakness',
-      body: 'Quenches under water.',
+    await createProjectComment(7, {
+      ...commentTargetFields({ kind: 'modelId', id: 12 }),
+      title: 'Scale',
+      body: 'Twice too large.',
       isPinned: false,
     })
-    expect(mockPost).toHaveBeenCalledWith('/projects/7/production-notes', {
-      characterId: 3,
-      title: 'Weakness',
-      body: 'Quenches under water.',
+    expect(mockPost).toHaveBeenCalledWith('/projects/7/comments', {
+      modelId: 12,
+      title: 'Scale',
+      body: 'Twice too large.',
       isPinned: false,
     })
+
+    await updateProjectComment(7, 5, {
+      modelId: 12,
+      title: 'Scale',
+      body: 'Twice too large.',
+      isPinned: false,
+      status: 'resolved',
+      resolution: 'Scaled to 0.5.',
+    })
+    expect(mockPut).toHaveBeenCalledWith('/projects/7/comments/5', {
+      modelId: 12,
+      title: 'Scale',
+      body: 'Twice too large.',
+      isPinned: false,
+      status: 'resolved',
+      resolution: 'Scaled to 0.5.',
+    })
+  })
+
+  // A target read back from the wrong field would resend a comment's update
+  // against the wrong thing - or detach it from its target entirely.
+  it('reads a comment target from whichever id field is set', () => {
+    const none = {
+      levelId: null,
+      referenceImageId: null,
+      characterId: null,
+      modelId: null,
+      textureSetId: null,
+      spriteId: null,
+      soundId: null,
+      environmentMapId: null,
+      vfxId: null,
+    }
+    expect(commentTarget(none)).toBeNull()
+    expect(commentTarget({ ...none, environmentMapId: 4 })).toEqual({
+      kind: 'environmentMapId',
+      id: 4,
+    })
+    expect(commentTargetFields(null)).toEqual({})
   })
 })

@@ -158,7 +158,7 @@ describe('ProjectDetailsPanel draft ownership', () => {
     studioQueriesMock.useProjectReferencesQuery.mockReturnValue(
       emptyQuery([]) as never
     )
-    studioQueriesMock.useProductionNotesQuery.mockReturnValue(
+    studioQueriesMock.useProjectCommentsQuery.mockReturnValue(
       emptyQuery([]) as never
     )
     // The studio's level asset view reads the project's explicit members and

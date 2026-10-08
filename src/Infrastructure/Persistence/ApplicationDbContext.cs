@@ -92,7 +92,7 @@ namespace Infrastructure.Persistence
         public DbSet<ProjectCharacterModel> ProjectCharacterModels => Set<ProjectCharacterModel>();
         public DbSet<CharacterAbility> CharacterAbilities => Set<CharacterAbility>();
         public DbSet<CharacterVariant> CharacterVariants => Set<CharacterVariant>();
-        public DbSet<ProductionNote> ProductionNotes => Set<ProductionNote>();
+        public DbSet<ProjectComment> ProjectComments => Set<ProjectComment>();
         public DbSet<ModelCategory> ModelCategories => Set<ModelCategory>();
         public DbSet<TextureSetCategory> TextureSetCategories => Set<TextureSetCategory>();
         public DbSet<ModelTag> ModelTags => Set<ModelTag>();
@@ -241,6 +241,11 @@ namespace Infrastructure.Persistence
                 .HasMany(e => e.Projects)
                 .WithMany(p => p.EnvironmentMaps)
                 .UsingEntity(j => j.ToTable("ProjectEnvironmentMaps"));
+
+            modelBuilder.Entity<Vfx>()
+                .HasMany(v => v.Projects)
+                .WithMany(p => p.Vfx)
+                .UsingEntity(j => j.ToTable("ProjectVfx"));
 
             modelBuilder.Entity<EnvironmentMap>(entity =>
             {
@@ -803,9 +808,9 @@ namespace Infrastructure.Persistence
                     .HasForeignKey(tag => tag.ProjectId)
                     .OnDelete(DeleteBehavior.Cascade);
 
-                entity.HasMany(p => p.ProductionNotes)
-                    .WithOne(note => note.Project)
-                    .HasForeignKey(note => note.ProjectId)
+                entity.HasMany(p => p.Comments)
+                    .WithOne(comment => comment.Project)
+                    .HasForeignKey(comment => comment.ProjectId)
                     .OnDelete(DeleteBehavior.Cascade);
 
                 // Create index for efficient querying by name
@@ -831,40 +836,63 @@ namespace Infrastructure.Persistence
                 entity.HasIndex(level => new { level.ProjectId, level.SortOrder });
             });
 
-            modelBuilder.Entity<ProductionNote>(entity =>
+            // Project comments keep the table they had as production notes.
+            modelBuilder.Entity<ProjectComment>(entity =>
             {
                 entity.ToTable("ProductionNotes", table =>
+                {
                     table.HasCheckConstraint(
                         "CK_ProductionNotes_OneTarget",
-                        "(CASE WHEN \"LevelId\" IS NOT NULL THEN 1 ELSE 0 END) + (CASE WHEN \"ReferenceImageId\" IS NOT NULL THEN 1 ELSE 0 END) + (CASE WHEN \"CharacterId\" IS NOT NULL THEN 1 ELSE 0 END) <= 1"));
+                        string.Join(" + ", new[]
+                        {
+                            "LevelId", "ReferenceImageId", "CharacterId", "ModelId", "TextureSetId",
+                            "SpriteId", "SoundId", "EnvironmentMapId", "VfxId",
+                        }.Select(column => $"(CASE WHEN \"{column}\" IS NOT NULL THEN 1 ELSE 0 END)")) + " <= 1");
+                    table.HasCheckConstraint(
+                        "CK_ProductionNotes_Status",
+                        "\"Status\" IN ('open', 'resolved')");
+                });
 
-                entity.HasKey(note => note.Id);
-                entity.Property(note => note.Title).IsRequired().HasMaxLength(200);
-                entity.Property(note => note.Body).IsRequired().HasMaxLength(10_000);
-                entity.Property(note => note.IsPinned).IsRequired();
-                entity.Property(note => note.CreatedAt).IsRequired();
-                entity.Property(note => note.UpdatedAt).IsRequired();
+                entity.HasKey(comment => comment.Id);
+                entity.Property(comment => comment.Title).IsRequired().HasMaxLength(200);
+                entity.Property(comment => comment.Body).IsRequired().HasMaxLength(10_000);
+                entity.Property(comment => comment.IsPinned).IsRequired();
+                entity.Property(comment => comment.Status).IsRequired().HasMaxLength(20).HasDefaultValue("open");
+                entity.Property(comment => comment.Resolution).HasMaxLength(ProjectComment.MaxResolutionLength);
+                entity.Property(comment => comment.CreatedAt).IsRequired();
+                entity.Property(comment => comment.UpdatedAt).IsRequired();
+                entity.Ignore(comment => comment.Target);
 
-                entity.HasIndex(note => new { note.ProjectId, note.UpdatedAt });
-                entity.HasIndex(note => new { note.ProjectId, note.LevelId });
-                entity.HasIndex(note => new { note.ProjectId, note.ReferenceImageId });
-                entity.HasIndex(note => new { note.ProjectId, note.CharacterId });
-                entity.HasIndex(note => new { note.ProjectId, note.IsPinned });
+                entity.HasIndex(comment => new { comment.ProjectId, comment.UpdatedAt });
+                entity.HasIndex(comment => new { comment.ProjectId, comment.LevelId });
+                entity.HasIndex(comment => new { comment.ProjectId, comment.ReferenceImageId });
+                entity.HasIndex(comment => new { comment.ProjectId, comment.CharacterId });
+                entity.HasIndex(comment => new { comment.ProjectId, comment.IsPinned });
+                entity.HasIndex(comment => new { comment.ProjectId, comment.Status });
 
-                entity.HasOne(note => note.Level)
-                    .WithMany(level => level.Notes)
-                    .HasForeignKey(note => note.LevelId)
+                entity.HasOne(comment => comment.Level)
+                    .WithMany(level => level.Comments)
+                    .HasForeignKey(comment => comment.LevelId)
                     .OnDelete(DeleteBehavior.SetNull);
 
-                entity.HasOne(note => note.ReferenceImage)
-                    .WithMany(reference => reference.Notes)
-                    .HasForeignKey(note => note.ReferenceImageId)
+                entity.HasOne(comment => comment.ReferenceImage)
+                    .WithMany(reference => reference.Comments)
+                    .HasForeignKey(comment => comment.ReferenceImageId)
                     .OnDelete(DeleteBehavior.SetNull);
 
-                entity.HasOne(note => note.Character)
-                    .WithMany(character => character.Notes)
-                    .HasForeignKey(note => note.CharacterId)
+                entity.HasOne(comment => comment.Character)
+                    .WithMany(character => character.Comments)
+                    .HasForeignKey(comment => comment.CharacterId)
                     .OnDelete(DeleteBehavior.SetNull);
+
+                // Library assets outlive any one project. A hard-deleted asset leaves its
+                // comments on the project rather than taking them with it.
+                entity.HasOne<Model>().WithMany().HasForeignKey(comment => comment.ModelId).OnDelete(DeleteBehavior.SetNull);
+                entity.HasOne<TextureSet>().WithMany().HasForeignKey(comment => comment.TextureSetId).OnDelete(DeleteBehavior.SetNull);
+                entity.HasOne<Sprite>().WithMany().HasForeignKey(comment => comment.SpriteId).OnDelete(DeleteBehavior.SetNull);
+                entity.HasOne<Sound>().WithMany().HasForeignKey(comment => comment.SoundId).OnDelete(DeleteBehavior.SetNull);
+                entity.HasOne<EnvironmentMap>().WithMany().HasForeignKey(comment => comment.EnvironmentMapId).OnDelete(DeleteBehavior.SetNull);
+                entity.HasOne<Vfx>().WithMany().HasForeignKey(comment => comment.VfxId).OnDelete(DeleteBehavior.SetNull);
             });
 
             modelBuilder.Entity<ProjectCharacter>(entity =>

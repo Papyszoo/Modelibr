@@ -406,17 +406,20 @@ internal sealed class RemoveProjectCharacterImageCommandHandler : ICommandHandle
 internal sealed class AddProjectCharacterModelCommandHandler
     : ICommandHandler<AddProjectCharacterModelCommand, ProjectCharacterModelDto>
 {
+    private readonly IProjectRepository _projects;
     private readonly IProjectCharacterRepository _characters;
     private readonly IModelRepository _models;
     private readonly IDateTimeProvider _clock;
     private readonly IUnitOfWork _unitOfWork;
 
     public AddProjectCharacterModelCommandHandler(
+        IProjectRepository projects,
         IProjectCharacterRepository characters,
         IModelRepository models,
         IDateTimeProvider clock,
         IUnitOfWork unitOfWork)
     {
+        _projects = projects;
         _characters = characters;
         _models = models;
         _clock = clock;
@@ -442,6 +445,16 @@ internal sealed class AddProjectCharacterModelCommandHandler
             var now = _clock.UtcNow;
             var link = character.AddModel(model, command.Label, command.SortOrder ?? character.Models.Count, now);
             await _characters.UpdateAsync(character, cancellationToken);
+
+            // A character's model is one the project uses, so it joins the project's models
+            // too - otherwise the cast names a model the project's own asset list does not.
+            var project = await _projects.GetByIdAsync(command.ProjectId, cancellationToken);
+            if (project is not null && !project.HasModel(model.Id))
+            {
+                project.AddModel(model, now);
+                await _projects.UpdateAsync(project, cancellationToken);
+            }
+
             await _unitOfWork.SaveChangesAsync(cancellationToken);
             return Result.Success(ProjectCharacterView.ModelFrom(link));
         }

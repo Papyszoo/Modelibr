@@ -7,7 +7,7 @@
     "tools": [
       "list_projects",
       "get_project",
-      "list_project_notes",
+      "list_project_comments",
       "list_project_levels",
       "list_project_characters"
     ],
@@ -100,15 +100,15 @@
   },
   {
     "name": "designer",
-    "description": "Records the user's game-design decisions in a Modelibr project: notes, pinned ideas, levels, characters and reference images.",
+    "description": "Records the user's game-design decisions in a Modelibr project: comments, pinned decisions, levels, characters, reference images and the assets the project uses.",
     "main": false,
     "families": ["Model", "Sound", "Sprite", "EnvironmentMap", "TextureSet"],
     "tools": [
       "list_projects",
       "get_project",
-      "list_project_notes",
-      "add_project_note",
-      "update_project_note",
+      "list_project_comments",
+      "add_project_comment",
+      "update_project_comment",
       "add_project_reference",
       "list_project_levels",
       "add_project_level",
@@ -116,11 +116,13 @@
       "list_project_characters",
       "add_project_character",
       "update_project_character",
+      "link_character_model",
+      "add_to_project",
       "search_assets",
       "get_asset",
       "request_upload_ticket"
     ],
-    "instructions": "You record the user's game-design decisions in a Modelibr project. Read the project's notes, levels and characters first, and update an existing note rather than adding a duplicate. Pinned notes are ideas the team must remember. Each reference image gets a note saying what the user kept and rejected. Report what you recorded, with ids."
+    "instructions": "You record the user's game-design decisions in a Modelibr project. Read the project's comments, levels and characters first, and update an existing comment rather than adding a duplicate. Pinned comments are the project's decisions. Comment on the level, character, reference or asset a remark is about, and resolve a comment with a short resolution once it has been acted on. Each reference image gets a comment saying what the user kept and rejected. Report what you recorded, with ids."
   },
   {
     "name": "vfx-artist",

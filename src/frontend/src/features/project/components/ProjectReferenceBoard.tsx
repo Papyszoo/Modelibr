@@ -13,15 +13,11 @@ import {
 } from '@/features/project/api/projectApi'
 import {
   addProjectReferenceLink,
-  createProductionNote,
-  type ProductionNoteDto,
   type ProjectReferenceDto,
   removeProjectReferenceLink,
-  updateProductionNote,
   updateProjectReference,
 } from '@/features/project/api/projectStudioApi'
 import {
-  useProductionNotesQuery,
   useProjectCharactersQuery,
   useProjectLevelsQuery,
   useProjectReferencesQuery,
@@ -34,7 +30,7 @@ import {
 } from '@/shared/components/feedback'
 import { ImageLightboxDialog } from '@/shared/components/ImageLightboxDialog'
 
-import { ProductionNoteItem } from './ProductionNoteItem'
+import { ProjectCommentThread } from './ProjectCommentThread'
 
 interface ProjectReferenceBoardProps {
   projectId: number
@@ -91,16 +87,12 @@ export function ProjectReferenceBoard({
   )
   const levelsQuery = useProjectLevelsQuery(projectId)
   const charactersQuery = useProjectCharactersQuery(projectId)
-  const notesQuery = useProductionNotesQuery(projectId)
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null)
 
   const invalidate = async () => {
     await Promise.all([
       queryClient.invalidateQueries({
         queryKey: ['projects', projectId, 'references'],
-      }),
-      queryClient.invalidateQueries({
-        queryKey: ['projects', projectId, 'production-notes'],
       }),
       onChanged?.(),
     ])
@@ -149,42 +141,8 @@ export function ProjectReferenceBoard({
     onSuccess: invalidate,
   })
 
-  const addNote = useMutation({
-    mutationFn: (input: { referenceId: number; title: string; body: string }) =>
-      createProductionNote(projectId, {
-        referenceImageId: input.referenceId,
-        title: input.title,
-        body: input.body,
-        isPinned: false,
-      }),
-    onSuccess: invalidate,
-  })
-
-  const updateNote = useMutation({
-    mutationFn: (input: {
-      note: ProductionNoteDto
-      title: string
-      body: string
-      isPinned: boolean
-    }) =>
-      updateProductionNote(projectId, input.note.id, {
-        // The reference link has to ride along: the update route replaces the
-        // note rather than patching it.
-        levelId: input.note.levelId,
-        referenceImageId: input.note.referenceImageId,
-        characterId: input.note.characterId,
-        title: input.title,
-        body: input.body,
-        isPinned: input.isPinned,
-      }),
-    onSuccess: invalidate,
-  })
-
   const queryError =
-    referencesQuery.error ??
-    levelsQuery.error ??
-    charactersQuery.error ??
-    notesQuery.error
+    referencesQuery.error ?? levelsQuery.error ?? charactersQuery.error
   if (queryError) {
     return (
       <ErrorState
@@ -200,7 +158,6 @@ export function ProjectReferenceBoard({
             allReferencesQuery.refetch(),
             levelsQuery.refetch(),
             charactersQuery.refetch(),
-            notesQuery.refetch(),
           ])
         }}
       />
@@ -213,7 +170,6 @@ export function ProjectReferenceBoard({
   const references = referencesQuery.data ?? []
   const levels = levelsQuery.data ?? []
   const characters = charactersQuery.data ?? []
-  const notes = notesQuery.data ?? []
   // Unfiltered total, so "3 of 12" stays honest while a target filter is on.
   const totalReferences = filtering
     ? (allReferencesQuery.data?.length ?? references.length)
@@ -331,9 +287,7 @@ export function ProjectReferenceBoard({
               index={index}
               levels={levels}
               characters={characters}
-              notes={notes.filter(
-                note => note.referenceImageId === reference.id
-              )}
+              projectId={projectId}
               onOpen={() => setLightboxIndex(index)}
               onRename={title =>
                 renameReference.mutate({
@@ -346,12 +300,6 @@ export function ProjectReferenceBoard({
               }
               onRemoveLink={linkId =>
                 removeLink.mutate({ referenceId: reference.id, linkId })
-              }
-              onAddNote={values =>
-                addNote.mutate({ referenceId: reference.id, ...values })
-              }
-              onUpdateNote={(note, values) =>
-                updateNote.mutate({ note, ...values })
               }
               onRemove={() => {
                 confirmDialog({
@@ -377,20 +325,18 @@ function ReferenceCard({
   index,
   levels,
   characters,
-  notes,
+  projectId,
   onOpen,
   onRename,
   onAddLink,
   onRemoveLink,
-  onAddNote,
-  onUpdateNote,
   onRemove,
 }: {
   reference: ProjectReferenceDto
   index: number
   levels: Array<{ id: number; name: string }>
   characters: Array<{ id: number; name: string }>
-  notes: ProductionNoteDto[]
+  projectId: number
   onOpen: () => void
   onRename: (title: string) => void
   onAddLink: (link: {
@@ -398,16 +344,10 @@ function ReferenceCard({
     projectCharacterId?: number | null
   }) => void
   onRemoveLink: (linkId: number) => void
-  onAddNote: (values: { title: string; body: string }) => void
-  onUpdateNote: (
-    note: ProductionNoteDto,
-    values: { title: string; body: string; isPinned: boolean }
-  ) => void
   onRemove: () => void
 }) {
   const [title, setTitle] = useState(reference.title)
   const [picker, setPicker] = useState<LinkTarget | null>(null)
-  const [showNote, setShowNote] = useState(false)
 
   const levelLinks = reference.links.filter(link => link.targetType === 'level')
   const characterLinks = reference.links.filter(
@@ -502,35 +442,14 @@ function ReferenceCard({
           onRemove={onRemoveLink}
         />
 
-        <div className="project-reference-notes">
-          {notes.map(note => (
-            <ProductionNoteItem
-              key={note.id}
-              note={note}
-              testId="project-reference-note"
-              className="project-reference-note"
-              onSave={values => onUpdateNote(note, values)}
-            />
-          ))}
-          {showNote ? (
-            <NoteForm
-              fileName={reference.fileName}
-              onCancel={() => setShowNote(false)}
-              onSubmit={values => {
-                onAddNote(values)
-                setShowNote(false)
-              }}
-            />
-          ) : (
-            <Button
-              icon="pi pi-plus"
-              text
-              rounded
-              aria-label={`Add note to ${reference.fileName}`}
-              title="Add note"
-              onClick={() => setShowNote(true)}
-            />
-          )}
+        <div className="project-reference-comments">
+          <ProjectCommentThread
+            projectId={projectId}
+            target={{ kind: 'referenceImageId', id: reference.id }}
+            targetName={reference.title || reference.fileName}
+            itemTestId="project-reference-comment"
+            bodyPlaceholder="What does this image say about the project?"
+          />
         </div>
       </div>
     </article>
@@ -622,53 +541,5 @@ function LinkRow({
         </div>
       ) : null}
     </div>
-  )
-}
-
-function NoteForm({
-  fileName,
-  onSubmit,
-  onCancel,
-}: {
-  fileName: string
-  onSubmit: (values: { title: string; body: string }) => void
-  onCancel: () => void
-}) {
-  const [title, setTitle] = useState('')
-  const [body, setBody] = useState('')
-
-  return (
-    <form
-      className="project-reference-note-form"
-      onSubmit={event => {
-        event.preventDefault()
-        if (title.trim() && body.trim()) {
-          onSubmit({ title: title.trim(), body: body.trim() })
-        }
-      }}
-    >
-      <InputText
-        aria-label={`Note title for ${fileName}`}
-        value={title}
-        onChange={event => setTitle(event.target.value)}
-        placeholder="Note title"
-      />
-      <textarea
-        aria-label={`Note body for ${fileName}`}
-        value={body}
-        onChange={event => setBody(event.target.value)}
-        placeholder="What should this image say?"
-        rows={2}
-      />
-      <div className="project-reference-note-actions">
-        <Button label="Cancel" text type="button" onClick={onCancel} />
-        <Button
-          type="submit"
-          label="Save note"
-          aria-label="Save note"
-          disabled={!title.trim() || !body.trim()}
-        />
-      </div>
-    </form>
   )
 }

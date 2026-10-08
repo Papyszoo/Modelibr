@@ -49,6 +49,7 @@ internal class GetProjectByIdQueryHandler : IQueryHandler<GetProjectByIdQuery, P
             SoundCount = project.SoundCount,
             ScriptCount = project.ScriptCount,
             EnvironmentMapCount = project.EnvironmentMapCount,
+            VfxCount = project.VfxCount,
             IsEmpty = project.IsEmpty,
             CustomThumbnailUrl = project.CustomThumbnailFileId.HasValue ? $"/files/{project.CustomThumbnailFileId.Value}/preview?channel=rgb" : null,
             ConceptImages = project.ConceptImages
@@ -80,6 +81,10 @@ internal class GetProjectByIdQueryHandler : IQueryHandler<GetProjectByIdQuery, P
                 project.EnvironmentMaps.Select(e => new ProjectEnvironmentMapDto { Id = e.Id, Name = e.Name }),
                 used, SceneAssetTypes.EnvironmentMap,
                 (id, name, scenes) => new ProjectEnvironmentMapDto { Id = id, Name = name, UsedInScenes = scenes }),
+            Vfx = project.Vfx
+                .OrderBy(v => v.Name)
+                .Select(v => new ProjectVfxDto { Id = v.Id, Name = v.Name })
+                .ToList(),
 
             // Both counts, rather than quietly redefining the one the UI already shows.
             // "Is it a member" and "does this project use it" are different questions, and
@@ -175,6 +180,7 @@ public record ProjectDetailDto
     public int SoundCount { get; init; }
     public int ScriptCount { get; init; }
     public int EnvironmentMapCount { get; init; }
+    public int VfxCount { get; init; }
 
     /// <summary>
     /// Members plus what the project's scenes reference (prompt 13-C). Beside the membership
@@ -192,6 +198,7 @@ public record ProjectDetailDto
     public ICollection<ProjectTextureSetDto> TextureSets { get; init; } = new List<ProjectTextureSetDto>();
     public ICollection<ProjectSpriteDto> Sprites { get; init; } = new List<ProjectSpriteDto>();
     public ICollection<ProjectEnvironmentMapDto> EnvironmentMaps { get; init; } = new List<ProjectEnvironmentMapDto>();
+    public ICollection<ProjectVfxDto> Vfx { get; init; } = new List<ProjectVfxDto>();
 }
 
 public record ProjectConceptImageDto
@@ -236,4 +243,10 @@ public record ProjectEnvironmentMapDto : IProjectAssetDto
 
     /// <summary>Empty for a member; the scenes that reference it otherwise.</summary>
     public IReadOnlyList<string> UsedInScenes { get; init; } = Array.Empty<string>();
+}
+
+public record ProjectVfxDto
+{
+    public int Id { get; init; }
+    public string Name { get; init; } = string.Empty;
 }
