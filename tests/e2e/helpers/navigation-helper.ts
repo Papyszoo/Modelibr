@@ -35,6 +35,7 @@ const TILE_LABELS: Record<string, string> = {
   sounds: "Sounds",
   scripts: "Scripts",
   scenes: "Scenes",
+  vfxList: "VFX",
   packs: "Packs",
   projects: "Projects",
   assetStore: "Asset Store",
