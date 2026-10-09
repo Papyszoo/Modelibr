@@ -20,6 +20,8 @@ internal static class GodotVfxScene
 {
     public const int MaxParticles = 5000;
     private const string DiscId = "particle_disc";
+    /// <summary>The grey a primitive mesh keeps until it authors a colour.</summary>
+    private const string DefaultPrimitiveColor = "#8a93a6";
 
     public static string Write(
         string effectName,
@@ -65,17 +67,103 @@ internal static class GodotVfxScene
                         texture = $"SubResource(\"{DiscId}\")";
                     }
 
-                    WriteParticles(id, particles, transform, texture, sub, nodes);
+                    WriteParticles(id, component, particles, transform, texture, sub, nodes);
 
                     if (particles.GetProperty("mode").GetString() == "burst")
                         tracks.Add(MethodTrack(id, start, "restart"));
                     else if (Num(particles, "rate") > 0)
                         tracks.Add(WindowTrack($"{id}:emitting", start, end));
+
+                    // A radius track drives the process material's ring radius; a ring keeps its
+                    // inner/outer ratio by animating the inner radius by the same factor.
+                    var particleTracks = component.TryGetProperty("tracks", out var radiusTracks) ? radiusTracks : default;
+                    if (TryGroundEmitter(component, out var emitter, out var emitterShape)
+                        && TryKeys(particleTracks, "radius", start, out var radiusKeys))
+                    {
+                        var baseInner = emitterShape == "ring" ? Num(emitter, "innerRadius") : 0;
+                        var baseOuter = emitterShape == "ring" ? Num(emitter, "outerRadius") : Num(emitter, "radius");
+                        var ratio = baseOuter > 0 ? baseInner / baseOuter : 0;
+                        tracks.Add(ValueTrack($"{id}:process_material:emission_ring_radius", radiusKeys, F));
+                        if (ratio > 0)
+                            tracks.Add(ValueTrack(
+                                $"{id}:process_material:emission_ring_inner_radius", radiusKeys, v => F(v * ratio)));
+                    }
+
                     break;
                 }
 
                 case "mesh":
                 {
+                    var mesh = component.GetProperty("mesh");
+                    var keyTracks = component.TryGetProperty("tracks", out var t) ? t : default;
+
+                    // A flat ground primitive has no library file; it becomes a stock Godot mesh.
+                    if (VfxDefinition.IsPrimitiveMesh(mesh))
+                    {
+                        var kind = mesh.GetProperty("kind").GetString()!;
+                        var scaleY = 1.0;
+                        double baseRadius;
+
+                        // The primitive's own material: its colour, and a glow when it asks for one.
+                        var color = mesh.TryGetProperty("color", out var colorElement)
+                                    && colorElement.ValueKind == JsonValueKind.String
+                            ? colorElement.GetString()!
+                            : DefaultPrimitiveColor;
+                        var emissive = mesh.TryGetProperty("emissiveIntensity", out var emissiveElement)
+                                       && emissiveElement.ValueKind == JsonValueKind.Number
+                            ? emissiveElement.GetDouble()
+                            : 0;
+                        sub.Append($"[sub_resource type=\"StandardMaterial3D\" id=\"{id}_material\"]\n");
+                        sub.Append($"albedo_color = {Color(color, 1)}\n");
+                        if (emissive > 0)
+                        {
+                            sub.Append("emission_enabled = true\n");
+                            sub.Append($"emission = {Color(color, 1)}\n");
+                            sub.Append($"emission_energy_multiplier = {F(emissive)}\n");
+                        }
+
+                        sub.Append('\n');
+
+                        if (kind == "disc")
+                        {
+                            baseRadius = Num(mesh, "radius");
+                            sub.Append($"[sub_resource type=\"CylinderMesh\" id=\"{id}_mesh\"]\n");
+                            sub.Append($"top_radius = {F(baseRadius)}\n");
+                            sub.Append($"bottom_radius = {F(baseRadius)}\n");
+                            sub.Append("height = 0.002\n");
+                            sub.Append("radial_segments = 64\n");
+                            sub.Append("rings = 1\n");
+                            sub.Append($"material = SubResource(\"{id}_material\")\n\n");
+                        }
+                        else
+                        {
+                            baseRadius = Num(mesh, "outerRadius");
+                            scaleY = 0.02;
+                            sub.Append($"[sub_resource type=\"TorusMesh\" id=\"{id}_mesh\"]\n");
+                            sub.Append($"inner_radius = {F(Num(mesh, "innerRadius"))}\n");
+                            sub.Append($"outer_radius = {F(baseRadius)}\n");
+                            sub.Append($"material = SubResource(\"{id}_material\")\n\n");
+                        }
+
+                        nodes.Append(Node(id, "type=\"MeshInstance3D\" parent=\".\""));
+                        nodes.Append(Transform(component, 1, scaleY, 1));
+                        nodes.Append($"mesh = SubResource(\"{id}_mesh\")\n");
+                        nodes.Append("visible = false\n\n");
+                        tracks.Add(WindowTrack($"{id}:visible", start, end));
+
+                        // A radius track scales x/z by r(t)/r0, keeping the primitive's y scale.
+                        if (TryKeys(keyTracks, "radius", start, out var radius))
+                        {
+                            var scaleKeys = radius
+                                .Select(k => (k.Time, baseRadius > 0 ? k.Value / baseRadius : 1.0))
+                                .ToList();
+                            tracks.Add(ValueTrack(
+                                $"{id}:scale", scaleKeys, v => $"Vector3({F(v)}, {F(scaleY)}, {F(v)})"));
+                        }
+
+                        break;
+                    }
+
                     if (assetPath is null)
                         break;
 
@@ -95,7 +183,6 @@ internal static class GodotVfxScene
                     nodes.Append(transform).Append("visible = false\n\n");
                     tracks.Add(WindowTrack($"{id}:visible", start, end));
 
-                    var keyTracks = component.TryGetProperty("tracks", out var t) ? t : default;
                     if (TryKeys(keyTracks, "scale", start, out var scale))
                         tracks.Add(ValueTrack($"{id}:scale", scale, v => $"Vector3({F(v)}, {F(v)}, {F(v)})"));
                     if (TryKeys(keyTracks, "rotationY", start, out var rotation))
@@ -178,7 +265,7 @@ internal static class GodotVfxScene
     }
 
     private static void WriteParticles(
-        string id, JsonElement p, string transform, string texture, StringBuilder sub, StringBuilder nodes)
+        string id, JsonElement component, JsonElement p, string transform, string texture, StringBuilder sub, StringBuilder nodes)
     {
         var burst = p.GetProperty("mode").GetString() == "burst";
         var lifetime = Num(p, "lifetime");
@@ -187,6 +274,14 @@ internal static class GodotVfxScene
         var sizeStart = Num(p, "sizeStart");
         var sizeEnd = Num(p, "sizeEnd");
         var size = Math.Max(sizeStart, sizeEnd);
+
+        // A disc or ring emitter spreads its particles over the ground; a point emitter
+        // (no emitter, or shape "point") stays the default.
+        var hasGroundEmitter = TryGroundEmitter(component, out var emitter, out var emitterShape);
+        var emitterInner = hasGroundEmitter && emitterShape == "ring" ? Num(emitter, "innerRadius") : 0;
+        var emitterOuter = hasGroundEmitter
+            ? (emitterShape == "ring" ? Num(emitter, "outerRadius") : Num(emitter, "radius"))
+            : 0;
 
         // Godot's scale curve is a 0..1 multiplier, so the base scale is the larger size.
         var hasScaleCurve = size > 0 && sizeStart != sizeEnd;
@@ -219,7 +314,18 @@ internal static class GodotVfxScene
         sub.Append($"scale_max = {F(size)}\n");
         if (hasScaleCurve)
             sub.Append($"scale_curve = SubResource(\"{id}_size_texture\")\n");
-        sub.Append($"color_ramp = SubResource(\"{id}_color_texture\")\n\n");
+        sub.Append($"color_ramp = SubResource(\"{id}_color_texture\")\n");
+        if (hasGroundEmitter)
+        {
+            // Godot's ring lies on the emitter's own plane; the axis and zero height put it on XZ.
+            sub.Append("emission_shape = 6\n");
+            sub.Append("emission_ring_axis = Vector3(0, 1, 0)\n");
+            sub.Append("emission_ring_height = 0\n");
+            sub.Append($"emission_ring_inner_radius = {F(emitterInner)}\n");
+            sub.Append($"emission_ring_radius = {F(emitterOuter)}\n");
+        }
+
+        sub.Append('\n');
 
         sub.Append($"[sub_resource type=\"StandardMaterial3D\" id=\"{id}_material\"]\n");
         sub.Append("transparency = 1\n");
@@ -234,7 +340,7 @@ internal static class GodotVfxScene
         sub.Append($"material = SubResource(\"{id}_material\")\n\n");
 
         // Room for the farthest particle, so Godot does not cull a live effect.
-        var reach = 1.25 * speed * lifetime + 0.5 * Math.Abs(gravity) * lifetime * lifetime + size;
+        var reach = 1.25 * speed * lifetime + 0.5 * Math.Abs(gravity) * lifetime * lifetime + size + emitterOuter;
         nodes.Append(Node(id, "type=\"GPUParticles3D\" parent=\".\""));
         nodes.Append(transform);
         nodes.Append("emitting = false\n");
@@ -322,13 +428,38 @@ internal static class GodotVfxScene
 
     private static string Node(string name, string attributes) => $"[node name=\"{name}\" {attributes}]\n";
 
-    private static string Transform(JsonElement component)
+    private static string Transform(JsonElement component) => Transform(component, 1, 1, 1);
+
+    private static string Transform(JsonElement component, double scaleX, double scaleY, double scaleZ)
     {
-        if (!component.TryGetProperty("position", out var position) || position.ValueKind != JsonValueKind.Array)
+        var hasPosition = component.TryGetProperty("position", out var position)
+                          && position.ValueKind == JsonValueKind.Array;
+        if (!hasPosition && scaleX == 1 && scaleY == 1 && scaleZ == 1)
             return string.Empty;
 
-        var p = position.EnumerateArray().Select(v => F(v.GetDouble())).ToArray();
-        return $"transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, {p[0]}, {p[1]}, {p[2]})\n";
+        var p = hasPosition
+            ? position.EnumerateArray().Select(v => F(v.GetDouble())).ToArray()
+            : new[] { "0", "0", "0" };
+        return $"transform = Transform3D({F(scaleX)}, 0, 0, 0, {F(scaleY)}, 0, 0, 0, {F(scaleZ)}, {p[0]}, {p[1]}, {p[2]})\n";
+    }
+
+    /// <summary>True when a particles component spreads over the ground, with its outer and inner radii.</summary>
+    private static bool TryGroundEmitter(JsonElement component, out JsonElement emitter, out string shape)
+    {
+        emitter = default;
+        shape = string.Empty;
+        if (!component.TryGetProperty("emitter", out var candidate) || candidate.ValueKind != JsonValueKind.Object)
+            return false;
+        if (!candidate.TryGetProperty("shape", out var shapeElement) || shapeElement.ValueKind != JsonValueKind.String)
+            return false;
+
+        var value = shapeElement.GetString();
+        if (value is not ("disc" or "ring"))
+            return false;
+
+        emitter = candidate;
+        shape = value;
+        return true;
     }
 
     private static string Color(string hex, double alpha) => $"Color({ColorValues(hex, alpha)})";

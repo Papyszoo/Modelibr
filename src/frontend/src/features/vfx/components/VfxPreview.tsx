@@ -1,6 +1,13 @@
 import { Grid, OrbitControls } from '@react-three/drei'
-import { Canvas, useLoader } from '@react-three/fiber'
-import { type JSX, Suspense, useEffect, useMemo, useRef } from 'react'
+import { Canvas, useLoader, useThree } from '@react-three/fiber'
+import {
+  type JSX,
+  Suspense,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+} from 'react'
 import * as THREE from 'three'
 
 import { getFileUrl } from '@/features/models/api/modelApi'
@@ -11,13 +18,25 @@ import type { SceneNode } from '@/features/scenes/types'
 
 import { useVfxMeshSources } from '../hooks/useVfxMeshSources'
 import {
+  computeEffectBounds,
+  frameThumbnailCamera,
+  type ThumbnailCamera,
+  thumbnailWindowSeconds,
+} from '../lib/vfxFraming'
+import {
   createParticleBuffers,
   isComponentActive,
   MAX_PARTICLES,
   sampleParticles,
   sampleTrack,
 } from '../lib/vfxRuntime'
-import type { VfxComponent, VfxDefinition } from '../types'
+import {
+  DEFAULT_PRIMITIVE_COLOR,
+  isPrimitiveMesh,
+  meshOuterRadius,
+  type VfxComponent,
+  type VfxDefinition,
+} from '../types'
 
 interface VfxPreviewProps {
   definition: VfxDefinition
@@ -136,13 +155,20 @@ export function VfxPreview({
   spriteFiles,
 }: VfxPreviewProps): JSX.Element {
   const { sources } = useVfxMeshSources(definition)
+  // The editor frames the effect the same way its thumbnail is framed, so a
+  // flat primitive or a wide emitter disc is never cropped by a fixed camera.
+  const camera = useMemo(
+    () =>
+      frameThumbnailCamera(
+        computeEffectBounds(definition, thumbnailWindowSeconds(definition))
+      ),
+    [definition]
+  )
 
   return (
     <div className="vfx-preview" data-testid="vfx-preview">
-      <Canvas
-        camera={{ position: [2.6, 1.9, 3.4], fov: 45 }}
-        gl={{ antialias: true }}
-      >
+      <Canvas camera={{ position: camera.position, fov: camera.fov }}>
+        <EditorCamera camera={camera} />
         <VfxStage />
         <Grid
           args={[20, 20]}
@@ -168,11 +194,32 @@ export function VfxPreview({
           makeDefault
           enableDamping
           dampingFactor={0.1}
-          target={[0, 0.8, 0]}
+          target={camera.target}
         />
       </Canvas>
     </div>
   )
+}
+
+/**
+ * Moves the editor camera onto the effect's framing, but only when the framing
+ * itself changes: an edit that leaves the bounds alone keeps the user's orbit.
+ */
+function EditorCamera({ camera }: { camera: ThumbnailCamera }): null {
+  const three = useThree(state => state.camera)
+  const applied = useRef('')
+
+  useLayoutEffect(() => {
+    const key = `${camera.position.join(',')}|${camera.target.join(',')}|${camera.fov}`
+    if (applied.current === key) return
+    applied.current = key
+    three.position.set(...camera.position)
+    three.lookAt(...camera.target)
+    if (three instanceof THREE.PerspectiveCamera) three.fov = camera.fov
+    three.updateProjectionMatrix()
+  }, [three, camera])
+
+  return null
 }
 
 /** Particle sizes in pixels at distance 1; sized for the editor's viewport. */
@@ -365,6 +412,13 @@ function MeshLayer({
   const scale = sampleTrack(component.tracks?.scale, local, 1)
   const rotationY = sampleTrack(component.tracks?.rotationY, local, 0)
   const opacity = sampleTrack(component.tracks?.opacity, local, 1)
+  const primitive =
+    component.mesh && isPrimitiveMesh(component.mesh) ? component.mesh : null
+  const baseRadius = primitive ? meshOuterRadius(primitive) : 0
+  const radius = primitive
+    ? Math.max(0, sampleTrack(component.tracks?.radius, local, baseRadius))
+    : baseRadius
+  const radialScale = baseRadius > 0 ? radius / baseRadius : 1
 
   useEffect(() => {
     groupRef.current?.traverse(object => {
@@ -400,6 +454,37 @@ function MeshLayer({
 
   if (!active && !selected) return null
   const [x, y, z] = component.position ?? [0, 0, 0]
+
+  if (primitive) {
+    // A flat ground primitive: the circle geometry lies in XY, so rotating it a
+    // quarter turn about X lays it on the XZ plane facing +Y. The radius track
+    // scales x/z by r(t)/r0, which is the in-plane mesh x/y axes after rotation.
+    return (
+      <group
+        ref={groupRef}
+        position={[x, y, z]}
+        rotation={[0, THREE.MathUtils.degToRad(rotationY), 0]}
+        visible={active}
+      >
+        <mesh
+          rotation={[-Math.PI / 2, 0, 0]}
+          scale={[scale * radialScale, scale * radialScale, scale]}
+        >
+          {primitive.kind === 'disc' ? (
+            <circleGeometry args={[baseRadius, 64]} />
+          ) : (
+            <ringGeometry args={[primitive.innerRadius ?? 0, baseRadius, 64]} />
+          )}
+          <meshStandardMaterial
+            color={primitive.color ?? DEFAULT_PRIMITIVE_COLOR}
+            emissive={primitive.color ?? DEFAULT_PRIMITIVE_COLOR}
+            emissiveIntensity={primitive.emissiveIntensity ?? 0}
+            side={THREE.DoubleSide}
+          />
+        </mesh>
+      </group>
+    )
+  }
 
   return (
     <group

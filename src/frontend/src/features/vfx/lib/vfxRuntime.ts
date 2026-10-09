@@ -1,4 +1,9 @@
-import type { VfxComponent, VfxKeyframe, VfxParticles } from '../types'
+import type {
+  VfxComponent,
+  VfxEmitter,
+  VfxKeyframe,
+  VfxParticles,
+} from '../types'
 
 /**
  * Everything the preview draws is a pure function of time.
@@ -59,6 +64,84 @@ export function particleRandom(
   return (h >>> 0) / 4294967296
 }
 
+/**
+ * The effective inner and outer radii of a disc/ring emitter at component-local
+ * `local` seconds. A radius track overrides the authored radius; on a ring the
+ * inner radius scales by the same factor, so the band keeps its ratio.
+ */
+export function emitterRadii(
+  emitter: VfxEmitter | undefined,
+  radiusKeys: VfxKeyframe[] | undefined,
+  local: number
+): { inner: number; outer: number } {
+  if (emitter?.shape === 'disc') {
+    const radius = Math.max(
+      0,
+      sampleTrack(radiusKeys, local, emitter.radius ?? 0)
+    )
+    return { inner: 0, outer: radius }
+  }
+  if (emitter?.shape === 'ring') {
+    const baseInner = emitter.innerRadius ?? 0
+    const baseOuter = emitter.outerRadius ?? 0
+    const outer = Math.max(0, sampleTrack(radiusKeys, local, baseOuter))
+    const ratio = baseOuter > 0 ? baseInner / baseOuter : 0
+    return { inner: outer * ratio, outer }
+  }
+  return { inner: 0, outer: 0 }
+}
+
+/** The largest value in a keyframe track, 0 when it is absent or empty. */
+export function maxKeyframeValue(keys: VfxKeyframe[] | undefined): number {
+  return (keys ?? []).reduce(
+    (largest, [, value]) => Math.max(largest, value),
+    0
+  )
+}
+
+/** The largest outer radius a disc/ring emitter can reach, for framing. */
+export function emitterMaxRadius(
+  emitter: VfxEmitter | undefined,
+  radiusKeys: VfxKeyframe[] | undefined
+): number {
+  const base =
+    emitter?.shape === 'ring'
+      ? (emitter.outerRadius ?? 0)
+      : emitter?.shape === 'disc'
+        ? (emitter.radius ?? 0)
+        : 0
+  return Math.max(base, maxKeyframeValue(radiusKeys))
+}
+
+/**
+ * A particle's spawn offset on its emitter shape, on the component's local XZ
+ * plane. A point emitter (or none) spawns at the origin; a disc and a ring place
+ * the particle uniformly by area, drawing from the emitter's seeded random
+ * stream so a render is reproducible.
+ */
+export function sampleEmitterOrigin(
+  emitter: VfxEmitter | undefined,
+  seed: number,
+  index: number,
+  innerRadius: number,
+  outerRadius: number
+): [number, number] {
+  const shape = emitter?.shape ?? 'point'
+  if (shape === 'point' || outerRadius <= 0) return [0, 0]
+
+  const u = particleRandom(seed, index, 3)
+  const angle = particleRandom(seed, index, 4) * Math.PI * 2
+  const r =
+    shape === 'ring'
+      ? Math.sqrt(
+          innerRadius * innerRadius +
+            u * (outerRadius * outerRadius - innerRadius * innerRadius)
+        )
+      : outerRadius * Math.sqrt(u)
+
+  return [r * Math.cos(angle), r * Math.sin(angle)]
+}
+
 export function hexToRgb(hex: string): [number, number, number] {
   const value = parseInt(hex.replace('#', ''), 16)
   return [
@@ -97,8 +180,10 @@ export function createParticleBuffers(
  * stops at the end of the component, but particles already released live out
  * their lifetime - the same rule Godot applies when `emitting` turns off.
  *
- * Each particle leaves the origin inside a cone of `spread` degrees around +Y,
- * at 75-125% of `speed`, and falls under `gravity` along Y.
+ * Each particle leaves the emitter inside a cone of `spread` degrees around +Y,
+ * at 75-125% of `speed`, and falls under `gravity` along Y. The emitter is a
+ * point unless it is a disc or ring, which spreads the spawn point over the
+ * local XZ plane. The direction is the cone from that spawn point either way.
  */
 export function sampleParticles(
   component: VfxComponent,
@@ -141,8 +226,18 @@ export function sampleParticles(
 
   let written = 0
   for (let index = first; index <= last && written < capacity; index++) {
-    const age = local - birthOf(index)
+    const birth = birthOf(index)
+    const age = local - birth
     if (age < 0 || age >= particles.lifetime) continue
+
+    // The spawn radius is the one in force when this particle was born: a
+    // radius track grows the emitter without dragging particles already in
+    // flight along with it.
+    const { inner: emitterInner, outer: emitterOuter } = emitterRadii(
+      component.emitter,
+      component.tracks?.radius,
+      birth
+    )
 
     const u1 = particleRandom(particles.seed, index, 0)
     const u2 = particleRandom(particles.seed, index, 1)
@@ -156,10 +251,17 @@ export function sampleParticles(
 
     const f = age / particles.lifetime
     const p = written * 3
-    out.positions[p] = ox + sinTheta * Math.cos(phi) * speed * age
+    const [ex, ez] = sampleEmitterOrigin(
+      component.emitter,
+      particles.seed,
+      index,
+      emitterInner,
+      emitterOuter
+    )
+    out.positions[p] = ox + ex + sinTheta * Math.cos(phi) * speed * age
     out.positions[p + 1] =
       oy + cosTheta * speed * age + 0.5 * particles.gravity * age * age
-    out.positions[p + 2] = oz + sinTheta * Math.sin(phi) * speed * age
+    out.positions[p + 2] = oz + ez + sinTheta * Math.sin(phi) * speed * age
     out.colors[p] = r0 + (r1 - r0) * f
     out.colors[p + 1] = g0 + (g1 - g0) * f
     out.colors[p + 2] = b0 + (b1 - b0) * f

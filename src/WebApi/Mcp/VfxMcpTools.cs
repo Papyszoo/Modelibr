@@ -46,7 +46,8 @@ public sealed class VfxReadMcpTools
 
     [McpServerTool(Name = "get_vfx")]
     [Description("Read one visual effect in full: its name, description and v1 definition parsed as a JSON object " +
-                 "(version, duration, loop, components), so the timeline can be inspected exactly as it is stored. thumbnailUrl is an " +
+                 "(version, duration, loop, components - including any ground emitter on a particles component and any " +
+                 "disc/ring mesh primitive), so the timeline can be inspected exactly as it is stored. thumbnailUrl is an " +
                  "API-relative animated WebP loop of the whole effect (null until the worker has rendered it).")]
     public static async Task<object> GetVfx(
         IQueryHandler<GetVfxQuery, VfxDetailDto> handler,
@@ -78,11 +79,23 @@ public sealed class VfxWriteMcpTools
                  "Required block by type - particles: {mode continuous|burst, rate 0-2000 (required in 'continuous' mode, " +
                  "optional otherwise), count 1-5000 (required in 'burst' mode, optional otherwise), lifetime (0,10], " +
                  "speed >=0, spread 0-180, gravity, sizeStart/sizeEnd >=0, colorStart/colorEnd #rrggbb, opacityStart/opacityEnd 0-1, " +
-                 "blending additive|normal, spriteId?, seed int}; mesh: {modelId, versionId (optional; omitted or null is resolved " +
-                 "to the model's active version)}; light: {color #rrggbb, range >0}; " +
-                 "sound: {soundId, volume 0-1}. Optional tracks: mesh scale/opacity/rotationY, light intensity, each [[time,value],...] " +
+                 "blending additive|normal, spriteId?, seed int} plus an optional emitter " +
+                 "{shape point|disc|ring (point is the default), radius 0-20 exclusive for disc, innerRadius 0-20 and " +
+                 "outerRadius 0-20 exclusive with innerRadius < outerRadius for ring} that spawns particles over the local XZ " +
+                 "ground plane; mesh: {modelId, versionId (optional; omitted or null is resolved to the model's active version)} " +
+                 "or a flat ground primitive {kind disc|ring, radius 0-20 exclusive for disc, innerRadius 0-20 and outerRadius " +
+                 "0-20 exclusive with innerRadius < outerRadius for ring, optional color #rrggbb and emissiveIntensity 0-10}; " +
+                 "light: {color #rrggbb, range >0}; " +
+                 "sound: {soundId, volume 0-1}. Optional tracks: mesh scale/opacity/rotationY, light intensity, and radius 0-20 " +
+                 "on a particles component with a disc or ring emitter or on a disc/ring mesh primitive, each [[time,value],...] " +
                  "relative to the component start; no other track is allowed. modelId/versionId/soundId/spriteId must exist. " +
                  "An invalid definition is rejected whole and every problem is returned at once with the path of the field it is about. " +
+                 "Example ground puddle: {version:1,duration:2,loop:true,components:[{id:\"pool\",type:\"mesh\",name:\"Pool\"," +
+                 "start:0,duration:2,mesh:{kind:\"disc\",radius:1.5,color:\"#5aa469\",emissiveIntensity:0.4}}," +
+                 "{id:\"bubbles\",type:\"particles\",name:\"Bubbles\",start:0," +
+                 "duration:2,emitter:{shape:\"disc\",radius:1.5},particles:{mode:\"continuous\",rate:20,lifetime:1,speed:0.4," +
+                 "spread:20,gravity:0,sizeStart:0.1,sizeEnd:0,colorStart:\"#88ff88\",colorEnd:\"#113311\",opacityStart:1," +
+                 "opacityEnd:0,blending:\"normal\",seed:1},tracks:{radius:[[0,1.5]]}}]}. " +
                  "Omit definition for a default empty effect.")]
     public static Task<object> CreateVfx(
         ICommandHandler<CreateVfxCommand, VfxWriteOutcome> handler,
@@ -120,9 +133,10 @@ public sealed class VfxWriteMcpTools
     [Description("Change a visual effect. Omitted fields are left alone. A supplied definition REPLACES the whole definition " +
                  "rather than merging it - a timeline is edited as a unit. The definition uses the same v1 contract as create_vfx " +
                  "(component types, required blocks per type, allowed tracks, start+duration <= effect duration, referenced asset ids " +
-                 "must exist). Particles require rate in 'continuous' mode and count in 'burst' mode, the other may be omitted; a mesh " +
-                 "versionId omitted or null is resolved to the model's active version. Every validation problem is returned at once " +
-                 "with its path.")]
+                 "must exist, optional ground emitters and disc/ring mesh primitives with their optional colour and " +
+                 "emissiveIntensity). Particles require rate in 'continuous' mode " +
+                 "and count in 'burst' mode, the other may be omitted; a mesh versionId omitted or null is resolved to the model's " +
+                 "active version. Every validation problem is returned at once with its path.")]
     public static Task<object> UpdateVfx(
         ICommandHandler<UpdateVfxCommand, VfxWriteOutcome> handler,
         IQueryHandler<GetVfxQuery, VfxDetailDto> getHandler,

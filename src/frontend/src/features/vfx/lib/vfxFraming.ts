@@ -1,7 +1,9 @@
-import type { VfxDefinition } from '../types'
+import { isPrimitiveMesh, meshOuterRadius, type VfxDefinition } from '../types'
 import {
   componentVisibleUntil,
   createParticleBuffers,
+  emitterMaxRadius,
+  maxKeyframeValue,
   sampleParticles,
   sampleTrack,
 } from './vfxRuntime'
@@ -84,6 +86,11 @@ export function computeEffectBounds(
 
     if (component.type === 'particles' && component.particles) {
       grow(px, py, pz, 0.05)
+      const emitterOuter = emitterMaxRadius(
+        component.emitter,
+        component.tracks?.radius
+      )
+      if (emitterOuter > 0) grow(px, py, pz, emitterOuter)
       const axes: number[][] = [[], [], []]
       let sizeSum = 0
 
@@ -119,7 +126,14 @@ export function computeEffectBounds(
         ...(component.tracks?.scale?.map(([, value]) => value) ?? [1]),
         sampleTrack(component.tracks?.scale, 0, 1)
       )
-      grow(px, py, pz, MESH_HALF_EXTENT * Math.max(scale, 0.1))
+      const extent =
+        component.mesh && isPrimitiveMesh(component.mesh)
+          ? Math.max(
+              meshOuterRadius(component.mesh),
+              maxKeyframeValue(component.tracks?.radius)
+            )
+          : MESH_HALF_EXTENT
+      grow(px, py, pz, extent * Math.max(scale, 0.1))
     } else if (component.type === 'light') {
       grow(px, py, pz, 0.2)
     }

@@ -184,4 +184,24 @@ public class VfxMcpToolsTests
         Assert.Contains($"\"thumbnailUrl\":\"{url}\"", got.Replace("\\u0026", "&"));
         Assert.Contains("\"thumbnailUrl\":\"/vfx/7/thumbnail/file?v=abc\"", listed);
     }
+
+    // The schema an agent reads is the tool description, so the ground-shape fields must be
+    // documented there or an agent cannot author them.
+    [Fact]
+    public void CreateVfx_Description_DocumentsTheGroundShapes()
+    {
+        var description = typeof(VfxWriteMcpTools)
+            .GetMethod(nameof(VfxWriteMcpTools.CreateVfx))!
+            .GetCustomAttributes(typeof(System.ComponentModel.DescriptionAttribute), false)
+            .Cast<System.ComponentModel.DescriptionAttribute>()
+            .Single()
+            .Description;
+
+        Assert.Contains("emitter", description);
+        Assert.Contains("kind disc|ring", description);
+        Assert.Contains("radius 0-20", description);
+        Assert.Contains("color #rrggbb", description);
+        Assert.Contains("emissiveIntensity 0-10", description);
+        Assert.Contains("ground puddle", description);
+    }
 }

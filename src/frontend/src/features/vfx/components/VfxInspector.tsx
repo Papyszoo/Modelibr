@@ -3,12 +3,16 @@ import { type JSX, type ReactNode, useState } from 'react'
 import { useVfxAssetInfo } from '../hooks/useVfxAssets'
 import { sampleTrack } from '../lib/vfxRuntime'
 import {
-  VFX_TRACKS,
+  DEFAULT_PRIMITIVE_COLOR,
+  isPrimitiveMesh,
   type VfxComponent,
+  type VfxEmitter,
   type VfxKeyframe,
+  type VfxMesh,
   type VfxParticles,
   type VfxProblem,
   type VfxTrackName,
+  vfxTracksFor,
 } from '../types'
 import { type VfxAssetKind, VfxAssetPicker } from './VfxAssetPicker'
 
@@ -27,6 +31,7 @@ const TRACK_LABELS: Record<VfxTrackName, string> = {
   opacity: 'Opacity',
   rotationY: 'Rotation Y (deg)',
   intensity: 'Intensity',
+  radius: 'Radius (m)',
 }
 
 const TRACK_DEFAULTS: Record<VfxTrackName, number> = {
@@ -34,6 +39,49 @@ const TRACK_DEFAULTS: Record<VfxTrackName, number> = {
   opacity: 1,
   rotationY: 0,
   intensity: 1,
+  radius: 1,
+}
+
+/** The radius a new disc/ring primitive starts at, in metres. */
+const DEFAULT_PRIMITIVE_RADIUS = 3
+
+/** A new emitter of `shape`, carrying over any radius the previous one had. */
+function defaultEmitter(
+  shape: VfxEmitter['shape'],
+  previous: VfxEmitter | undefined
+): VfxEmitter {
+  if (shape === 'disc')
+    return {
+      shape,
+      radius: previous?.radius ?? previous?.outerRadius ?? 2,
+    }
+  if (shape === 'ring')
+    return {
+      shape,
+      innerRadius: previous?.innerRadius ?? 1,
+      outerRadius: previous?.outerRadius ?? previous?.radius ?? 3,
+    }
+  return { shape: 'point' }
+}
+
+/** What a new radius keyframe starts at: the component's authored radius. */
+function radiusDefault(component: VfxComponent): number {
+  const mesh = component.mesh
+  if (mesh?.kind === 'disc') return mesh.radius ?? TRACK_DEFAULTS.radius
+  if (mesh?.kind === 'ring') return mesh.outerRadius ?? TRACK_DEFAULTS.radius
+  const emitter = component.emitter
+  if (emitter?.shape === 'disc') return emitter.radius ?? TRACK_DEFAULTS.radius
+  if (emitter?.shape === 'ring')
+    return emitter.outerRadius ?? TRACK_DEFAULTS.radius
+  return TRACK_DEFAULTS.radius
+}
+
+/** `tracks` without `radius`, kept as-is when it had none to begin with. */
+function withoutRadius(tracks: VfxComponent['tracks']): VfxComponent['tracks'] {
+  if (!tracks || tracks.radius === undefined) return tracks
+  const next = { ...tracks }
+  delete next.radius
+  return next
 }
 
 /** Edits one component: its timing, its own settings, and its keyframes. */
@@ -117,23 +165,92 @@ export function VfxInspector({
       ) : null}
 
       {component.particles ? (
-        <ParticlesFields
-          particles={component.particles}
-          onChange={particles => set({ particles })}
-        />
+        <>
+          <ParticlesFields
+            particles={component.particles}
+            onChange={particles => set({ particles })}
+          />
+          <EmitterFields
+            emitter={component.emitter}
+            onChange={emitter =>
+              set({
+                emitter,
+                tracks:
+                  emitter?.shape === 'point'
+                    ? withoutRadius(component.tracks)
+                    : component.tracks,
+              })
+            }
+          />
+        </>
       ) : null}
 
       {component.mesh ? (
         <Section title="Mesh">
-          <AssetField
-            kind="model"
-            id={component.mesh.modelId}
-            onPick={asset =>
-              set({
-                mesh: { modelId: asset.id, versionId: asset.versionId ?? null },
-              })
-            }
-          />
+          <label className="vfx-field">
+            <span>Primitive</span>
+            <select
+              value={component.mesh.kind ?? 'model'}
+              onChange={event => {
+                const shape = event.target.value
+                const previous = component.mesh!
+                if (shape === 'model') {
+                  set({
+                    mesh: {
+                      modelId: previous.kind ? 0 : (previous.modelId ?? 0),
+                      versionId: previous.kind
+                        ? null
+                        : (previous.versionId ?? null),
+                    },
+                    tracks: withoutRadius(component.tracks),
+                  })
+                  return
+                }
+                set({
+                  mesh:
+                    shape === 'disc'
+                      ? {
+                          kind: 'disc',
+                          radius:
+                            previous.radius ??
+                            previous.outerRadius ??
+                            DEFAULT_PRIMITIVE_RADIUS,
+                        }
+                      : {
+                          kind: 'ring',
+                          innerRadius: previous.innerRadius ?? 1,
+                          outerRadius:
+                            previous.outerRadius ??
+                            previous.radius ??
+                            DEFAULT_PRIMITIVE_RADIUS,
+                        },
+                })
+              }}
+            >
+              <option value="model">Library model</option>
+              <option value="disc">Disc</option>
+              <option value="ring">Ring</option>
+            </select>
+          </label>
+          {isPrimitiveMesh(component.mesh) ? (
+            <MeshPrimitiveFields
+              mesh={component.mesh}
+              onChange={mesh => set({ mesh })}
+            />
+          ) : (
+            <AssetField
+              kind="model"
+              id={component.mesh.modelId ?? null}
+              onPick={asset =>
+                set({
+                  mesh: {
+                    modelId: asset.id,
+                    versionId: asset.versionId ?? null,
+                  },
+                })
+              }
+            />
+          )}
         </Section>
       ) : null}
 
@@ -174,11 +291,16 @@ export function VfxInspector({
         </Section>
       ) : null}
 
-      {VFX_TRACKS[component.type].map(track => (
+      {vfxTracksFor(component).map(track => (
         <TrackEditor
           key={track}
           track={track}
           keys={component.tracks?.[track] ?? []}
+          defaultValue={
+            track === 'radius'
+              ? radiusDefault(component)
+              : TRACK_DEFAULTS[track]
+          }
           componentDuration={component.duration}
           localTime={Math.min(
             Math.max(0, time - component.start),
@@ -356,15 +478,152 @@ function ParticlesFields({
   )
 }
 
+/**
+ * The emitter shape of a particles component. In the definition it lives on the
+ * component, next to `particles`, which is where the server and the Godot export
+ * read it.
+ */
+function EmitterFields({
+  emitter,
+  onChange,
+}: {
+  emitter: VfxEmitter | undefined
+  onChange: (emitter: VfxEmitter) => void
+}): JSX.Element {
+  const shape = emitter?.shape ?? 'point'
+  const setShape = (next: VfxEmitter['shape']) =>
+    onChange(defaultEmitter(next, emitter))
+
+  return (
+    <Section title="Emitter">
+      <label className="vfx-field">
+        <span>Emitter shape</span>
+        <select
+          value={shape}
+          onChange={event =>
+            setShape(event.target.value as VfxEmitter['shape'])
+          }
+        >
+          <option value="point">Point</option>
+          <option value="disc">Disc</option>
+          <option value="ring">Ring</option>
+        </select>
+      </label>
+      {shape === 'disc' ? (
+        <NumberField
+          label="Radius (m)"
+          value={emitter?.radius ?? 1}
+          min={0.1}
+          max={20}
+          step={0.1}
+          onChange={radius => onChange({ shape: 'disc', radius })}
+        />
+      ) : null}
+      {shape === 'ring' ? (
+        <>
+          <NumberField
+            label="Inner radius (m)"
+            value={emitter?.innerRadius ?? 0}
+            min={0}
+            max={20}
+            step={0.1}
+            onChange={innerRadius =>
+              onChange({
+                ...(emitter ?? { shape: 'ring' }),
+                shape: 'ring',
+                innerRadius,
+              })
+            }
+          />
+          <NumberField
+            label="Outer radius (m)"
+            value={emitter?.outerRadius ?? 1}
+            min={0.1}
+            max={20}
+            step={0.1}
+            onChange={outerRadius =>
+              onChange({
+                ...(emitter ?? { shape: 'ring' }),
+                shape: 'ring',
+                outerRadius,
+              })
+            }
+          />
+        </>
+      ) : null}
+    </Section>
+  )
+}
+
+/** The radii and material of a flat disc or ring primitive. */
+function MeshPrimitiveFields({
+  mesh,
+  onChange,
+}: {
+  mesh: VfxMesh
+  onChange: (mesh: VfxMesh) => void
+}): JSX.Element {
+  const set = (patch: Partial<VfxMesh>) => onChange({ ...mesh, ...patch })
+
+  return (
+    <>
+      {mesh.kind === 'disc' ? (
+        <NumberField
+          label="Radius (m)"
+          value={mesh.radius ?? 1}
+          min={0.1}
+          max={20}
+          step={0.1}
+          onChange={radius => set({ radius })}
+        />
+      ) : (
+        <>
+          <NumberField
+            label="Inner radius (m)"
+            value={mesh.innerRadius ?? 0}
+            min={0}
+            max={20}
+            step={0.1}
+            onChange={innerRadius => set({ innerRadius })}
+          />
+          <NumberField
+            label="Outer radius (m)"
+            value={mesh.outerRadius ?? 1}
+            min={0.1}
+            max={20}
+            step={0.1}
+            onChange={outerRadius => set({ outerRadius })}
+          />
+        </>
+      )}
+      <ColorField
+        label="Colour"
+        value={mesh.color ?? DEFAULT_PRIMITIVE_COLOR}
+        onChange={color => set({ color })}
+      />
+      <NumberField
+        label="Emissive"
+        value={mesh.emissiveIntensity ?? 0}
+        min={0}
+        max={10}
+        step={0.1}
+        onChange={emissiveIntensity => set({ emissiveIntensity })}
+      />
+    </>
+  )
+}
+
 function TrackEditor({
   track,
   keys,
+  defaultValue,
   componentDuration,
   localTime,
   onChange,
 }: {
   track: VfxTrackName
   keys: VfxKeyframe[]
+  defaultValue: number
   componentDuration: number
   localTime: number
   onChange: (keys: VfxKeyframe[]) => void
@@ -373,7 +632,7 @@ function TrackEditor({
 
   const addAtPlayhead = () => {
     const t = Number(localTime.toFixed(2))
-    const value = sampleTrack(keys, t, TRACK_DEFAULTS[track])
+    const value = sampleTrack(keys, t, defaultValue)
     onChange(
       sorted([...keys.filter(([k]) => k !== t), [t, Number(value.toFixed(3))]])
     )
@@ -383,9 +642,7 @@ function TrackEditor({
     <Section title={`${TRACK_LABELS[track]} keyframes`}>
       <div className="vfx-keys" data-testid={`vfx-track-${track}`}>
         {keys.length === 0 ? (
-          <p className="vfx-muted">
-            No keyframes - stays at {TRACK_DEFAULTS[track]}.
-          </p>
+          <p className="vfx-muted">No keyframes - stays at {defaultValue}.</p>
         ) : (
           keys.map(([t, value], index) => (
             <div key={index} className="vfx-key-row">

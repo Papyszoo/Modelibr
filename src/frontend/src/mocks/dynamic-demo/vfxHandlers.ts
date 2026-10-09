@@ -2,7 +2,6 @@ import { strToU8, zipSync } from 'fflate'
 import { http, HttpResponse } from 'msw'
 
 import { now } from './shared'
-
 /**
  * Demo VFX effects, held in memory for the session.
  *
@@ -10,29 +9,13 @@ import { now } from './shared'
  * library assets by id, and the demo regenerates those ids when it is reseeded,
  * so an effect that survived would point at assets that no longer exist.
  */
+import {
+  validateDefinition,
+  type VfxDefinition,
+  type VfxProblem,
+} from './vfxValidation'
 
-type VfxComponentType = 'particles' | 'mesh' | 'light' | 'sound'
-
-interface VfxComponent {
-  id: string
-  type: VfxComponentType
-  name: string
-  start: number
-  duration: number
-  position?: [number, number, number]
-  particles?: Record<string, unknown>
-  mesh?: { modelId: number; versionId?: number | null }
-  light?: { color: string; range: number }
-  sound?: { soundId: number; volume: number }
-  tracks?: Record<string, [number, number][]>
-}
-
-interface VfxDefinition {
-  version: 1
-  duration: number
-  loop: boolean
-  components: VfxComponent[]
-}
+export { validateDefinition } from './vfxValidation'
 
 interface DemoVfx {
   id: number
@@ -41,18 +24,6 @@ interface DemoVfx {
   definition: VfxDefinition
   createdAt: string
   updatedAt: string
-}
-
-interface VfxProblem {
-  path: string
-  message: string
-}
-
-const TRACKS_BY_TYPE: Record<VfxComponentType, string[]> = {
-  particles: [],
-  mesh: ['scale', 'opacity', 'rotationY'],
-  light: ['intensity'],
-  sound: [],
 }
 
 function emptyDefinition(): VfxDefinition {
@@ -202,97 +173,6 @@ function toDetail(effect: DemoVfx) {
     updatedAt: effect.updatedAt,
     thumbnailUrl: thumbnailUrl(effect),
   }
-}
-
-/**
- * A small mirror of the server's definition validation, so the editor's
- * problem display has something real to show in the demo. It checks the
- * shape, the timing bounds and the per-type tracks - enough to catch the
- * mistakes an author actually makes.
- */
-function validateDefinition(definition: unknown): VfxProblem[] {
-  const problems: VfxProblem[] = []
-  const add = (path: string, message: string) =>
-    problems.push({ path, message })
-
-  if (typeof definition !== 'object' || definition === null) {
-    add('definition', 'The definition must be an object.')
-    return problems
-  }
-
-  const doc = definition as Partial<VfxDefinition>
-  if (doc.version !== 1) add('version', 'Unsupported definition version.')
-  const duration = doc.duration
-  if (typeof duration !== 'number' || !(duration > 0) || duration > 60) {
-    add('duration', 'Duration must be between 0 and 60 seconds.')
-  }
-  if (!Array.isArray(doc.components)) {
-    add('components', 'Components must be an array.')
-    return problems
-  }
-
-  const seen = new Set<string>()
-  doc.components.forEach((component, index) => {
-    const path = `components[${index}]`
-    if (!component || typeof component !== 'object') {
-      add(path, 'Each component must be an object.')
-      return
-    }
-    if (!component.id) add(`${path}.id`, 'A component needs an id.')
-    else if (seen.has(component.id))
-      add(`${path}.id`, 'Component ids must be unique.')
-    else seen.add(component.id)
-
-    if (!component.name) add(`${path}.name`, 'A component needs a name.')
-
-    if (
-      typeof component.start !== 'number' ||
-      component.start < 0 ||
-      (typeof duration === 'number' && component.start > duration)
-    ) {
-      add(`${path}.start`, 'Start must be inside the effect.')
-    }
-    if (typeof component.duration !== 'number' || component.duration <= 0) {
-      add(`${path}.duration`, 'Duration must be greater than zero.')
-    } else if (
-      typeof component.start === 'number' &&
-      typeof duration === 'number' &&
-      component.start + component.duration > duration + 0.001
-    ) {
-      add(`${path}.duration`, 'The component runs past the end of the effect.')
-    }
-
-    switch (component.type) {
-      case 'particles':
-        if (!component.particles)
-          add(`${path}.particles`, 'Particles settings are missing.')
-        break
-      case 'mesh':
-        if (!component.mesh) add(`${path}.mesh`, 'A mesh needs a model.')
-        break
-      case 'light':
-        if (!component.light)
-          add(`${path}.light`, 'Light settings are missing.')
-        break
-      case 'sound':
-        if (!component.sound) add(`${path}.sound`, 'A sound needs an asset.')
-        break
-      default:
-        add(`${path}.type`, 'Unknown component type.')
-    }
-
-    const allowed = TRACKS_BY_TYPE[component.type as VfxComponentType] ?? []
-    for (const track of Object.keys(component.tracks ?? {})) {
-      if (!allowed.includes(track)) {
-        add(
-          `${path}.tracks.${track}`,
-          `A ${component.type} cannot use the ${track} track.`
-        )
-      }
-    }
-  })
-
-  return problems
 }
 
 function invalidDefinition(problems: VfxProblem[]) {

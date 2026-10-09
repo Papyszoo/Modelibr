@@ -34,6 +34,27 @@ public sealed class ExportVfxGodotQueryTests : IDisposable
            "sound":{"soundId":9,"volume":0.5}}]}
         """;
 
+    private const string GroundShapes = """
+        {"version":1,"duration":3,"loop":false,"components":[
+          {"id":"mist","type":"particles","name":"Mist","start":0,"duration":2,
+           "emitter":{"shape":"disc","radius":1.5},
+           "particles":{"mode":"continuous","rate":10,"lifetime":1,"speed":1,"spread":20,
+             "gravity":0,"sizeStart":0.1,"sizeEnd":0.1,"colorStart":"#ffffff","colorEnd":"#000000",
+             "opacityStart":1,"opacityEnd":0,"blending":"normal","seed":1},
+           "tracks":{"radius":[[0,0.5],[2,1.5]]}},
+          {"id":"smoke","type":"particles","name":"Smoke","start":0,"duration":2,
+           "emitter":{"shape":"ring","innerRadius":0.5,"outerRadius":1.5},
+           "particles":{"mode":"burst","rate":0,"count":10,"lifetime":1,"speed":1,"spread":20,
+             "gravity":0,"sizeStart":0.1,"sizeEnd":0.1,"colorStart":"#ffffff","colorEnd":"#000000",
+             "opacityStart":1,"opacityEnd":0,"blending":"normal","seed":2},
+           "tracks":{"radius":[[0,1.5]]}},
+          {"id":"pool","type":"mesh","name":"Pool","start":0,"duration":2,
+           "mesh":{"kind":"disc","radius":1.5},
+           "tracks":{"radius":[[0,0.5],[2,1.5]]}},
+          {"id":"rim","type":"mesh","name":"Rim","start":1,"duration":2,
+           "mesh":{"kind":"ring","innerRadius":0.5,"outerRadius":1.5}}]}
+        """;
+
     private readonly string _root = Path.Combine(Path.GetTempPath(), $"vfx-export-{Guid.NewGuid():N}");
     private readonly Mock<IVfxRepository> _vfx = new();
     private readonly Mock<IModelRepository> _models = new();
@@ -158,6 +179,80 @@ public sealed class ExportVfxGodotQueryTests : IDisposable
         AssertTrack(scene, "flash:light_energy", "PackedFloat32Array(0.25, 0.75)", "[4, 0]");
         AssertTrack(scene, "boom", "PackedFloat32Array(0.25)", "&\"play\"");
         Assert.DoesNotContain("opacity", scene);
+    }
+
+    [Fact]
+    public void GroundShapesDefinition_UsedByTheseTests_IsValid()
+    {
+        Assert.Empty(VfxDefinition.Validate(JsonSerializer.Deserialize<JsonElement>(GroundShapes)));
+    }
+
+    [Fact]
+    public async Task Handle_WithGroundShapes_WritesRingEmittersFlatPrimitivesAndRadiusTracks()
+    {
+        GivenEffect(GroundShapes);
+
+        var scene = await ExportScene();
+
+        // A disc emitter is Godot's ring shape with a zero inner radius; a ring keeps both radii.
+        Assert.Contains(
+            "emission_shape = 6\nemission_ring_axis = Vector3(0, 1, 0)\nemission_ring_height = 0\n" +
+            "emission_ring_inner_radius = 0\nemission_ring_radius = 1.5",
+            scene);
+        Assert.Contains("emission_ring_inner_radius = 0.5\nemission_ring_radius = 1.5", scene);
+
+        // The radius track animates the process material's ring radii.
+        AssertTrack(scene, "mist:process_material:emission_ring_radius", "PackedFloat32Array(0, 2)", "[0.5, 1.5]");
+        AssertTrack(scene, "smoke:process_material:emission_ring_radius", "PackedFloat32Array(0)", "[1.5]");
+        AssertTrack(scene, "smoke:process_material:emission_ring_inner_radius", "PackedFloat32Array(0)", "[0.5]");
+
+        // A disc primitive is a flat CylinderMesh; its radius track scales x/z only.
+        Assert.Contains("[sub_resource type=\"CylinderMesh\" id=\"pool_mesh\"]", scene);
+        Assert.Contains("top_radius = 1.5\nbottom_radius = 1.5\nheight = 0.002\nradial_segments = 64\nrings = 1", scene);
+        AssertTrack(scene, "pool:scale", "PackedFloat32Array(0, 2)",
+            "[Vector3(0.333333, 1, 0.333333), Vector3(1, 1, 1)]");
+
+        // A ring primitive is a TorusMesh squashed on y; no library file is copied.
+        Assert.Contains("[sub_resource type=\"TorusMesh\" id=\"rim_mesh\"]", scene);
+        Assert.Contains("inner_radius = 0.5\nouter_radius = 1.5", scene);
+        Assert.Contains("[node name=\"rim\" type=\"MeshInstance3D\" parent=\".\"]", scene);
+        Assert.Contains("transform = Transform3D(1, 0, 0, 0, 0.02, 0, 0, 0, 1, 0, 0, 0)", scene);
+        Assert.DoesNotContain("PackedScene", scene);
+        Assert.DoesNotContain("assets/model", scene);
+    }
+
+    [Fact]
+    public async Task Handle_WithAColouredPrimitive_WritesItsMaterial()
+    {
+        const string json = """
+            {"version":1,"duration":2,"loop":false,"components":[
+              {"id":"pool","type":"mesh","name":"Pool","start":0,"duration":2,
+               "mesh":{"kind":"disc","radius":1.5,"color":"#5aa469","emissiveIntensity":4}}]}
+            """;
+        Assert.Empty(VfxDefinition.Validate(JsonSerializer.Deserialize<JsonElement>(json)));
+        GivenEffect(json);
+
+        var scene = await ExportScene();
+
+        // Section 7: albedo from the colour, emission from colour * intensity.
+        Assert.Contains("[sub_resource type=\"StandardMaterial3D\" id=\"pool_material\"]", scene);
+        Assert.Contains("albedo_color = Color(0.352941, 0.643137, 0.411765, 1)", scene);
+        Assert.Contains("emission_enabled = true", scene);
+        Assert.Contains("emission = Color(0.352941, 0.643137, 0.411765, 1)", scene);
+        Assert.Contains("emission_energy_multiplier = 4", scene);
+        Assert.Contains("material = SubResource(\"pool_material\")", scene);
+    }
+
+    [Fact]
+    public async Task Handle_WithAnUncolouredPrimitive_WritesTheDefaultGrey()
+    {
+        GivenEffect(GroundShapes);
+
+        var scene = await ExportScene();
+
+        // An effect authored before section 7 keeps the grey, unlit look.
+        Assert.Contains("albedo_color = Color(0.541176, 0.576471, 0.65098, 1)", scene);
+        Assert.DoesNotContain("emission_enabled", scene);
     }
 
     [Theory]

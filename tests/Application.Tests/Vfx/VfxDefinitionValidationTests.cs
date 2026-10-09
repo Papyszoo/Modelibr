@@ -276,4 +276,265 @@ public class VfxDefinitionValidationTests
         Assert.Equal(4, summary.ComponentCount);
         Assert.Equal(["particles", "mesh", "light", "sound"], summary.ComponentTypes);
     }
+
+    // ── Phase 5 ground shapes: emitters, radius track, flat primitives ─────────────────
+
+    private static string ParticlesDoc(string? emitter = null, string? tracks = null)
+    {
+        var emitterJson = emitter is null ? string.Empty : $"\"emitter\":{emitter},";
+        var tracksJson = tracks is null ? string.Empty : $",\"tracks\":{tracks}";
+        return $$"""
+            {"version":1,"duration":4,"loop":false,"components":[
+              {"id":"sparks","type":"particles","name":"Sparks","start":0,"duration":2,
+               {{emitterJson}}"particles":{"mode":"continuous","rate":10,"lifetime":1,"speed":1,"spread":10,
+                 "gravity":0,"sizeStart":1,"sizeEnd":1,"colorStart":"#ffffff","colorEnd":"#000000",
+                 "opacityStart":1,"opacityEnd":0,"blending":"normal","seed":1}{{tracksJson}}}]}
+            """;
+    }
+
+    private static string MeshDoc(string mesh, string? tracks = null)
+    {
+        var tracksJson = tracks is null ? string.Empty : $",\"tracks\":{tracks}";
+        return $$"""
+            {"version":1,"duration":4,"loop":false,"components":[
+              {"id":"pool","type":"mesh","name":"Pool","start":0,"duration":2,"mesh":{{mesh}}{{tracksJson}}}]}
+            """;
+    }
+
+    [Fact]
+    public void A_Definition_Without_Emitter_Or_Primitives_Validates_Unchanged()
+    {
+        var read = Read(Valid);
+
+        Assert.Empty(read.Problems);
+        Assert.False(read.Definition.GetProperty("components")[0].TryGetProperty("emitter", out _));
+        Assert.False(read.Definition.GetProperty("components")[1].GetProperty("mesh").TryGetProperty("kind", out _));
+    }
+
+    [Fact]
+    public void A_Disc_Emitter_With_Radius_Passes()
+    {
+        var read = Read(ParticlesDoc(emitter: """{"shape":"disc","radius":1.5}"""));
+
+        Assert.Empty(read.Problems);
+    }
+
+    [Fact]
+    public void A_Point_Emitter_Passes()
+    {
+        var read = Read(ParticlesDoc(emitter: """{"shape":"point"}"""));
+
+        Assert.Empty(read.Problems);
+    }
+
+    [Fact]
+    public void A_Ring_Emitter_With_Radii_Passes()
+    {
+        var read = Read(ParticlesDoc(emitter: """{"shape":"ring","innerRadius":0.5,"outerRadius":1.5}"""));
+
+        Assert.Empty(read.Problems);
+    }
+
+    [Fact]
+    public void A_Disc_Emitter_With_A_Zero_Radius_Names_The_Field()
+    {
+        var read = Read(ParticlesDoc(emitter: """{"shape":"disc","radius":0}"""));
+
+        Assert.Equal("must be greater than 0.", ProblemAt(read, "components[0].emitter.radius").Message);
+    }
+
+    [Fact]
+    public void An_Emitter_Radius_Above_Twenty_Names_The_Field()
+    {
+        var read = Read(ParticlesDoc(emitter: """{"shape":"disc","radius":25}"""));
+
+        Assert.Equal("must be at most 20.", ProblemAt(read, "components[0].emitter.radius").Message);
+    }
+
+    [Fact]
+    public void A_Ring_Emitter_With_Inner_Not_Below_Outer_Names_The_Field()
+    {
+        var read = Read(ParticlesDoc(emitter: """{"shape":"ring","innerRadius":2,"outerRadius":2}"""));
+
+        Assert.Equal("must be greater than innerRadius.", ProblemAt(read, "components[0].emitter.outerRadius").Message);
+    }
+
+    [Fact]
+    public void An_Emitter_With_An_Unknown_Shape_Names_The_Field()
+    {
+        var read = Read(ParticlesDoc(emitter: """{"shape":"sphere","radius":1}"""));
+
+        Assert.Equal("must be 'point', 'disc' or 'ring'.",
+            ProblemAt(read, "components[0].emitter.shape").Message);
+    }
+
+    [Fact]
+    public void An_Emitter_On_A_Non_Particles_Component_Names_Its_Path()
+    {
+        const string json = """
+            {"version":1,"duration":4,"loop":false,"components":[
+              {"id":"pool","type":"mesh","name":"Pool","start":0,"duration":2,
+               "emitter":{"shape":"disc","radius":1},"mesh":{"modelId":12}}]}
+            """;
+
+        var read = Read(json);
+
+        Assert.Equal("is only allowed on a particles component.",
+            ProblemAt(read, "components[0].emitter").Message);
+    }
+
+    [Fact]
+    public void A_Disc_Mesh_Primitive_With_Radius_Passes()
+    {
+        var read = Read(MeshDoc("""{"kind":"disc","radius":1.5}"""));
+
+        Assert.Empty(read.Problems);
+    }
+
+    [Fact]
+    public void A_Ring_Mesh_Primitive_With_Radii_Passes()
+    {
+        var read = Read(MeshDoc("""{"kind":"ring","innerRadius":0.5,"outerRadius":1.5}"""));
+
+        Assert.Empty(read.Problems);
+    }
+
+    [Fact]
+    public void A_Disc_Mesh_Primitive_Without_Radius_Names_The_Field()
+    {
+        var read = Read(MeshDoc("""{"kind":"disc"}"""));
+
+        Assert.Equal("is required.", ProblemAt(read, "components[0].mesh.radius").Message);
+    }
+
+    [Fact]
+    public void A_Ring_Mesh_Primitive_With_Inner_Not_Below_Outer_Names_The_Field()
+    {
+        var read = Read(MeshDoc("""{"kind":"ring","innerRadius":3,"outerRadius":2}"""));
+
+        Assert.Equal("must be greater than innerRadius.",
+            ProblemAt(read, "components[0].mesh.outerRadius").Message);
+    }
+
+    [Fact]
+    public void An_Unknown_Mesh_Kind_Names_The_Field()
+    {
+        var read = Read(MeshDoc("""{"kind":"sphere"}"""));
+
+        Assert.Equal("must be 'disc' or 'ring'.",
+            ProblemAt(read, "components[0].mesh.kind").Message);
+    }
+
+    [Fact]
+    public void A_Radius_Track_On_A_Disc_Emitter_Passes()
+    {
+        var read = Read(ParticlesDoc(
+            emitter: """{"shape":"disc","radius":1.5}""",
+            tracks: """{"radius":[[0,0.5],[1,1.5]]}"""));
+
+        Assert.Empty(read.Problems);
+    }
+
+    [Fact]
+    public void A_Radius_Track_On_A_Ring_Emitter_Passes()
+    {
+        var read = Read(ParticlesDoc(
+            emitter: """{"shape":"ring","innerRadius":0.5,"outerRadius":1.5}""",
+            tracks: """{"radius":[[0,1.5]]}"""));
+
+        Assert.Empty(read.Problems);
+    }
+
+    [Fact]
+    public void A_Radius_Track_On_A_Point_Emitter_Is_Not_Allowed()
+    {
+        var read = Read(ParticlesDoc(
+            emitter: """{"shape":"point"}""",
+            tracks: """{"radius":[[0,1]]}"""));
+
+        Assert.Equal("is not allowed on a particles component.",
+            ProblemAt(read, "components[0].tracks.radius").Message);
+    }
+
+    [Fact]
+    public void A_Radius_Track_On_A_Library_Mesh_Is_Not_Allowed()
+    {
+        var read = Read(MeshDoc("""{"modelId":12,"versionId":34}""", tracks: """{"radius":[[0,1]]}"""));
+
+        Assert.Equal("is not allowed on a mesh component.",
+            ProblemAt(read, "components[0].tracks.radius").Message);
+    }
+
+    [Fact]
+    public void A_Radius_Track_On_A_Disc_Mesh_Primitive_Passes()
+    {
+        var read = Read(MeshDoc("""{"kind":"disc","radius":1.5}""", tracks: """{"radius":[[0,0.5],[1,1.5]]}"""));
+
+        Assert.Empty(read.Problems);
+    }
+
+    [Fact]
+    public void An_Out_Of_Range_Radius_Track_Value_Names_The_Keyframe()
+    {
+        var read = Read(ParticlesDoc(
+            emitter: """{"shape":"disc","radius":1.5}""",
+            tracks: """{"radius":[[0,25]]}"""));
+
+        Assert.Equal("must be between 0 and 20.",
+            ProblemAt(read, "components[0].tracks.radius[0][1]").Message);
+    }
+
+    [Fact]
+    public void ExtractReferences_Ignores_Mesh_Primitives()
+    {
+        var read = Read(MeshDoc("""{"kind":"disc","radius":1.5,"modelId":99}"""));
+
+        Assert.Empty(read.Problems);
+        Assert.DoesNotContain(
+            VfxDefinition.ExtractReferences(read.Definition), r => r.Kind == VfxAssetKind.Model);
+    }
+
+    // ── Primitive colour (section 7) ───────────────────────────────────────────
+
+    [Fact]
+    public void A_Primitive_With_Colour_And_Emissive_Passes()
+    {
+        var read = Read(MeshDoc("""{"kind":"disc","radius":1.5,"color":"#5aa469","emissiveIntensity":4}"""));
+
+        Assert.Empty(read.Problems);
+    }
+
+    [Fact]
+    public void A_Primitive_Without_Colour_Passes_Unchanged()
+    {
+        var read = Read(MeshDoc("""{"kind":"ring","innerRadius":0.5,"outerRadius":1.5}"""));
+
+        Assert.Empty(read.Problems);
+    }
+
+    [Fact]
+    public void A_Malformed_Primitive_Colour_Names_The_Field()
+    {
+        var read = Read(MeshDoc("""{"kind":"disc","radius":1.5,"color":"green"}"""));
+
+        Assert.Equal("must be a colour in #rrggbb format.",
+            ProblemAt(read, "components[0].mesh.color").Message);
+    }
+
+    [Fact]
+    public void An_Out_Of_Range_Emissive_Intensity_Names_The_Field()
+    {
+        var read = Read(MeshDoc("""{"kind":"disc","radius":1.5,"emissiveIntensity":12}"""));
+
+        Assert.Equal("must be at most 10.",
+            ProblemAt(read, "components[0].mesh.emissiveIntensity").Message);
+    }
+
+    [Fact]
+    public void Colour_On_A_Library_Mesh_Is_Not_Validated()
+    {
+        var read = Read(MeshDoc("""{"modelId":12,"color":"not-a-colour"}"""));
+
+        Assert.Empty(read.Problems);
+    }
 }

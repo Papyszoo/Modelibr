@@ -5,7 +5,7 @@ import { getSceneResourceQueryOptions } from '@/features/scenes/api/resourceQuer
 import type { SceneAssetSource } from '@/features/scenes/hooks/useSceneAssetSources'
 import { getFileExtension } from '@/utils/fileUtils'
 
-import type { VfxDefinition } from '../types'
+import { isPrimitiveMesh, type VfxDefinition } from '../types'
 
 /**
  * Mesh sources for every mesh component, resolved outside the Canvas because
@@ -17,13 +17,17 @@ export function useVfxMeshSources(definition: VfxDefinition): {
   settled: boolean
 } {
   const meshComponents = definition.components.filter(
-    c => c.type === 'mesh' && c.mesh && c.mesh.modelId > 0
+    c =>
+      c.type === 'mesh' &&
+      c.mesh &&
+      !isPrimitiveMesh(c.mesh) &&
+      (c.mesh.modelId ?? 0) > 0
   )
   const resourceQueries = useQueries({
     queries: meshComponents.map(c =>
       getSceneResourceQueryOptions({
         assetType: 'Model',
-        assetId: c.mesh!.modelId,
+        assetId: c.mesh!.modelId ?? 0,
         versionId: c.mesh!.versionId ?? null,
       })
     ),

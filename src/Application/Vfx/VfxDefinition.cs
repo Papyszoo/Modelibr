@@ -62,6 +62,8 @@ public static class VfxDefinition
     private const string Particles = "particles";
     private static readonly string[] ComponentTypes = [Particles, "mesh", "light", "sound"];
     private static readonly string[] MeshTracks = ["scale", "opacity", "rotationY"];
+    private static readonly string[] MeshPrimitiveTracks = ["scale", "opacity", "rotationY", "radius"];
+    private static readonly string[] ParticleRadiusTracks = ["radius"];
     private static readonly string[] LightTracks = ["intensity"];
 
     private static readonly Regex ComponentIdPattern = new("^[a-z0-9-_]+$", RegexOptions.Compiled);
@@ -195,6 +197,9 @@ public static class VfxDefinition
                         break;
 
                     case "mesh" when TryBlock(component, "mesh", out var mesh):
+                        // A flat disc/ring primitive references no library model.
+                        if (IsPrimitiveMesh(mesh))
+                            break;
                         if (TryIntProperty(mesh, "modelId", out var modelId))
                             references.Add(new VfxAssetReference(
                                 $"{componentPath}.mesh.modelId", VfxAssetKind.Model, modelId));
@@ -244,6 +249,7 @@ public static class VfxDefinition
                 && type.ValueKind == JsonValueKind.String
                 && type.GetString() == "mesh"
                 && TryBlock(component, "mesh", out var mesh)
+                && !IsPrimitiveMesh(mesh)
                 && TryIntProperty(mesh, "modelId", out var modelId)
                 && !HasNonNullProperty(mesh, "versionId")
                 && activeVersionIdByModelId.TryGetValue(modelId, out var activeVersionId))
@@ -271,6 +277,29 @@ public static class VfxDefinition
 
     private static bool TryBlock(JsonElement component, string name, out JsonElement block) =>
         component.TryGetProperty(name, out block) && block.ValueKind == JsonValueKind.Object;
+
+    /// <summary>
+    /// A mesh block is a flat ground primitive rather than a library model when it names
+    /// the disc or ring kind; then its radius fields stand in for a model reference.
+    /// </summary>
+    internal static bool IsPrimitiveMesh(JsonElement mesh) =>
+        mesh.ValueKind == JsonValueKind.Object
+        && mesh.TryGetProperty("kind", out var kind)
+        && kind.ValueKind == JsonValueKind.String
+        && kind.GetString() is "disc" or "ring";
+
+    private static JsonElement GetBlock(JsonElement component, string name) =>
+        component.TryGetProperty(name, out var block) && block.ValueKind == JsonValueKind.Object
+            ? block
+            : default;
+
+    /// <summary>A particles component may carry the radius track only when its emitter spreads over a disc or a ring.</summary>
+    private static bool HasRadiusEmitter(JsonElement component) =>
+        component.TryGetProperty("emitter", out var emitter)
+        && emitter.ValueKind == JsonValueKind.Object
+        && emitter.TryGetProperty("shape", out var shape)
+        && shape.ValueKind == JsonValueKind.String
+        && shape.GetString() is "disc" or "ring";
 
     private static bool HasNonNullProperty(JsonElement obj, string name) =>
         obj.TryGetProperty(name, out var element) && element.ValueKind != JsonValueKind.Null;
@@ -428,8 +457,16 @@ public static class VfxDefinition
             }
         }
 
+        if (TryProperty(component, "emitter", out var emitter) && emitter.ValueKind != JsonValueKind.Null)
+        {
+            if (type == Particles)
+                ValidateEmitter(emitter, $"{path}.emitter", problems);
+            else if (type is not null)
+                problems.Add(new VfxProblem($"{path}.emitter", "is only allowed on a particles component."));
+        }
+
         if (TryProperty(component, "tracks", out var tracks))
-            ValidateTracks(type, tracks, path, problems);
+            ValidateTracks(type, component, tracks, path, problems);
     }
 
     private static void ValidateId(JsonElement component, string path, HashSet<string> ids, List<VfxProblem> problems)
@@ -653,14 +690,104 @@ public static class VfxDefinition
         RequireInt(block, "seed", path, problems);
     }
 
+    private static void ValidateEmitter(JsonElement emitter, string path, List<VfxProblem> problems)
+    {
+        if (emitter.ValueKind != JsonValueKind.Object)
+        {
+            problems.Add(new VfxProblem(path, "must be an object."));
+            return;
+        }
+
+        string? shape = null;
+        var shapePath = $"{path}.shape";
+        if (!TryProperty(emitter, "shape", out var shapeElement))
+        {
+            problems.Add(new VfxProblem(shapePath, "is required."));
+        }
+        else if (shapeElement.ValueKind != JsonValueKind.String
+                 || shapeElement.GetString() is not ("point" or "disc" or "ring"))
+        {
+            problems.Add(new VfxProblem(shapePath, "must be 'point', 'disc' or 'ring'."));
+        }
+        else
+        {
+            shape = shapeElement.GetString();
+        }
+
+        switch (shape)
+        {
+            case "disc":
+                RequireNumber(emitter, "radius", path, problems, min: 0, max: 20, minExclusive: true);
+                break;
+
+            case "ring":
+                RequireNumber(emitter, "innerRadius", path, problems, min: 0, max: 20);
+                RequireNumber(emitter, "outerRadius", path, problems, min: 0, max: 20, minExclusive: true);
+                RequireInnerBelowOuter(emitter, path, problems);
+                break;
+        }
+    }
+
     private static void ValidateMesh(JsonElement block, string path, List<VfxProblem> problems)
     {
-        RequireInt(block, "modelId", path, problems);
-        if (TryProperty(block, "versionId", out var versionId)
-            && versionId.ValueKind != JsonValueKind.Null
-            && !TryInt(versionId, out _))
+        string? kind = null;
+        if (TryProperty(block, "kind", out var kindElement) && kindElement.ValueKind != JsonValueKind.Null)
         {
-            problems.Add(new VfxProblem($"{path}.versionId", "must be an integer or null."));
+            if (kindElement.ValueKind != JsonValueKind.String
+                || kindElement.GetString() is not ("disc" or "ring"))
+            {
+                problems.Add(new VfxProblem($"{path}.kind", "must be 'disc' or 'ring'."));
+            }
+            else
+            {
+                kind = kindElement.GetString();
+            }
+        }
+
+        switch (kind)
+        {
+            // A flat ground primitive carries its own radius fields and references no model.
+            case "disc":
+                RequireNumber(block, "radius", path, problems, min: 0, max: 20, minExclusive: true);
+                ValidatePrimitiveColour(block, path, problems);
+                break;
+
+            case "ring":
+                RequireNumber(block, "innerRadius", path, problems, min: 0, max: 20);
+                RequireNumber(block, "outerRadius", path, problems, min: 0, max: 20, minExclusive: true);
+                RequireInnerBelowOuter(block, path, problems);
+                ValidatePrimitiveColour(block, path, problems);
+                break;
+
+            default:
+                RequireInt(block, "modelId", path, problems);
+                if (TryProperty(block, "versionId", out var versionId)
+                    && versionId.ValueKind != JsonValueKind.Null
+                    && !TryInt(versionId, out _))
+                {
+                    problems.Add(new VfxProblem($"{path}.versionId", "must be an integer or null."));
+                }
+                break;
+        }
+    }
+
+    /// <summary>
+    /// The optional material of a flat primitive: a colour and an emission strength.
+    /// Both are optional, so a definition written before them keeps its grey, unlit look.
+    /// </summary>
+    private static void ValidatePrimitiveColour(JsonElement block, string path, List<VfxProblem> problems)
+    {
+        OptionalColor(block, "color", path, problems);
+        OptionalNumber(block, "emissiveIntensity", path, problems, min: 0, max: 10);
+    }
+
+    private static void RequireInnerBelowOuter(JsonElement block, string path, List<VfxProblem> problems)
+    {
+        if (TryProperty(block, "innerRadius", out var innerElement) && TryNumber(innerElement, out var inner)
+            && TryProperty(block, "outerRadius", out var outerElement) && TryNumber(outerElement, out var outer)
+            && inner >= outer)
+        {
+            problems.Add(new VfxProblem($"{path}.outerRadius", "must be greater than innerRadius."));
         }
     }
 
@@ -676,7 +803,8 @@ public static class VfxDefinition
         RequireNumber(block, "volume", path, problems, min: 0, max: 1);
     }
 
-    private static void ValidateTracks(string? type, JsonElement tracks, string componentPath, List<VfxProblem> problems)
+    private static void ValidateTracks(
+        string? type, JsonElement component, JsonElement tracks, string componentPath, List<VfxProblem> problems)
     {
         var tracksPath = $"{componentPath}.tracks";
         if (tracks.ValueKind != JsonValueKind.Object)
@@ -687,7 +815,8 @@ public static class VfxDefinition
 
         var allowed = type switch
         {
-            "mesh" => MeshTracks,
+            "mesh" => IsPrimitiveMesh(GetBlock(component, "mesh")) ? MeshPrimitiveTracks : MeshTracks,
+            Particles => HasRadiusEmitter(component) ? ParticleRadiusTracks : [],
             "light" => LightTracks,
             _ => []
         };
@@ -752,6 +881,9 @@ public static class VfxDefinition
                     break;
                 case "intensity" when value < 0:
                     problems.Add(new VfxProblem(valuePath, "must be zero or greater."));
+                    break;
+                case "radius" when value < 0 || value > 20:
+                    problems.Add(new VfxProblem(valuePath, "must be between 0 and 20."));
                     break;
             }
 
@@ -874,6 +1006,12 @@ public static class VfxDefinition
         {
             problems.Add(new VfxProblem(fieldPath, "must be a colour in #rrggbb format."));
         }
+    }
+
+    private static void OptionalColor(JsonElement obj, string name, string path, List<VfxProblem> problems)
+    {
+        if (TryProperty(obj, name, out var element) && element.ValueKind != JsonValueKind.Null)
+            RequireColor(obj, name, path, problems);
     }
 
     private static bool TryProperty(JsonElement obj, string name, out JsonElement value) =>

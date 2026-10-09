@@ -102,6 +102,40 @@ describe('computeEffectBounds', () => {
       computeEffectBounds(effect({}, [tiny]), 2).radius
     ).toBeGreaterThanOrEqual(0.75)
   })
+
+  // The editor viewport was cut off by a flat primitive the framing ignored.
+  it('grows with a flat primitive radius and its radius track', () => {
+    const disc: VfxComponent = {
+      id: 'pool',
+      type: 'mesh',
+      name: 'Pool',
+      start: 0,
+      duration: 1,
+      position: [0, 0, 0],
+      mesh: { kind: 'disc', radius: 2 },
+    }
+    const small = computeEffectBounds(effect({}, [disc]), 1)
+    const tracked = computeEffectBounds(
+      effect({}, [{ ...disc, tracks: { radius: [[0, 6]] } }]),
+      1
+    )
+    expect(small.radius).toBeGreaterThanOrEqual(2)
+    expect(tracked.radius).toBeGreaterThan(small.radius)
+  })
+
+  it('grows with a disc emitter radius, including its radius track', () => {
+    const disc = sparks({
+      emitter: { shape: 'disc', radius: 3 },
+      particles: { ...sparks().particles!, speed: 0 },
+    })
+    const small = computeEffectBounds(effect({}, [disc]), 1)
+    const tracked = computeEffectBounds(
+      effect({}, [{ ...disc, tracks: { radius: [[0, 8]] } }]),
+      1
+    )
+    expect(small.radius).toBeGreaterThanOrEqual(3)
+    expect(tracked.radius).toBeGreaterThan(small.radius)
+  })
 })
 
 describe('frameThumbnailCamera', () => {

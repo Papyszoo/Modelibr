@@ -107,7 +107,14 @@ internal sealed class ExportVfxGodotQueryHandler : IQueryHandler<ExportVfxGodotQ
 
                 case "mesh":
                 {
-                    var path = await CopyModelAsync(component.GetProperty("mesh"), files, cancellationToken);
+                    var mesh = component.GetProperty("mesh");
+                    if (VfxDefinition.IsPrimitiveMesh(mesh))
+                    {
+                        lines.Add($"{window}: built-in {mesh.GetProperty("kind").GetString()}, flat on the XZ ground plane");
+                        break;
+                    }
+
+                    var path = await CopyModelAsync(mesh, files, cancellationToken);
                     if (path is null)
                     {
                         notes.Add($"{id}: its model has no file left in the library; the mesh was left out.");
