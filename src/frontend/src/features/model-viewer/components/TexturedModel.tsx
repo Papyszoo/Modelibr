@@ -11,6 +11,7 @@ import { useModelAnimationController } from '@/features/model-viewer/animation/M
 import { type ModelAnimationController } from '@/features/model-viewer/animation/ModelAnimationController'
 import { useModelObject } from '@/features/model-viewer/hooks/useModelObject'
 import { cloneSkinnedModel } from '@/shared/three/cloneSkinnedModel'
+import { advanceMaterialEffects } from '@/shared/three/materialEffects'
 import {
   createResourceManager,
   safeLoadingManager,
@@ -135,9 +136,14 @@ function OBJModelWithTextures({
   const scaledRef = useRef(false)
   const { gl: renderer } = useThree()
 
-  useFrame(() => {
+  useFrame(state => {
     if (meshRef.current && rotationSpeed > 0) {
       meshRef.current.rotation.y += rotationSpeed
+    }
+    // Material effects run on any material in the clone that has them
+    // installed; without effects this is a cheap traversal.
+    if (meshRef.current) {
+      advanceMaterialEffects(meshRef.current, state.clock.elapsedTime)
     }
   })
 
@@ -196,9 +202,14 @@ function GLTFModelWithTextures({
   const scaledRef = useRef(false)
   const { gl: renderer } = useThree()
 
-  useFrame(() => {
+  useFrame(state => {
     if (meshRef.current && rotationSpeed > 0) {
       meshRef.current.rotation.y += rotationSpeed
+    }
+    // Material effects run on any material in the clone that has them
+    // installed; without effects this is a cheap traversal.
+    if (meshRef.current) {
+      advanceMaterialEffects(meshRef.current, state.clock.elapsedTime)
     }
   })
 
@@ -261,9 +272,14 @@ function FBXModelWithTextures({
   const scaledRef = useRef(false)
   const { gl: renderer } = useThree()
 
-  useFrame(() => {
+  useFrame(state => {
     if (meshRef.current && rotationSpeed > 0) {
       meshRef.current.rotation.y += rotationSpeed
+    }
+    // Material effects run on any material in the clone that has them
+    // installed; without effects this is a cheap traversal.
+    if (meshRef.current) {
+      advanceMaterialEffects(meshRef.current, state.clock.elapsedTime)
     }
   })
 
@@ -322,9 +338,14 @@ function STLModelWithTextures({
   const scaledRef = useRef(false)
   const { gl: renderer } = useThree()
 
-  useFrame(() => {
+  useFrame(state => {
     if (meshRef.current && rotationSpeed > 0) {
       meshRef.current.rotation.y += rotationSpeed
+    }
+    // Material effects run on any material in the clone that has them
+    // installed; without effects this is a cheap traversal.
+    if (meshRef.current) {
+      advanceMaterialEffects(meshRef.current, state.clock.elapsedTime)
     }
   })
 
@@ -384,9 +405,14 @@ function ThreeMFModelWithTextures({
   const scaledRef = useRef(false)
   const { gl: renderer } = useThree()
 
-  useFrame(() => {
+  useFrame(state => {
     if (meshRef.current && rotationSpeed > 0) {
       meshRef.current.rotation.y += rotationSpeed
+    }
+    // Material effects run on any material in the clone that has them
+    // installed; without effects this is a cheap traversal.
+    if (meshRef.current) {
+      advanceMaterialEffects(meshRef.current, state.clock.elapsedTime)
     }
   })
 

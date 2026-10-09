@@ -481,6 +481,7 @@ function demoMaterial(
     tags: [],
     createdAt: now(),
     updatedAt: now(),
+    effects: null,
     parameters: {
       baseColorR: channel(1),
       baseColorG: channel(3),
@@ -578,6 +579,7 @@ export const systemHandlers = [
             previewGeometryType: material.previewGeometryType,
             hasThumbnail: false,
             parameters: material.parameters,
+            effects: material.effects,
             tiling: null,
             tags: material.tags,
             createdAt: material.createdAt,
@@ -604,6 +606,7 @@ export const systemHandlers = [
               previewGeometryType: set.previewGeometryType ?? 'sphere',
               hasThumbnail: Boolean(set.thumbnailPath),
               parameters: null,
+              effects: null,
               tiling: {
                 tilingScaleX: set.tilingScaleX ?? 1,
                 tilingScaleY: set.tilingScaleY ?? 1,

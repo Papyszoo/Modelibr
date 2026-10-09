@@ -114,7 +114,13 @@ export function MaterialEditorDialog({
     >
       <div className="material-editor">
         <div className="material-editor-preview">
-          <MaterialSwatch parameters={parameters} size="editor" />
+          <MaterialSwatch
+            parameters={parameters}
+            size="editor"
+            // The editor edits factors, not effects, so the effects come from
+            // the saved material while the preview follows the live draft.
+            material={material ? { ...material, parameters } : undefined}
+          />
         </div>
 
         <div className="material-editor-fields">

@@ -1,8 +1,16 @@
+import { useFrame } from '@react-three/fiber'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import * as THREE from 'three'
 import { EXRLoader } from 'three/examples/jsm/loaders/EXRLoader.js'
 
 import { getFileUrl } from '@/features/models/api/modelApi'
+import {
+  advanceMaterialEffects,
+  applyMaterialEffects,
+  hasMaterialEffects,
+  type MaterialEffectsDocument,
+  parseMaterialEffects,
+} from '@/shared/three/materialEffects'
 import { applyDispNormalDisplacement } from '@/shared/three/sharedDisplacementNormal'
 import { TextureChannel, type TextureSetDto, TextureType } from '@/types'
 import { isExrFile, isTiffFile } from '@/utils/fileUtils'
@@ -43,6 +51,12 @@ interface TexturedGeometryProps {
   onLoadingChange?: (state: TextureLoadingState) => void
   /** 0 = Original, 256/512/1024/2048 = proxy size */
   textureQuality?: number
+  /**
+   * Runtime effects to layer on the preview material - how a library material
+   * previews its jelly wobble, rim or pulse. Null, absent or invalid renders
+   * the plain PBR surface: with no effects nothing about the preview changes.
+   */
+  effects?: MaterialEffectsDocument | null
 }
 
 interface TextureUrlInfo {
@@ -342,6 +356,7 @@ function TexturedMesh({
   disabledTextures,
   textureStrengths,
   onLoadingChange,
+  effects,
 }: {
   geometryType: GeometryType
   geometryParams: GeometryParams
@@ -349,6 +364,7 @@ function TexturedMesh({
   disabledTextures?: Set<string>
   textureStrengths?: TextureStrengths
   onLoadingChange?: (state: TextureLoadingState) => void
+  effects?: MaterialEffectsDocument | null
 }) {
   const meshRef = useRef<THREE.Mesh>(null)
   const [loadedTextures, setLoadedTextures] = useState<
@@ -398,6 +414,31 @@ function TexturedMesh({
       }
     }
   }, [hasNormalMap, geometryType])
+
+  // The previewed material's effects, validated once per document. Null for
+  // everything the parser rejects - the same no-op as no document at all.
+  const parsedEffects = useMemo(() => parseMaterialEffects(effects), [effects])
+
+  // Effects are injected into the preview material itself, composed with its
+  // displacement-normals hook (one onBeforeCompile chain; see
+  // applyMaterialEffects). Re-runs when the material is rebuilt for a new
+  // texture/strength set, so a fresh material gets them back.
+  useEffect(() => {
+    const material = meshRef.current?.material
+    const single = Array.isArray(material) ? material[0] : material
+    if (single) applyMaterialEffects(single, parsedEffects ?? null)
+  }, [parsedEffects, texturesReady])
+
+  // Effect time is explicit: this clock, which r3f advances on every rendered
+  // frame. The canvas is demand-driven, so a time-animated preview has to ask
+  // for the next frame itself; a preview with no effects asks for nothing and
+  // stays event-rendered exactly as it is today.
+  useFrame(state => {
+    const mesh = meshRef.current
+    if (!mesh) return
+    advanceMaterialEffects(mesh, state.clock.elapsedTime)
+    if (hasMaterialEffects(parsedEffects)) state.invalidate()
+  })
 
   // Simple UV scale - direct multiplier from database value
   const uvScale = geometryParams.uvScale ?? 1
@@ -565,7 +606,9 @@ function TexturedMesh({
       <meshPhysicalMaterial
         key={materialKey}
         ref={(mat: THREE.MeshPhysicalMaterial | null) => {
-          if (mat) applyDispNormalDisplacement(mat)
+          if (!mat) return
+          applyDispNormalDisplacement(mat)
+          applyMaterialEffects(mat, parsedEffects ?? null)
         }}
         map={(!isDisabled('map') && t.map) || null}
         normalMap={(!isDisabled('normalMap') && t.normalMap) || null}
@@ -613,6 +656,7 @@ export function TexturedGeometry({
   textureStrengths,
   onLoadingChange,
   textureQuality = 0,
+  effects = null,
 }: TexturedGeometryProps) {
   // Build ALL texture URLs - does NOT depend on disabledTextures
   // When textureQuality > 0, use proxy files where available
@@ -629,6 +673,7 @@ export function TexturedGeometry({
       disabledTextures={disabledTextures}
       textureStrengths={textureStrengths}
       onLoadingChange={onLoadingChange}
+      effects={effects}
     />
   )
 }

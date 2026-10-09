@@ -181,7 +181,12 @@ export function MaterialList(): JSX.Element {
                 event.preventDefault()
                 setPendingDelete(material)
               }}
-              media={<MaterialSwatch parameters={material.parameters} />}
+              media={
+                <MaterialSwatch
+                  parameters={material.parameters}
+                  material={material}
+                />
+              }
             />
           ))}
           <AddTile label="New material" onClick={() => setEditing(null)} />

@@ -1,6 +1,7 @@
 import { type AxiosResponse } from 'axios'
 
 import { client } from '@/lib/apiBase'
+import { type MaterialEffectsDocument } from '@/shared/three/materialEffects'
 
 /** glTF's alphaMode, which is what the viewport and every exporter speak. */
 export type AlphaMode = 'Opaque' | 'Mask' | 'Blend'
@@ -40,6 +41,8 @@ export interface MaterialDto {
   tags: string[]
   createdAt: string
   updatedAt: string
+  /** Null, absent or invalid means the material renders with its params only. */
+  effects?: MaterialEffectsDocument | null
 }
 
 /** Which table a library entry came from. Ids are unique per kind, not across both. */
@@ -78,6 +81,7 @@ export interface MaterialLibraryEntryDto {
   tags: string[]
   createdAt: string
   updatedAt: string
+  effects?: MaterialEffectsDocument | null
 }
 
 export interface MaterialLibraryResponse {

@@ -2,6 +2,7 @@ import * as THREE from 'three'
 
 import type { MaterialDto } from '@/features/materials/api/materialApi'
 
+import { applyMaterialEffects, parseMaterialEffects } from './materialEffects'
 import { mergeMaterialChannels } from './mergeMaterialChannels'
 
 /**
@@ -12,6 +13,16 @@ import { mergeMaterialChannels } from './mergeMaterialChannels'
 export type SlotMaterials = Record<string, MaterialDto>
 
 /**
+ * What building a parameter material actually reads: its name, its factors and
+ * its effects. Narrower than `MaterialDto` so a live draft (the material editor's
+ * preview) can build one without inventing an id or timestamps.
+ */
+export type ParameterMaterialSource = Pick<
+  MaterialDto,
+  'name' | 'parameters' | 'effects'
+>
+
+/**
  * Builds a three.js material from stored PBR factors.
  *
  * The factors are linear, which is what three.js wants for a colour set through
@@ -19,7 +30,7 @@ export type SlotMaterials = Record<string, MaterialDto>
  * amount the API already converted for.
  */
 export function buildParameterMaterial(
-  material: MaterialDto
+  material: ParameterMaterialSource
 ): THREE.MeshPhysicalMaterial {
   const p = material.parameters
   const built = new THREE.MeshPhysicalMaterial({
@@ -52,6 +63,12 @@ export function buildParameterMaterial(
   } else if (p.alphaMode === 'Mask') {
     built.alphaTest = p.alphaCutoff
   }
+
+  // Runtime effects are injected into this same material (never a replacement),
+  // composed with any onBeforeCompile already on it. An absent or invalid
+  // document is a no-op.
+  const effects = parseMaterialEffects(material.effects)
+  if (effects) applyMaterialEffects(built, effects)
 
   return built
 }

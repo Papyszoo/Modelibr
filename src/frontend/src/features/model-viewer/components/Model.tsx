@@ -12,6 +12,7 @@ import { LoadingPlaceholder } from '@/components/LoadingPlaceholder'
 import { useModelAnimationController } from '@/features/model-viewer/animation/ModelAnimationContext'
 import { useModelObject } from '@/features/model-viewer/hooks/useModelObject'
 import { cloneSkinnedModel } from '@/shared/three/cloneSkinnedModel'
+import { advanceMaterialEffects } from '@/shared/three/materialEffects'
 import {
   createResourceManager,
   safeLoadingManager,
@@ -38,9 +39,16 @@ function useRenderedModel(
   const scaledRef = useRef(false)
 
   // Rotate the model with configurable speed
-  useFrame(() => {
+  useFrame(state => {
     if (meshRef.current && rotationSpeed > 0) {
       meshRef.current.rotation.y += rotationSpeed
+    }
+    // A viewed model usually wears its own embedded materials, which carry no
+    // effects and skip this traversal without allocating. If a library
+    // material ever reached this clone (buildParameterMaterial installs its
+    // effects), this is the component that advances them.
+    if (meshRef.current) {
+      advanceMaterialEffects(meshRef.current, state.clock.elapsedTime)
     }
   })
 

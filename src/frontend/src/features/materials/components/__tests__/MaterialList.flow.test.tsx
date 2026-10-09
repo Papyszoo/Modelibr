@@ -7,8 +7,15 @@ import { renderWithProviders } from '@/test/renderWithProviders'
 import { type MaterialDto } from '../../api/materialApi'
 import { MaterialList } from '../MaterialList'
 
+// Effects previews mount a WebGL canvas; this flow test is about the request
+// the editor sends, not what the preview draws.
+jest.mock('../MaterialEffectPreview', () => ({
+  MaterialEffectPreview: () => <div data-testid="material-effect-preview" />,
+}))
+
 const mockGet = client.get as jest.Mock
 const mockPost = client.post as jest.Mock
+const mockPut = client.put as jest.Mock
 const mockDelete = client.delete as jest.Mock
 
 function materialDto(
@@ -63,6 +70,7 @@ beforeEach(() => {
     return Promise.resolve({ data: { materials: [brass, plaster] } })
   })
   mockPost.mockResolvedValue({ data: { id: 3, name: 'New material' } })
+  mockPut.mockResolvedValue({ data: brass })
   mockDelete.mockResolvedValue({ data: null })
 })
 
@@ -119,6 +127,33 @@ describe('MaterialList', () => {
     expect(body.parameters).not.toHaveProperty('baseColorR')
     expect(body.parameters).not.toHaveProperty('baseColorG')
     expect(body.parameters).not.toHaveProperty('baseColorB')
+  })
+
+  it('does not clear a material&apos;s effects when saving the editor', async () => {
+    // Effects are edited elsewhere; the update request must omit them rather
+    // than send effects: null, which the server would read as "remove".
+    const jelly = materialDto(1, 'Wobbly Jelly')
+    jelly.effects = {
+      version: 1,
+      effects: [{ type: 'rim', color: '#ffffff', power: 3, intensity: 1 }],
+    }
+    mockGet.mockResolvedValue({ data: { materials: [jelly] } })
+
+    const user = userEvent.setup()
+    renderWithProviders(<MaterialList />)
+    await screen.findByText('Wobbly Jelly')
+
+    await user.click(screen.getByTestId('material-tile'))
+    await user.click(screen.getByTestId('material-editor-save'))
+
+    await waitFor(() => expect(mockPut).toHaveBeenCalled())
+
+    const [url, body] = mockPut.mock.calls.at(-1) as [
+      string,
+      Record<string, unknown>,
+    ]
+    expect(url).toBe('/materials/1')
+    expect(body).not.toHaveProperty('effects')
   })
 
   it('refetches the list after a create so the new material appears', async () => {

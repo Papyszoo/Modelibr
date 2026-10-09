@@ -2,6 +2,7 @@ import * as THREE from 'three'
 
 import type { MaterialDto } from '@/features/materials/api/materialApi'
 
+import { advanceMaterialEffects } from '../materialEffects'
 import {
   applyParameterMaterials,
   buildParameterMaterial,
@@ -101,6 +102,49 @@ describe('buildParameterMaterial', () => {
       THREE.DoubleSide
     )
     expect(buildParameterMaterial(material()).side).toBe(THREE.FrontSide)
+  })
+})
+
+describe('buildParameterMaterial effects', () => {
+  /** The builder must install stored effects, or a scene shows a plain PBR. */
+  function materialWithEffects(): MaterialDto {
+    const dto = material()
+    dto.effects = {
+      version: 1,
+      effects: [{ type: 'rim', color: '#ff00aa', power: 3, intensity: 1 }],
+    }
+    return dto
+  }
+
+  it('installs the stored effects on the built material and advances them', () => {
+    const built = buildParameterMaterial(materialWithEffects())
+
+    // Patch the shader the way the renderer would, then move the effects
+    // clock: the rim code must be injected and uEffectTime must follow.
+    const shader = {
+      uniforms: {},
+      vertexShader: 'void main() {\n#include <skinning_vertex>\n}',
+      fragmentShader: 'void main() {\n#include <emissivemap_fragment>\n}',
+    } as unknown as Parameters<NonNullable<typeof built.onBeforeCompile>>[0]
+    built.onBeforeCompile!(shader, {} as THREE.WebGLRenderer)
+
+    expect(shader.fragmentShader).toContain(
+      'totalEmissiveRadiance += uRimColor'
+    )
+
+    const group = new THREE.Group()
+    group.add(new THREE.Mesh(new THREE.BoxGeometry(), built))
+    advanceMaterialEffects(group, 4)
+
+    expect(
+      (shader.uniforms as Record<string, THREE.IUniform>).uEffectTime.value
+    ).toBe(4)
+  })
+
+  it('leaves a material without effects untouched', () => {
+    const built = buildParameterMaterial(material())
+
+    expect(built.userData.materialEffectState).toBeUndefined()
   })
 })
 

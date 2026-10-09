@@ -13,6 +13,7 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader'
 import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader'
 import { STLLoader } from 'three/examples/jsm/loaders/STLLoader'
 
+import { advanceMaterialEffects } from '@/shared/three/materialEffects'
 import { createResourceManager } from '@/shared/three/safeLoadingManager'
 import {
   type MaterialTextureSets,
@@ -785,7 +786,13 @@ function PlacedObject({
   // mixer is posed at exactly that time every frame - never advanced by the
   // wall clock - so the same scene rendered twice is the same picture and
   // `t = 0` shows the node's configured start-offset pose.
-  useFrame((_, delta) => {
+  useFrame((state, delta) => {
+    // Effect time follows the same rule as clip time: explicit in a render,
+    // the live clock in the editor. Runs even when the node has no animation.
+    const effectTime =
+      renderTime !== undefined ? renderTime : state.clock.elapsedTime
+    advanceMaterialEffects(clone, effectTime)
+
     if (!nodeAnimation) {
       return
     }
