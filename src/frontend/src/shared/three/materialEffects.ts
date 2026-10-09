@@ -89,23 +89,34 @@ export const DEFAULT_EFFECT_INPUTS: MaterialEffectInputs = {
 
 // -- Validation ---------------------------------------------------------------
 
-const EFFECT_TYPES: readonly MaterialEffectType[] = [
+export const EFFECT_TYPES: readonly MaterialEffectType[] = [
   'jelly_wobble',
   'rim',
   'translucency',
   'emission_pulse',
 ]
 
-const DRIVER_INPUTS: readonly MaterialEffectInputName[] = [
+export const MAX_EFFECTS = 4
+
+export const DRIVER_INPUTS: readonly MaterialEffectInputName[] = [
   'speed',
   'impulse',
   'charge',
 ]
 
-const MAX_EFFECTS = 4
+/** Full travel of each preview input: the parser's clamp and the editor sliders. */
+export const INPUT_RANGES: Record<MaterialEffectInputName, [number, number]> = {
+  speed: [0, 20],
+  impulse: [0, 1],
+  charge: [0, 1],
+}
 
-/** Numeric params a driver may map, with their clamped ranges. */
-const DRIVABLE_PARAMS: Record<
+/**
+ * The clamped range of every effect param. The parser reads against these, the
+ * shader's `effectiveParam` clamps drivers to these, and the editor sliders
+ * present exactly these - one definition keeps the three in step.
+ */
+export const EFFECT_PARAM_RANGES: Record<
   MaterialEffectType,
   Record<string, [number, number]>
 > = {
@@ -113,11 +124,27 @@ const DRIVABLE_PARAMS: Record<
     amplitude: [0, 0.5],
     frequency: [0, 10],
     waveScale: [0, 20],
+    seed: [0, 1000],
   },
   rim: { power: [0.5, 8], intensity: [0, 10] },
   translucency: { thickness: [0, 1] },
   emission_pulse: { intensity: [0, 10], rate: [0, 20] },
 }
+
+/**
+ * Numeric params a driver may map: every ranged param except the integer seed.
+ * Derived from the table above so the two never drift.
+ */
+const DRIVABLE_PARAMS = Object.fromEntries(
+  EFFECT_TYPES.map(type => [
+    type,
+    Object.fromEntries(
+      Object.entries(EFFECT_PARAM_RANGES[type]).filter(
+        ([param]) => param !== 'seed'
+      )
+    ),
+  ])
+) as Record<MaterialEffectType, Record<string, [number, number]>>
 
 const HEX_COLOR = /^#[0-9a-fA-F]{6}$/
 
@@ -132,6 +159,16 @@ function readNumber(value: unknown, min: number, max: number): number | null {
 
 function readColor(value: unknown): string | null {
   return typeof value === 'string' && HEX_COLOR.test(value) ? value : null
+}
+
+/** Read one param against the runtime range table. */
+function readParam(
+  value: unknown,
+  type: MaterialEffectType,
+  param: string
+): number | null {
+  const [min, max] = EFFECT_PARAM_RANGES[type][param]
+  return readNumber(value, min, max)
 }
 
 function readDrivers(
@@ -168,10 +205,10 @@ function parseEffect(value: unknown): MaterialEffect | null {
   if (!EFFECT_TYPES.includes(type)) return null
 
   if (type === 'jelly_wobble') {
-    const amplitude = readNumber(value.amplitude, 0, 0.5)
-    const frequency = readNumber(value.frequency, 0, 10)
-    const waveScale = readNumber(value.waveScale, 0, 20)
-    const seed = readNumber(value.seed, 0, 1000)
+    const amplitude = readParam(value.amplitude, type, 'amplitude')
+    const frequency = readParam(value.frequency, type, 'frequency')
+    const waveScale = readParam(value.waveScale, type, 'waveScale')
+    const seed = readParam(value.seed, type, 'seed')
     const drivers = readDrivers(value.drivers, type)
     if (amplitude === null || frequency === null || waveScale === null) {
       return null
@@ -184,8 +221,8 @@ function parseEffect(value: unknown): MaterialEffect | null {
 
   if (type === 'rim') {
     const color = readColor(value.color)
-    const power = readNumber(value.power, 0.5, 8)
-    const intensity = readNumber(value.intensity, 0, 10)
+    const power = readParam(value.power, type, 'power')
+    const intensity = readParam(value.intensity, type, 'intensity')
     const drivers = readDrivers(value.drivers, type)
     if (color === null || power === null || intensity === null) return null
     if (drivers === null) return null
@@ -194,7 +231,7 @@ function parseEffect(value: unknown): MaterialEffect | null {
 
   if (type === 'translucency') {
     const interiorColor = readColor(value.interiorColor)
-    const thickness = readNumber(value.thickness, 0, 1)
+    const thickness = readParam(value.thickness, type, 'thickness')
     const drivers = readDrivers(value.drivers, type)
     if (interiorColor === null || thickness === null) return null
     if (drivers === null) return null
@@ -202,8 +239,8 @@ function parseEffect(value: unknown): MaterialEffect | null {
   }
 
   const color = readColor(value.color)
-  const intensity = readNumber(value.intensity, 0, 10)
-  const rate = readNumber(value.rate, 0, 20)
+  const intensity = readParam(value.intensity, type, 'intensity')
+  const rate = readParam(value.rate, type, 'rate')
   const drivers = readDrivers(value.drivers, type)
   if (color === null || intensity === null || rate === null) return null
   if (drivers === null) return null
@@ -217,21 +254,12 @@ function parsePreviewInputs(
   if (!isRecord(value)) return null
   const inputs: MaterialPreviewInputs = {}
   for (const [key, raw] of Object.entries(value)) {
-    if (key === 'speed') {
-      const speed = readNumber(raw, 0, 20)
-      if (speed === null) return null
-      inputs.speed = speed
-    } else if (key === 'impulse') {
-      const impulse = readNumber(raw, 0, 1)
-      if (impulse === null) return null
-      inputs.impulse = impulse
-    } else if (key === 'charge') {
-      const charge = readNumber(raw, 0, 1)
-      if (charge === null) return null
-      inputs.charge = charge
-    } else {
-      return null
-    }
+    if (!(key in INPUT_RANGES)) return null
+    const input = key as MaterialEffectInputName
+    const [min, max] = INPUT_RANGES[input]
+    const parsed = readNumber(raw, min, max)
+    if (parsed === null) return null
+    inputs[input] = parsed
   }
   return inputs
 }
@@ -659,7 +687,7 @@ function structuralKey(effects: MaterialEffectsDocument | null): string {
     .join('+')
 }
 
-function inputsFromDocument(
+export function inputsFromDocument(
   effects: MaterialEffectsDocument | null
 ): MaterialEffectInputs {
   const preview = effects?.previewInputs ?? {}

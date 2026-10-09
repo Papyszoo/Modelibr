@@ -36,10 +36,6 @@
   overflow: hidden;
 }
 
-.material-swatch--editor .material-swatch-sphere {
-  width: 132px;
-}
-
 .material-swatch-highlight {
   position: absolute;
   inset: 0;

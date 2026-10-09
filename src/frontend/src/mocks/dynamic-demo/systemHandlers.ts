@@ -1,5 +1,7 @@
 import { http, HttpResponse } from 'msw'
 
+import { type MaterialEffectsDocument } from '@/shared/three/materialEffects'
+
 import {
   type DemoEnvironmentMap,
   type DemoModel,
@@ -481,7 +483,7 @@ function demoMaterial(
     tags: [],
     createdAt: now(),
     updatedAt: now(),
-    effects: null,
+    effects: null as MaterialEffectsDocument | null,
     parameters: {
       baseColorR: channel(1),
       baseColorG: channel(3),
@@ -648,6 +650,7 @@ export const systemHandlers = [
       name: string
       description?: string | null
       parameters?: Record<string, unknown>
+      effects?: MaterialEffectsDocument | null
     }
 
     const nextId = DEMO_MATERIALS.reduce((max, m) => Math.max(max, m.id), 0) + 1
@@ -656,6 +659,7 @@ export const systemHandlers = [
       body.parameters
     )
     created.description = body.description ?? null
+    if (body.effects !== undefined) created.effects = body.effects
     DEMO_MATERIALS.push(created)
 
     return HttpResponse.json(
@@ -679,11 +683,17 @@ export const systemHandlers = [
       name?: string
       description?: string | null
       parameters?: Record<string, unknown>
+      effects?: MaterialEffectsDocument | null
+      clearEffects?: boolean
     }
 
     if (body.name !== undefined) material.name = body.name
     if (body.description !== undefined) material.description = body.description
     applyParameters(material, body.parameters)
+    // Matches the server: an explicit clear wins, otherwise a supplied document
+    // replaces the stored one, and an omitted effects field changes nothing.
+    if (body.clearEffects === true) material.effects = null
+    else if (body.effects !== undefined) material.effects = body.effects
     material.updatedAt = now()
 
     return HttpResponse.json(material)

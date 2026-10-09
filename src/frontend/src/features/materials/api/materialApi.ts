@@ -101,6 +101,8 @@ export interface CreateMaterialRequest {
   categoryId?: number | null
   previewGeometryType?: string | null
   tags?: string[]
+  /** The full effects document to store, or null for a material with none. */
+  effects?: MaterialEffectsDocument | null
 }
 
 export async function getMaterialById(
@@ -172,7 +174,14 @@ export async function createMaterial(
 
 export async function updateMaterial(
   materialId: number,
-  request: Partial<CreateMaterialRequest> & { clearCategory?: boolean }
+  request: Partial<CreateMaterialRequest> & {
+    clearCategory?: boolean
+    /**
+     * Removes the stored effects document. Omit both this and `effects` to
+     * leave whatever is stored untouched.
+     */
+    clearEffects?: boolean
+  }
 ): Promise<MaterialDto> {
   const response: AxiosResponse<MaterialDto> = await client.put(
     `/materials/${materialId}`,

@@ -67,7 +67,10 @@ export function useUpdateMaterialMutation() {
   return useMutation({
     mutationFn: (input: {
       materialId: number
-      request: Partial<CreateMaterialRequest> & { clearCategory?: boolean }
+      request: Partial<CreateMaterialRequest> & {
+        clearCategory?: boolean
+        clearEffects?: boolean
+      }
     }) => updateMaterial(input.materialId, input.request),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['materials'] })

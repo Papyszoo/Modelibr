@@ -84,6 +84,13 @@ export function MaterialList(): JSX.Element {
           name: value.name,
           description: value.description,
           parameters,
+          // undefined means the document was left as it was, null means the
+          // user removed every effect and the server should clear it.
+          ...(value.effects === undefined
+            ? {}
+            : value.effects === null
+              ? { clearEffects: true }
+              : { effects: value.effects }),
         },
       })
     } else {
@@ -91,6 +98,7 @@ export function MaterialList(): JSX.Element {
         name: value.name,
         description: value.description,
         parameters,
+        ...(value.effects ? { effects: value.effects } : {}),
       })
     }
 
@@ -202,7 +210,7 @@ export function MaterialList(): JSX.Element {
           material={editing}
           isSaving={isSaving}
           onClose={() => setEditing(undefined)}
-          onSubmit={value => void handleSubmit(value)}
+          onSubmit={handleSubmit}
         />
       )}
 
