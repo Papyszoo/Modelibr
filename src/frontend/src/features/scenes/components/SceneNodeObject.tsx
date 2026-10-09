@@ -13,22 +13,16 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader'
 import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader'
 import { STLLoader } from 'three/examples/jsm/loaders/STLLoader'
 
-import { cloneSkinnedModel } from '@/shared/three/cloneSkinnedModel'
-import { applyParameterMaterials } from '@/shared/three/parameterMaterial'
 import { createResourceManager } from '@/shared/three/safeLoadingManager'
 import {
-  applyMaterialTextures,
   type MaterialTextureSets,
   usePerMaterialTextures,
 } from '@/shared/three/textureSetMaterial'
 
+import { usePlacedModel } from '../hooks/usePlacedModel'
 import type { SceneAssetSource } from '../hooks/useSceneAssetSources'
 import type { NodeDressing } from '../hooks/useSceneMaterials'
 import { boundsOffset } from '../lib/sceneGeometry'
-import {
-  applyShapeKeyWeights,
-  createSceneNodeAnimation,
-} from '../lib/sceneNodeAnimation'
 import type { SceneNode, Vec3 } from '../types'
 import { SceneNodeErrorBoundary } from './SceneNodeErrorBoundary'
 
@@ -268,6 +262,7 @@ function SceneNodeAsset({
         }
       >
         <SceneAssetMesh
+          nodeId={nodeId}
           source={source}
           bounds={bounds}
           originConvention={originConvention}
@@ -427,6 +422,7 @@ type LoaderConstructor =
 
 /** Dispatches to the loader for the asset's format. Props only - see the note above. */
 function SceneAssetMesh({
+  nodeId,
   source,
   bounds,
   originConvention,
@@ -437,6 +433,7 @@ function SceneAssetMesh({
   renderTime,
   onReady,
 }: {
+  nodeId: string
   source?: SceneAssetSource
   bounds: Vec3 | null
   originConvention: string | null
@@ -474,6 +471,7 @@ function SceneAssetMesh({
     case 'gltf':
       return (
         <GltfMesh
+          nodeId={nodeId}
           url={source.url}
           resources={source.resources}
           dressing={dressing}
@@ -486,6 +484,7 @@ function SceneAssetMesh({
     case 'fbx':
       return (
         <FbxMesh
+          nodeId={nodeId}
           url={source.url}
           resources={source.resources}
           dressing={dressing}
@@ -498,6 +497,7 @@ function SceneAssetMesh({
     case 'obj':
       return (
         <ObjMesh
+          nodeId={nodeId}
           url={source.url}
           resources={source.resources}
           dressing={dressing}
@@ -510,6 +510,7 @@ function SceneAssetMesh({
     case 'stl':
       return (
         <StlMesh
+          nodeId={nodeId}
           url={source.url}
           dressing={dressing}
           animation={animation}
@@ -536,6 +537,7 @@ function SceneAssetMesh({
 }
 
 function GltfMesh({
+  nodeId,
   url,
   resources,
   dressing,
@@ -544,6 +546,7 @@ function GltfMesh({
   renderTime,
   onReady,
 }: {
+  nodeId: string
   url: string
   resources: Record<string, string>
   dressing?: NodeDressing
@@ -572,13 +575,14 @@ function GltfMesh({
       renderTime={renderTime}
       dressing={dressing}
       flipY={false}
-      warnKey={url}
+      nodeId={nodeId}
       onReady={onReady}
     />
   )
 }
 
 function FbxMesh({
+  nodeId,
   url,
   resources,
   dressing,
@@ -587,6 +591,7 @@ function FbxMesh({
   renderTime,
   onReady,
 }: {
+  nodeId: string
   url: string
   resources: Record<string, string>
   dressing?: NodeDressing
@@ -613,13 +618,14 @@ function FbxMesh({
       shapeKeys={shapeKeys}
       renderTime={renderTime}
       dressing={dressing}
-      warnKey={url}
+      nodeId={nodeId}
       onReady={onReady}
     />
   )
 }
 
 function ObjMesh({
+  nodeId,
   url,
   resources,
   dressing,
@@ -628,6 +634,7 @@ function ObjMesh({
   renderTime,
   onReady,
 }: {
+  nodeId: string
   url: string
   resources: Record<string, string>
   dressing?: NodeDressing
@@ -647,13 +654,14 @@ function ObjMesh({
       shapeKeys={shapeKeys}
       renderTime={renderTime}
       dressing={dressing}
-      warnKey={url}
+      nodeId={nodeId}
       onReady={onReady}
     />
   )
 }
 
 function StlMesh({
+  nodeId,
   url,
   dressing,
   animation,
@@ -661,6 +669,7 @@ function StlMesh({
   renderTime,
   onReady,
 }: {
+  nodeId: string
   url: string
   dressing?: NodeDressing
   animation?: SceneNode['animation']
@@ -695,7 +704,7 @@ function StlMesh({
       shapeKeys={shapeKeys}
       renderTime={renderTime}
       dressing={dressing}
-      warnKey={url}
+      nodeId={nodeId}
       onReady={onReady}
     />
   )
@@ -717,7 +726,7 @@ function PlacedObject({
   shapeKeys,
   dressing,
   flipY = true,
-  warnKey,
+  nodeId,
   renderTime,
   onReady,
 }: {
@@ -728,8 +737,8 @@ function PlacedObject({
   shapeKeys?: SceneNode['shapeKeys']
   dressing?: NodeDressing
   flipY?: boolean
-  /** Names the source in the one-time "clip not found" warning; usually the url. */
-  warnKey: string
+  /** The scene node's id; the one-time "clip not found" warning is keyed by it. */
+  nodeId: string
   /** The render page's deterministic time; undefined in the editor (live clock). */
   renderTime?: number
   onReady: () => void
@@ -750,46 +759,20 @@ function PlacedObject({
     flipY
   )
 
-  const clone = useMemo(() => {
-    const copy = cloneSkinnedModel(object)
-    copy.traverse(child => {
-      if ((child as THREE.Mesh).isMesh) {
-        child.castShadow = true
-        child.receiveShadow = true
-      }
-    })
-
-    if (Object.keys(materialTextureSets).length > 0) {
-      // Until the channels load this leaves the source materials in place, so a
-      // node fades into its bound material rather than flashing untextured.
-      applyMaterialTextures(
-        copy,
-        materialTextureSets,
-        loadedTextures,
-        texturesReady
-      )
-    }
-
-    // Second, so the two layer predictably on a node that uses both: a tiling
-    // material on the frame, a colour on the cushions. Parameter materials need
-    // nothing loaded, so they appear on the first frame.
-    applyParameterMaterials(copy, slotMaterials)
-
-    // Last: the placement's own pose. Applied on the clone, never the shared
-    // source, so one posed instance cannot drag every other placement of the
-    // same model along with it. A playing clip overrides these per frame for
-    // the targets its tracks carry - the clip wins, matching the viewer.
-    applyShapeKeyWeights(copy, shapeKeys)
-
-    return copy
-  }, [
+  // Cloning, dressing, shape keys and the mixer are one lifecycle; see
+  // `usePlacedModel`. Keeping the shape-key influence out of the clone memo is
+  // what stops a slider drag from rebuilding the node and restarting its clip.
+  const { clone, nodeAnimation } = usePlacedModel({
     object,
+    clips,
+    animation,
+    shapeKeys,
     materialTextureSets,
     slotMaterials,
     loadedTextures,
     texturesReady,
-    shapeKeys,
-  ])
+    nodeId,
+  })
 
   // applyMaterialTextures allocates fresh materials on every rebuild, so the
   // superseded ones are released here. Only materials this clone introduced:
@@ -797,23 +780,6 @@ function PlacedObject({
   // the source object, so disposing indiscriminately would blank the original -
   // and with it every other placement of the same asset, plus any open viewer.
   useEffect(() => () => disposeClonedMaterials(clone, object), [clone, object])
-
-  // One mixer per node clone: two instances of one rigged model are two
-  // performances, and a mixer created on the shared loaded object would pose
-  // both copies from whichever instance was set up last.
-  const nodeAnimation = useMemo(
-    () => createSceneNodeAnimation(clone, clips, animation, warnKey),
-    [clone, clips, animation, warnKey]
-  )
-
-  // Stop the mixer with the clone it drives; a superseded clone must not keep
-  // writing into bindings nothing shows any more.
-  useEffect(
-    () => () => {
-      nodeAnimation?.mixer.stopAllAction()
-    },
-    [nodeAnimation]
-  )
 
   // In the editor this is the live clock. In a render (`renderTime` set) the
   // mixer is posed at exactly that time every frame - never advanced by the

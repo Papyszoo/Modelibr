@@ -28,9 +28,11 @@ import type { SceneAnimation } from '../types'
 export type SceneNodeClips = THREE.AnimationClip[] | undefined
 
 /**
- * Missing clips already reported, keyed by source + clip name. A missing clip
- * is a data mismatch the caller fixes once - warning per node instance would
- * bury the console the first warning was meant to make readable.
+ * Missing clips already reported, keyed by node id + clip name. A missing clip
+ * is a data mismatch, but the fix can differ per placement - two nodes may
+ * reference the same asset under different intents - so the warning is deduped
+ * per node rather than per asset: each node reports its own miss once and a
+ * second node with the same asset is not silently swallowed by the first.
  */
 const warnedMissingClips = new Set<string>()
 
@@ -51,15 +53,15 @@ export interface SceneNodeAnimationRuntime {
  *
  * Returns null when the node declares no animation, or names a clip the model
  * does not carry - in that case the node renders static and the miss is
- * reported once (see `warnedMissingClips`). Never throws: an animation that
- * cannot be resolved must not take the whole node, and with it the scene,
+ * reported once per node (see `warnedMissingClips`). Never throws: an animation
+ * that cannot be resolved must not take the whole node, and with it the scene,
  * down.
  */
 export function createSceneNodeAnimation(
   root: THREE.Object3D,
   clips: SceneNodeClips,
   animation: SceneAnimation | null | undefined,
-  warnKey: string
+  nodeId: string
 ): SceneNodeAnimationRuntime | null {
   if (!animation) {
     return null
@@ -69,7 +71,7 @@ export function createSceneNodeAnimation(
     candidate => candidate.name === animation.clip
   )
   if (!clip) {
-    const key = `${warnKey}::${animation.clip}`
+    const key = `${nodeId}::${animation.clip}`
     if (!warnedMissingClips.has(key)) {
       warnedMissingClips.add(key)
       console.warn(
@@ -154,4 +156,38 @@ export function applyShapeKeyWeights(
       mesh.morphTargetInfluences[index] = Math.min(Math.max(weight, 0), 1)
     }
   })
+}
+
+/**
+ * Puts a clone back into the pose it would hold with no clip at all: every
+ * skinned mesh returns to its bind pose and every morph returns to the node's
+ * static weight, or 0 where the document names none.
+ *
+ * Stopping an animation releases the clip's bindings but leaves the properties
+ * it last wrote behind, so without this a node switched to "None" stays frozen
+ * in the final animated frame. This resets the clone that is already on screen;
+ * rebuilding the clone to undo a pose would repeat the whole load, texture and
+ * shader cost just to stop moving.
+ */
+export function restoreRestPose(
+  root: THREE.Object3D,
+  weights: Record<string, number> | null | undefined
+): void {
+  root.traverse(child => {
+    const skinned = child as THREE.SkinnedMesh
+    if (skinned.isSkinnedMesh) {
+      skinned.skeleton.pose()
+    }
+
+    const mesh = child as THREE.Mesh
+    if (!mesh.isMesh || !mesh.morphTargetInfluences) {
+      return
+    }
+
+    // Clear every influence a clip may have driven, then layer the node's
+    // static keys back on below - an unnamed morph resets to 0.
+    mesh.morphTargetInfluences.fill(0)
+  })
+
+  applyShapeKeyWeights(root, weights)
 }
