@@ -10,7 +10,8 @@ public sealed record VfxSummaryDto(
     double Duration,
     int ComponentCount,
     IReadOnlyList<string> ComponentTypes,
-    DateTime UpdatedAt)
+    DateTime UpdatedAt,
+    string? ThumbnailUrl = null)
 {
     public static VfxSummaryDto From(Domain.Models.Vfx vfx)
     {
@@ -23,7 +24,24 @@ public sealed record VfxSummaryDto(
             summary.Duration,
             summary.ComponentCount,
             summary.ComponentTypes,
-            vfx.UpdatedAt);
+            vfx.UpdatedAt,
+            VfxThumbnailUrl.For(vfx));
+    }
+}
+
+/// <summary>
+/// The API-relative address of an effect's animated thumbnail, or null while it has none.
+/// The thumbnail is stored under its content hash, so the hash doubles as a cache-buster:
+/// a re-render changes the URL and the browser fetches the new picture.
+/// </summary>
+public static class VfxThumbnailUrl
+{
+    public static string? For(Domain.Models.Vfx vfx)
+    {
+        if (string.IsNullOrEmpty(vfx.ThumbnailPath))
+            return null;
+
+        return $"/vfx/{vfx.Id}/thumbnail/file?v={Path.GetFileNameWithoutExtension(vfx.ThumbnailPath)}";
     }
 }
 
@@ -34,7 +52,8 @@ public sealed record VfxDetailDto(
     string? Description,
     JsonElement Definition,
     DateTime CreatedAt,
-    DateTime UpdatedAt)
+    DateTime UpdatedAt,
+    string? ThumbnailUrl = null)
 {
     public static VfxDetailDto From(Domain.Models.Vfx vfx) => new(
         vfx.Id,
@@ -42,7 +61,8 @@ public sealed record VfxDetailDto(
         vfx.Description,
         ParseDefinition(vfx.DefinitionJson),
         vfx.CreatedAt,
-        vfx.UpdatedAt);
+        vfx.UpdatedAt,
+        VfxThumbnailUrl.For(vfx));
 
     private static JsonElement ParseDefinition(string definitionJson)
     {

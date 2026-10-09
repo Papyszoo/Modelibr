@@ -33,9 +33,14 @@ export class FrameEncoderService {
    * Creates a looping animation from all frames
    * @param {Array} frames - Array of rendered frame data
    * @param {Object} jobLogger - Logger with job context
+   * @param {Object} [options]
+   * @param {number} [options.frameDelayMs] - Hold each frame this long instead of
+   *   deriving it from config.encoding.framerate (for clips whose frames are not
+   *   evenly spaced at the global rate, such as a VFX loop).
+   * @param {boolean} [options.animatedOnly] - Skip the JPEG poster and PNG still.
    * @returns {Promise<Object>} Encoding result with file paths and metadata
    */
-  async encodeFrames(frames, jobLogger) {
+  async encodeFrames(frames, jobLogger, options = {}) {
     const startTime = Date.now()
     const jobId = Date.now().toString(36) + Math.random().toString(36).substr(2)
     const workingDir = path.join(this.tempDir, `job-${jobId}`)
@@ -59,8 +64,26 @@ export class FrameEncoderService {
       const webpPath = await this.createAnimatedWebP(
         frames,
         workingDir,
-        jobLogger
+        jobLogger,
+        options.frameDelayMs
       )
+
+      if (options.animatedOnly) {
+        const encodeTime = Date.now() - startTime
+        jobLogger.info('Frame encoding completed (animated only)', {
+          webpPath,
+          encodeTimeMs: encodeTime,
+          frameCount: frames.length,
+        })
+        return {
+          webpPath,
+          posterPath: null,
+          pngPath: null,
+          frameCount: frames.length,
+          encodeTimeMs: encodeTime,
+          isAnimated: true,
+        }
+      }
 
       // Step 2: Create poster frame (JPG) from middle frame for fallback/preview
       const middleFrameIndex = Math.floor(frames.length / 2)
@@ -115,13 +138,17 @@ export class FrameEncoderService {
    * @param {Array} frames - Array of frame data with pixels buffers
    * @param {string} workingDir - Working directory
    * @param {Object} jobLogger - Logger with job context
+   * @param {number} [frameDelayMs] - Per-frame hold time; defaults to the configured framerate
    * @returns {Promise<string>} Path to created animated WebP file
    */
-  async createAnimatedWebP(frames, workingDir, jobLogger) {
+  async createAnimatedWebP(frames, workingDir, jobLogger, frameDelayMs) {
     const webpPath = path.join(workingDir, 'thumbnail.webp')
     const quality = config.encoding?.webpQuality || 75
     const framerate = config.encoding?.framerate || 10
-    const frameDuration = Math.round(1000 / framerate) // Duration in ms per frame
+    const frameDuration =
+      frameDelayMs && frameDelayMs > 0
+        ? Math.round(frameDelayMs)
+        : Math.round(1000 / framerate) // Duration in ms per frame
 
     jobLogger.info('Creating animated WebP thumbnail', {
       quality,

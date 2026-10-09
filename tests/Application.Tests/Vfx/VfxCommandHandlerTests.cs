@@ -1,10 +1,12 @@
 using System.Text.Json;
 using Application.Abstractions;
 using Application.Abstractions.Repositories;
+using Application.Abstractions.Services;
 using Application.Models;
 using Application.Vfx;
 using Domain.Models;
 using Domain.Services;
+using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using SharedKernel;
 using Xunit;
@@ -50,6 +52,7 @@ public class VfxCommandHandlerTests
     private readonly Mock<ISpriteRepository> _sprites = new();
     private readonly Mock<IDateTimeProvider> _clock = new();
     private readonly Mock<IUnitOfWork> _unitOfWork = new();
+    private readonly Mock<IThumbnailQueue> _thumbnailQueue = new();
 
     public VfxCommandHandlerTests()
     {
@@ -69,11 +72,13 @@ public class VfxCommandHandlerTests
 
     private CreateVfxCommandHandler CreateHandler() => new(
         _vfx.Object, _models.Object, _versions.Object, _sounds.Object, _sprites.Object,
-        _clock.Object, _unitOfWork.Object);
+        _clock.Object, _unitOfWork.Object, _thumbnailQueue.Object,
+        NullLogger<CreateVfxCommandHandler>.Instance);
 
     private UpdateVfxCommandHandler UpdateHandler() => new(
         _vfx.Object, _models.Object, _versions.Object, _sounds.Object, _sprites.Object,
-        _clock.Object, _unitOfWork.Object);
+        _clock.Object, _unitOfWork.Object, _thumbnailQueue.Object,
+        NullLogger<UpdateVfxCommandHandler>.Instance);
 
     private DeleteVfxCommandHandler DeleteHandler() => new(_vfx.Object, _unitOfWork.Object);
 
@@ -235,6 +240,94 @@ public class VfxCommandHandlerTests
         Assert.True(result.IsSuccess);
         Assert.True(result.Value.IsValid);
         Assert.Contains("\"id\":\"rock\"", vfx.DefinitionJson);
+    }
+
+    // Regression: effects created through MCP create_vfx never got a thumbnail because
+    // nothing queued the render, so the list showed a placeholder forever.
+    [Fact]
+    public async Task Create_QueuesTheThumbnailRenderAfterTheSave()
+    {
+        var order = new List<string>();
+        _unitOfWork.Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()))
+            .Callback(() => order.Add("save")).Returns(Task.CompletedTask);
+        _thumbnailQueue.Setup(q => q.EnqueueVfxThumbnailAsync(
+                It.IsAny<int>(), true, It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .Callback(() => order.Add("enqueue"))
+            .ReturnsAsync(Domain.Models.ThumbnailJob.CreateForVfx(1, Now));
+
+        var result = await CreateHandler().Handle(new CreateVfxCommand("Sparks"), CancellationToken.None);
+
+        Assert.True(result.Value.IsValid);
+        // The job needs the real id, which only exists once the save has run.
+        Assert.Equal(["save", "enqueue"], order);
+    }
+
+    [Fact]
+    public async Task Create_WhenTheQueueFails_StillSavesTheEffect()
+    {
+        _thumbnailQueue.Setup(q => q.EnqueueVfxThumbnailAsync(
+                It.IsAny<int>(), It.IsAny<bool>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("queue down"));
+
+        var result = await CreateHandler().Handle(new CreateVfxCommand("Sparks"), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.True(result.Value.IsValid);
+    }
+
+    [Fact]
+    public async Task Create_WhenTheDefinitionIsRejected_QueuesNothing()
+    {
+        var invalid = Json("""{"version":2,"duration":0,"loop":false,"components":[]}""");
+
+        await CreateHandler().Handle(new CreateVfxCommand("Bad", Definition: invalid), CancellationToken.None);
+
+        _thumbnailQueue.Verify(q => q.EnqueueVfxThumbnailAsync(
+            It.IsAny<int>(), It.IsAny<bool>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    // Regression: an edited effect kept showing its old picture. A new definition must
+    // re-render; a rename must not (the picture is unchanged).
+    [Fact]
+    public async Task Update_WithNewDefinition_RequeuesTheThumbnail()
+    {
+        var vfx = Domain.Models.Vfx.Create("Rockfall", null, DefaultJson, Now);
+        vfx.SetThumbnailPath("/uploads/aa/bb/hash", Now);
+        _vfx.Setup(r => r.GetByIdAsync(1, It.IsAny<CancellationToken>())).ReturnsAsync(vfx);
+
+        var result = await UpdateHandler().Handle(
+            new UpdateVfxCommand(1, Definition: Json("""{"version":1,"duration":3,"loop":true,"components":[]}""")),
+            CancellationToken.None);
+
+        Assert.True(result.Value.IsValid);
+        _thumbnailQueue.Verify(q => q.EnqueueVfxThumbnailAsync(
+            It.IsAny<int>(), true, It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Once);
+        Assert.Equal("/uploads/aa/bb/hash", vfx.ThumbnailPath);
+    }
+
+    [Fact]
+    public async Task Update_WithNameOnly_KeepsTheExistingThumbnailWithoutRequeueing()
+    {
+        var vfx = Domain.Models.Vfx.Create("Old", null, DefaultJson, Now);
+        vfx.SetThumbnailPath("/uploads/aa/bb/hash", Now);
+        _vfx.Setup(r => r.GetByIdAsync(1, It.IsAny<CancellationToken>())).ReturnsAsync(vfx);
+
+        await UpdateHandler().Handle(new UpdateVfxCommand(1, Name: "New"), CancellationToken.None);
+
+        _thumbnailQueue.Verify(q => q.EnqueueVfxThumbnailAsync(
+            It.IsAny<int>(), It.IsAny<bool>(), It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Update_OfAnEffectWithoutAThumbnail_QueuesOne()
+    {
+        var vfx = Domain.Models.Vfx.Create("Old", null, DefaultJson, Now);
+        _vfx.Setup(r => r.GetByIdAsync(1, It.IsAny<CancellationToken>())).ReturnsAsync(vfx);
+
+        await UpdateHandler().Handle(new UpdateVfxCommand(1, Name: "New"), CancellationToken.None);
+
+        _thumbnailQueue.Verify(q => q.EnqueueVfxThumbnailAsync(
+            It.IsAny<int>(), true, It.IsAny<int>(), It.IsAny<int>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]

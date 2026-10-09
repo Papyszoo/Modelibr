@@ -67,8 +67,14 @@ public class ThumbnailJob
     public int? SceneRevision { get; private set; }
 
     /// <summary>
-    /// Type of asset this job is for: "Model", "Sound", "TextureSet", "EnvironmentMap"
-    /// or "Scene".
+    /// The ID of the visual effect this job renders an animated thumbnail for (null for
+    /// every other asset type).
+    /// </summary>
+    public int? VfxId { get; private set; }
+
+    /// <summary>
+    /// Type of asset this job is for: "Model", "Sound", "TextureSet", "EnvironmentMap",
+    /// "Scene" or "Vfx".
     /// </summary>
     public string AssetType { get; private set; } = "Model";
     
@@ -136,6 +142,7 @@ public class ThumbnailJob
     public EnvironmentMap? EnvironmentMap { get; set; }
     public EnvironmentMapVariant? EnvironmentMapVariant { get; set; }
     public Scene? Scene { get; set; }
+    public Vfx? Vfx { get; set; }
 
     /// <summary>
     /// Creates a new thumbnail job for model processing.
@@ -225,6 +232,28 @@ public class ThumbnailJob
             AssetType = "EnvironmentMap",
             EnvironmentMapId = environmentMapId,
             EnvironmentMapVariantId = environmentMapVariantId,
+            Status = ThumbnailJobStatus.Pending,
+            MaxAttempts = maxAttempts,
+            LockTimeoutMinutes = lockTimeoutMinutes,
+            CreatedAt = createdAt,
+            UpdatedAt = createdAt
+        };
+    }
+
+    /// <summary>
+    /// Creates a job that renders an animated thumbnail of a visual effect.
+    /// </summary>
+    public static ThumbnailJob CreateForVfx(int vfxId, DateTime createdAt, int maxAttempts = 3, int lockTimeoutMinutes = 10)
+    {
+        if (vfxId <= 0)
+            throw new ArgumentException("Vfx ID must be a positive integer.", nameof(vfxId));
+        ValidateMaxAttempts(maxAttempts);
+        ValidateLockTimeoutMinutes(lockTimeoutMinutes);
+
+        return new ThumbnailJob
+        {
+            AssetType = "Vfx",
+            VfxId = vfxId,
             Status = ThumbnailJobStatus.Pending,
             MaxAttempts = maxAttempts,
             LockTimeoutMinutes = lockTimeoutMinutes,

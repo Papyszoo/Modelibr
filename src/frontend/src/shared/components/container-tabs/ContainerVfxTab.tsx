@@ -6,6 +6,7 @@ import { type MenuItem } from 'primereact/menuitem'
 import { useRef, useState } from 'react'
 
 import { useVfxListQuery } from '@/features/vfx/api/queries'
+import { VfxTileMedia } from '@/features/vfx/components/VfxTileMedia'
 import { formatSeconds } from '@/features/vfx/lib/vfxDefaults'
 import { useTabContext } from '@/hooks/useTabContext'
 import {
@@ -42,9 +43,9 @@ interface ContainerVfxTabProps {
 }
 
 /**
- * The effects a container holds. Effects are small authored documents with no
- * thumbnail and no paging, so the member list comes straight from the
- * container and the library list fills in duration and the add picker.
+ * The effects a container holds. Effects have no paging, so the member list
+ * comes straight from the container and the library list fills in duration,
+ * the animated thumbnail and the add picker.
  */
 export function ContainerVfxTab({
   adapter,
@@ -104,8 +105,14 @@ export function ContainerVfxTab({
     },
   ]
 
-  const effectMedia = (
-    <AssetTilePlaceholder icon="pi pi-sparkles" label="Effect" />
+  const effectMedia = (name: string, thumbnailUrl?: string | null) => (
+    <VfxTileMedia
+      name={name}
+      thumbnailUrl={thumbnailUrl}
+      placeholder={
+        <AssetTilePlaceholder icon="pi pi-sparkles" label="Effect" />
+      }
+    />
   )
 
   return (
@@ -147,7 +154,7 @@ export function ContainerVfxTab({
                 key={member.id}
                 name={member.name}
                 meta={summary ? formatSeconds(summary.duration) : undefined}
-                media={effectMedia}
+                media={effectMedia(member.name, summary?.thumbnailUrl)}
                 accessory={adapter.renderAssetAccessory?.({
                   type: 'vfx',
                   id: member.id,
@@ -210,7 +217,7 @@ export function ContainerVfxTab({
                   key={effect.id}
                   name={effect.name}
                   meta={formatSeconds(effect.duration)}
-                  media={effectMedia}
+                  media={effectMedia(effect.name, effect.thumbnailUrl)}
                   selected={isPicked}
                   checkbox={<Checkbox checked={isPicked} readOnly />}
                   onClick={() =>

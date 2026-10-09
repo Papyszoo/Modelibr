@@ -9,6 +9,7 @@ import App from './app/App'
 import { AppProvider } from './app/providers'
 import { SceneRenderView } from './features/scenes/components/SceneRenderView'
 import { sceneViewpointFromName } from './features/scenes/lib/sceneRenderCamera'
+import { VfxRenderView } from './features/vfx/components/VfxRenderView'
 import { overrideApiBaseUrl } from './lib/apiBase'
 
 async function bootstrap() {
@@ -31,7 +32,8 @@ async function bootstrap() {
 }
 
 /**
- * What to mount: the app, or a single scene drawn for a headless renderer.
+ * What to mount: the app, or a single scene or visual effect drawn for a
+ * headless renderer.
  *
  * Branching here rather than behind a route because the app has no router - it
  * is a dock of tabs, and a scene is not addressable by URL. Mounting the render
@@ -41,7 +43,11 @@ async function bootstrap() {
  */
 function renderTarget() {
   const params = new URLSearchParams(window.location.search)
-  if (params.get('render') !== 'scene') {
+  const render = params.get('render')
+  if (render === 'vfx') {
+    return vfxRenderTarget(params)
+  }
+  if (render !== 'scene') {
     return <App />
   }
 
@@ -74,6 +80,27 @@ function renderTarget() {
       viewpoint={sceneViewpointFromName(params.get('view'))}
     />
   )
+}
+
+/** The effect page for `?render=vfx&vfxId=...`; the worker steps its time and photographs it. */
+function vfxRenderTarget(params: URLSearchParams) {
+  const apiOverride = params.get('api')
+  if (apiOverride) {
+    overrideApiBaseUrl(apiOverride)
+  }
+
+  const vfxId = Number(params.get('vfxId'))
+  if (!Number.isInteger(vfxId) || vfxId <= 0) {
+    window.__VFX_RENDER__ = {
+      ready: true,
+      windowSeconds: 0,
+      setTime: () => Promise.resolve(),
+      error: `render=vfx needs a positive integer vfxId, got "${params.get('vfxId') ?? ''}"`,
+    }
+    return null
+  }
+
+  return <VfxRenderView vfxId={vfxId} />
 }
 
 bootstrap()

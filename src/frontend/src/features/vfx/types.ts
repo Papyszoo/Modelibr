@@ -79,6 +79,8 @@ export interface VfxSummary {
   componentCount: number
   componentTypes: VfxComponentType[]
   updatedAt: string
+  /** API-relative animated WebP loop of the whole effect; absent until the worker has rendered it. */
+  thumbnailUrl?: string | null
 }
 
 export interface VfxDetail {
@@ -88,6 +90,7 @@ export interface VfxDetail {
   definition: VfxDefinition
   createdAt: string
   updatedAt: string
+  thumbnailUrl?: string | null
 }
 
 /** One validation problem, as the server reports it: where, and what. */

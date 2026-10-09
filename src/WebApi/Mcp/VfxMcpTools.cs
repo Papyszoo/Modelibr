@@ -24,7 +24,8 @@ public sealed class VfxReadMcpTools
 {
     [McpServerTool(Name = "list_vfx")]
     [Description("Browse the visual effects in the library. Each hit carries its duration, component count and component types " +
-                 "so an agent can pick an effect without opening it. Read one in full with get_vfx.")]
+                 "so an agent can pick an effect without opening it, plus thumbnailUrl: an API-relative animated WebP loop of the whole " +
+                 "effect (null until the worker has rendered it). Read one in full with get_vfx.")]
     public static async Task<object> ListVfx(
         IQueryHandler<GetVfxListQuery, IReadOnlyList<VfxSummaryDto>> handler,
         McpCallerContext caller,
@@ -45,7 +46,8 @@ public sealed class VfxReadMcpTools
 
     [McpServerTool(Name = "get_vfx")]
     [Description("Read one visual effect in full: its name, description and v1 definition parsed as a JSON object " +
-                 "(version, duration, loop, components), so the timeline can be inspected exactly as it is stored.")]
+                 "(version, duration, loop, components), so the timeline can be inspected exactly as it is stored. thumbnailUrl is an " +
+                 "API-relative animated WebP loop of the whole effect (null until the worker has rendered it).")]
     public static async Task<object> GetVfx(
         IQueryHandler<GetVfxQuery, VfxDetailDto> handler,
         McpCallerContext caller,

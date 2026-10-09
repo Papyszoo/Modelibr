@@ -48,3 +48,25 @@ internal sealed class GetVfxQueryHandler : IQueryHandler<GetVfxQuery, VfxDetailD
             : Result.Success(VfxDetailDto.From(vfx));
     }
 }
+
+/// <summary>The stored path of an effect's thumbnail file, for the endpoint that serves it.</summary>
+public sealed record GetVfxThumbnailQuery(int Id) : IQuery<string>;
+
+internal sealed class GetVfxThumbnailQueryHandler : IQueryHandler<GetVfxThumbnailQuery, string>
+{
+    private readonly IVfxRepository _vfx;
+
+    public GetVfxThumbnailQueryHandler(IVfxRepository vfx)
+    {
+        _vfx = vfx;
+    }
+
+    public async Task<Result<string>> Handle(GetVfxThumbnailQuery query, CancellationToken cancellationToken)
+    {
+        var vfx = await _vfx.GetByIdAsync(query.Id, cancellationToken);
+
+        return string.IsNullOrEmpty(vfx?.ThumbnailPath)
+            ? Result.Failure<string>(new Error("VfxThumbnailNotFound", $"Vfx {query.Id} has no thumbnail."))
+            : Result.Success(vfx.ThumbnailPath);
+    }
+}

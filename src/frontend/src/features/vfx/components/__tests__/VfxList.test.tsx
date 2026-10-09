@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor } from '@testing-library/react'
+import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
 import { renderWithProviders } from '@/test/renderWithProviders'
@@ -65,6 +65,46 @@ describe('VfxList', () => {
     expect(screen.getAllByLabelText('Particles')).toHaveLength(2)
     expect(screen.getAllByLabelText('Light')).toHaveLength(2)
     expect(screen.getAllByLabelText('Sound')).toHaveLength(2)
+  })
+
+  // Regression: tiles showed the sparkles placeholder forever because nothing read
+  // the thumbnail the worker renders. A rendered effect must show its picture, an
+  // unrendered one must keep the placeholder, and a picture that fails to load
+  // must fall back instead of leaving a broken-image icon.
+  it('shows the animated thumbnail when rendered and the placeholder while pending', async () => {
+    vfx.getVfxList.mockResolvedValue([
+      summary(1, { thumbnailUrl: '/vfx/1/thumbnail/file?v=abc' }),
+      summary(2, { thumbnailUrl: null }),
+    ] as never)
+
+    renderList()
+    const tiles = await screen.findAllByTestId('vfx-tile')
+
+    const image = within(tiles[0]).getByTestId('vfx-tile-thumbnail')
+    expect(image).toHaveAttribute(
+      'src',
+      expect.stringMatching(/\/vfx\/1\/thumbnail\/file\?v=abc$/)
+    )
+    expect(
+      within(tiles[1]).queryByTestId('vfx-tile-thumbnail')
+    ).not.toBeInTheDocument()
+    expect(tiles[1].querySelector('.pi-sparkles')).toBeInTheDocument()
+  })
+
+  it('falls back to the placeholder when the thumbnail cannot be loaded', async () => {
+    vfx.getVfxList.mockResolvedValue([
+      summary(1, { thumbnailUrl: '/vfx/1/thumbnail/file?v=abc' }),
+    ] as never)
+
+    renderList()
+    const tile = (await screen.findAllByTestId('vfx-tile'))[0]
+
+    fireEvent.error(within(tile).getByTestId('vfx-tile-thumbnail'))
+
+    expect(
+      within(tile).queryByTestId('vfx-tile-thumbnail')
+    ).not.toBeInTheDocument()
+    expect(tile.querySelector('.pi-sparkles')).toBeInTheDocument()
   })
 
   it('shows the empty state when there are no effects', async () => {

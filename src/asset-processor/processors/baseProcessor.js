@@ -42,6 +42,7 @@ export class BaseProcessor {
       job.soundId ||
       job.textureSetId ||
       job.environmentMapId ||
+      job.vfxId ||
       job.id
     const jobLogger = withJobContext(job.id, assetId)
 

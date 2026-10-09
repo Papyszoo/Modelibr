@@ -144,6 +144,38 @@ export function findDemoVfx(id: number): DemoVfx | undefined {
   return demoVfx.get(id)
 }
 
+/**
+ * The demo has no worker to render an effect, so its thumbnail is a looping SVG
+ * drawn from the effect's first particle colours. It is ready immediately; the
+ * `v` query changes with the effect so an edit shows a fresh picture.
+ */
+function thumbnailUrl(effect: DemoVfx): string {
+  return `/vfx/${effect.id}/thumbnail/file?v=${Date.parse(effect.updatedAt)}`
+}
+
+function demoThumbnailSvg(effect: DemoVfx): string {
+  const particles = effect.definition.components.find(
+    component => component.type === 'particles'
+  )?.particles as { colorStart?: string; colorEnd?: string } | undefined
+  const inner = particles?.colorStart ?? '#ffd27a'
+  const outer = particles?.colorEnd ?? '#ff4a1c'
+  const seconds = Math.max(effect.definition.duration, 1)
+
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
+  <rect width="256" height="256" fill="#14161b"/>
+  <ellipse cx="128" cy="214" rx="70" ry="10" fill="#1b1e25"/>
+  <circle cx="128" cy="150" r="14" fill="${inner}" opacity="0.9">
+    <animate attributeName="r" values="14;58;14" dur="${seconds}s" repeatCount="indefinite"/>
+    <animate attributeName="fill" values="${inner};${outer};${inner}" dur="${seconds}s" repeatCount="indefinite"/>
+    <animate attributeName="opacity" values="0.95;0.15;0.95" dur="${seconds}s" repeatCount="indefinite"/>
+  </circle>
+  <circle cx="128" cy="150" r="6" fill="#ffffff">
+    <animate attributeName="cy" values="170;70;170" dur="${seconds}s" repeatCount="indefinite"/>
+    <animate attributeName="opacity" values="1;0;1" dur="${seconds}s" repeatCount="indefinite"/>
+  </circle>
+</svg>`
+}
+
 function toSummary(effect: DemoVfx) {
   const { definition } = effect
   return {
@@ -156,6 +188,7 @@ function toSummary(effect: DemoVfx) {
       ...new Set(definition.components.map(component => component.type)),
     ],
     updatedAt: effect.updatedAt,
+    thumbnailUrl: thumbnailUrl(effect),
   }
 }
 
@@ -167,6 +200,7 @@ function toDetail(effect: DemoVfx) {
     definition: effect.definition,
     createdAt: effect.createdAt,
     updatedAt: effect.updatedAt,
+    thumbnailUrl: thumbnailUrl(effect),
   }
 }
 
@@ -287,6 +321,15 @@ export const vfxHandlers = [
   http.get('*/vfx', async () => {
     ensureSeeded()
     return HttpResponse.json([...demoVfx.values()].map(toSummary))
+  }),
+
+  http.get('*/vfx/:id/thumbnail/file', async ({ params }) => {
+    ensureSeeded()
+    const effect = demoVfx.get(Number(params.id))
+    if (!effect) return new HttpResponse(null, { status: 404 })
+    return new HttpResponse(demoThumbnailSvg(effect), {
+      headers: { 'Content-Type': 'image/svg+xml' },
+    })
   }),
 
   http.get('*/vfx/:id/export/godot', async ({ params }) => {

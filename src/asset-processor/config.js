@@ -86,6 +86,20 @@ export const config = {
     timeoutMs: parseInt(process.env.SCENE_RENDER_TIMEOUT_MS, 10) || 60000,
   },
 
+  // Animated VFX thumbnails. Like scene renders this photographs the running
+  // frontend (the app's own VFX runtime draws the effect - see vfxRenderer.js),
+  // so it reuses FRONTEND_URL and the scene render's readiness timeout.
+  vfxRender: {
+    // Same fixed size as model thumbnails.
+    width: 256,
+    height: 256,
+    // One loop covers the WHOLE effect. Frames are spread evenly across it at
+    // up to targetFps; the count is capped so a long effect stays a small file,
+    // and the cap lowers the rate (each frame is held for window / frames).
+    targetFps: 15,
+    maxFrames: 90,
+  },
+
   // Environment map rendering settings
   environmentMaps: {
     cameraDistanceMultiplier:

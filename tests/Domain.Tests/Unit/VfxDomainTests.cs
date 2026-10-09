@@ -22,6 +22,26 @@ public class VfxDomainTests
     }
 
     [Fact]
+    public void SetThumbnailPath_StoresTheTrimmedPathAndStampsTheUpdate()
+    {
+        var vfx = Vfx.Create("Sparks", null, ValidDefinition, Now);
+        var later = Now.AddMinutes(5);
+
+        vfx.SetThumbnailPath("  /uploads/ab/cd/hash  ", later);
+
+        Assert.Equal("/uploads/ab/cd/hash", vfx.ThumbnailPath);
+        Assert.Equal(later, vfx.UpdatedAt);
+    }
+
+    [Fact]
+    public void SetThumbnailPath_RejectsABlankPath()
+    {
+        var vfx = Vfx.Create("Sparks", null, ValidDefinition, Now);
+
+        Assert.Throws<ArgumentException>(() => vfx.SetThumbnailPath("  ", Now));
+    }
+
+    [Fact]
     public void Create_RejectsEmptyName()
     {
         Assert.Throws<ArgumentException>(() => Vfx.Create("   ", null, ValidDefinition, Now));

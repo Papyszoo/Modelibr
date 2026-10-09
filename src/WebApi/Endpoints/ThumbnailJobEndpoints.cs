@@ -54,6 +54,7 @@ public static class ThumbnailJobEndpoints
                 EnvironmentMapVariantId = response.Job.EnvironmentMapVariantId,
                 SceneId = response.Job.SceneId,
                 SceneViewpoint = response.Job.SceneViewpoint,
+                VfxId = response.Job.VfxId,
                 DefaultTextureSetId = response.Job.ModelVersion?.DefaultTextureSetId,
                 MainVariantName = response.Job.ModelVersion?.MainVariantName ?? "",
                 TextureMappings = response.Job.ModelVersion?.TextureMappings?.Select(tm => new
@@ -194,6 +195,34 @@ public static class ThumbnailJobEndpoints
         .WithTags("ThumbnailJobs")
         .AddEndpointFilter<WorkerApiKeyFilter>();
 
+        app.MapPost("/thumbnail-jobs/vfx/{jobId:int}/finish", async (
+            int jobId,
+            [FromBody] FinishVfxJobRequest request,
+            ICommandHandler<FinishVfxThumbnailJobCommand, FinishVfxThumbnailJobResponse> commandHandler,
+            CancellationToken cancellationToken) =>
+        {
+            var result = await commandHandler.Handle(new FinishVfxThumbnailJobCommand(
+                jobId,
+                request.Success,
+                request.ErrorMessage), cancellationToken);
+
+            if (result.IsFailure)
+            {
+                return Results.BadRequest(new { error = result.Error.Code, message = result.Error.Message });
+            }
+
+            return Results.Ok(new
+            {
+                result.Value.JobId,
+                result.Value.VfxId,
+                result.Value.Status,
+                Message = request.Success ? "Vfx thumbnail job completed successfully" : "Vfx thumbnail job marked as failed"
+            });
+        })
+        .WithName("Finish Vfx Thumbnail Job")
+        .WithTags("ThumbnailJobs")
+        .AddEndpointFilter<WorkerApiKeyFilter>();
+
         app.MapPost("/thumbnail-jobs/environment-maps/{jobId:int}/finish", async (
             int jobId,
             [FromBody] FinishEnvironmentMapJobRequest request,
@@ -328,6 +357,13 @@ public record FinishEnvironmentMapJobRequest(
 /// the worker a second chance to disagree with itself.
 /// </summary>
 public record FinishSceneRenderJobRequest(
+    bool Success,
+    string? ErrorMessage = null);
+
+/// <summary>
+/// No path here: the animated WebP was stored by the vfx thumbnail upload that preceded this call.
+/// </summary>
+public record FinishVfxJobRequest(
     bool Success,
     string? ErrorMessage = null);
 

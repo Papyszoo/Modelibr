@@ -11,7 +11,7 @@
   align-content: start;
 }
 
-/* Placeholder art until an effect can be preview-rendered as a thumbnail. */
+/* Placeholder art while an effect has no rendered thumbnail yet. */
 .vfx-list-tile-media {
   width: 100%;
   height: 100%;

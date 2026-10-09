@@ -1,7 +1,9 @@
 using Application.Abstractions;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
+using Application.Abstractions.Services;
 using Domain.Services;
+using Microsoft.Extensions.Logging;
 using SharedKernel;
 using System.Text.Json;
 
@@ -27,6 +29,8 @@ internal sealed class UpdateVfxCommandHandler : ICommandHandler<UpdateVfxCommand
     private readonly ISpriteRepository _spriteRepository;
     private readonly IDateTimeProvider _dateTimeProvider;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly IThumbnailQueue _thumbnailQueue;
+    private readonly ILogger<UpdateVfxCommandHandler> _logger;
 
     public UpdateVfxCommandHandler(
         IVfxRepository vfxRepository,
@@ -35,7 +39,9 @@ internal sealed class UpdateVfxCommandHandler : ICommandHandler<UpdateVfxCommand
         ISoundRepository soundRepository,
         ISpriteRepository spriteRepository,
         IDateTimeProvider dateTimeProvider,
-        IUnitOfWork unitOfWork)
+        IUnitOfWork unitOfWork,
+        IThumbnailQueue thumbnailQueue,
+        ILogger<UpdateVfxCommandHandler> logger)
     {
         _vfxRepository = vfxRepository;
         _modelRepository = modelRepository;
@@ -44,6 +50,8 @@ internal sealed class UpdateVfxCommandHandler : ICommandHandler<UpdateVfxCommand
         _spriteRepository = spriteRepository;
         _dateTimeProvider = dateTimeProvider;
         _unitOfWork = unitOfWork;
+        _thumbnailQueue = thumbnailQueue;
+        _logger = logger;
     }
 
     public async Task<Result<VfxWriteOutcome>> Handle(
@@ -100,6 +108,12 @@ internal sealed class UpdateVfxCommandHandler : ICommandHandler<UpdateVfxCommand
 
         await _vfxRepository.UpdateAsync(vfx, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+        // A new definition changes the picture, so it is re-rendered (the old thumbnail
+        // stays until the new one replaces it). A rename or description edit does not -
+        // unless the effect never got a thumbnail, in which case any update tries again.
+        if (resolvedDefinition is not null || string.IsNullOrEmpty(vfx.ThumbnailPath))
+            await VfxThumbnails.TryEnqueueAsync(_thumbnailQueue, _logger, vfx.Id, cancellationToken);
 
         return Result.Success(VfxWriteOutcome.Saved(VfxDetailDto.From(vfx)));
     }

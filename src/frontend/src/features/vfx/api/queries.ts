@@ -5,6 +5,7 @@ import {
   useQueryClient,
 } from '@tanstack/react-query'
 
+import { THUMBNAIL_POLL_MS, thumbnailMayChange } from '../lib/vfxThumbnails'
 import type { VfxDefinition } from '../types'
 import { createVfx, deleteVfx, getVfx, getVfxList, updateVfx } from './vfxApi'
 
@@ -14,6 +15,9 @@ export function getVfxListQueryOptions() {
     queryFn: getVfxList,
     // An agent writes effects over MCP from outside this browser.
     staleTime: 0,
+    // Thumbnails are rendered by the worker after the save returns.
+    refetchInterval: query =>
+      thumbnailMayChange(query.state.data) ? THUMBNAIL_POLL_MS : false,
   })
 }
 

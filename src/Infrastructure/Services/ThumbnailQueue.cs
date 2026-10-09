@@ -233,6 +233,39 @@ public class ThumbnailQueue : IThumbnailQueue
         return createdJob;
     }
 
+    public async Task<ThumbnailJob> EnqueueVfxThumbnailAsync(
+        int vfxId,
+        bool forceRegenerate = false,
+        int maxAttempts = 3,
+        int lockTimeoutMinutes = 10,
+        CancellationToken cancellationToken = default)
+    {
+        var existingJob = await _thumbnailJobRepository.GetByVfxIdAsync(vfxId, cancellationToken);
+
+        if (existingJob != null)
+        {
+            if (forceRegenerate || existingJob.Status == ThumbnailJobStatus.Dead)
+            {
+                existingJob.Reset(DateTime.UtcNow);
+                await _thumbnailJobRepository.UpdateAsync(existingJob, cancellationToken);
+                await SaveAndNotifyAsync(existingJob, cancellationToken);
+
+                _logger.LogInformation("Reset existing vfx thumbnail job {JobId} for vfx {VfxId} (forceRegenerate: {ForceRegenerate})",
+                    existingJob.Id, vfxId, forceRegenerate);
+            }
+
+            return existingJob;
+        }
+
+        var job = ThumbnailJob.CreateForVfx(vfxId, DateTime.UtcNow, maxAttempts, lockTimeoutMinutes);
+        var createdJob = await _thumbnailJobRepository.AddAsync(job, cancellationToken);
+        await SaveAndNotifyAsync(createdJob, cancellationToken);
+
+        _logger.LogInformation("Enqueued vfx thumbnail job {JobId} for vfx {VfxId}", createdJob.Id, vfxId);
+
+        return createdJob;
+    }
+
     public async Task<ThumbnailJob> EnqueueSceneRenderAsync(
         int sceneId,
         string viewpoint,

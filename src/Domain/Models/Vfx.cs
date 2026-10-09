@@ -11,8 +11,10 @@ namespace Domain.Models;
 /// join on every read. The server validates the document on the way in, so what is
 /// stored is always the contract the frontend and the export understand.
 ///
-/// Deliberately no tags, categories, thumbnails or soft delete: an effect is a small
-/// authored document, and a hard delete is unambiguous.
+/// Deliberately no tags, categories or soft delete: an effect is a small authored
+/// document, and a hard delete is unambiguous. It does carry a thumbnail - an animated
+/// loop of the whole effect rendered by the worker from the app's own preview - because
+/// a name alone does not say what an effect looks like.
 /// </summary>
 public class Vfx : AggregateRoot
 {
@@ -24,6 +26,12 @@ public class Vfx : AggregateRoot
 
     /// <summary>The validated v1 definition, serialized as camelCase JSON.</summary>
     public string DefinitionJson { get; private set; } = string.Empty;
+
+    /// <summary>
+    /// Where the worker-rendered animated WebP lives, or null while none exists yet.
+    /// Kept after a definition change until the re-render replaces it.
+    /// </summary>
+    public string? ThumbnailPath { get; private set; }
 
     public DateTime CreatedAt { get; private set; }
     public DateTime UpdatedAt { get; private set; }
@@ -77,6 +85,15 @@ public class Vfx : AggregateRoot
         ValidateDefinition(definitionJson);
 
         DefinitionJson = definitionJson;
+        UpdatedAt = updatedAt;
+    }
+
+    public void SetThumbnailPath(string thumbnailPath, DateTime updatedAt)
+    {
+        if (string.IsNullOrWhiteSpace(thumbnailPath))
+            throw new ArgumentException("Thumbnail path cannot be null or empty.", nameof(thumbnailPath));
+
+        ThumbnailPath = thumbnailPath.Trim();
         UpdatedAt = updatedAt;
     }
 

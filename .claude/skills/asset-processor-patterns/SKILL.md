@@ -21,12 +21,18 @@ Rendering must be offline-safe: local Three.js/Blender, no CDN imports.
 ## Processor architecture
 
 - `ProcessorRegistry` (Strategy) maps `job.assetType` → processor. Registered:
-  `Model`, `Sound`, `TextureSet`, `EnvironmentMap`, `MeshAnalysis` (stub).
+  `Model`, `Sound`, `TextureSet`, `EnvironmentMap`, `Scene`, `Vfx`.
 - `BaseProcessor` is the template method: `execute(job, signal)` wraps your
   `process()` with error handling, `withJobContext` logging, and `JobApiClient`
   callbacks. New processor = extend it, implement `get processorType()` +
   `async process(job, jobLogger, signal)`, register in the registry constructor.
 - `jobProcessor.js` dispatch goes exclusively through `ProcessorRegistry` - no other path.
+- `Vfx` (animated effect thumbnails) follows the scene pattern: `vfxRenderer.js`
+  drives the app's own `?render=vfx` page, stepping its clock via
+  `window.__VFX_RENDER__.setTime(t)` - no real-time playback, one VFX renderer.
+  Frames are encoded to one looping WebP with `FrameEncoderService`
+  (`frameDelayMs`, `animatedOnly`); frame count/rate limits live in
+  `config.vfxRender`.
 
 ## Job lifecycle
 

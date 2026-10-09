@@ -1,8 +1,10 @@
 using Application.Abstractions;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
+using Application.Abstractions.Services;
 using Domain.Models;
 using Domain.Services;
+using Microsoft.Extensions.Logging;
 using SharedKernel;
 using System.Text.Json;
 
@@ -26,6 +28,8 @@ internal sealed class CreateVfxCommandHandler : ICommandHandler<CreateVfxCommand
     private readonly ISpriteRepository _spriteRepository;
     private readonly IDateTimeProvider _dateTimeProvider;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly IThumbnailQueue _thumbnailQueue;
+    private readonly ILogger<CreateVfxCommandHandler> _logger;
 
     public CreateVfxCommandHandler(
         IVfxRepository vfxRepository,
@@ -34,7 +38,9 @@ internal sealed class CreateVfxCommandHandler : ICommandHandler<CreateVfxCommand
         ISoundRepository soundRepository,
         ISpriteRepository spriteRepository,
         IDateTimeProvider dateTimeProvider,
-        IUnitOfWork unitOfWork)
+        IUnitOfWork unitOfWork,
+        IThumbnailQueue thumbnailQueue,
+        ILogger<CreateVfxCommandHandler> logger)
     {
         _vfxRepository = vfxRepository;
         _modelRepository = modelRepository;
@@ -43,6 +49,8 @@ internal sealed class CreateVfxCommandHandler : ICommandHandler<CreateVfxCommand
         _spriteRepository = spriteRepository;
         _dateTimeProvider = dateTimeProvider;
         _unitOfWork = unitOfWork;
+        _thumbnailQueue = thumbnailQueue;
+        _logger = logger;
     }
 
     public async Task<Result<VfxWriteOutcome>> Handle(
@@ -78,6 +86,10 @@ internal sealed class CreateVfxCommandHandler : ICommandHandler<CreateVfxCommand
 
             var saved = await _vfxRepository.AddAsync(vfx, cancellationToken);
             await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+            // After the save so the job carries the real id. A failed enqueue never fails
+            // the create: the effect is saved and simply has no thumbnail until its next update.
+            await VfxThumbnails.TryEnqueueAsync(_thumbnailQueue, _logger, saved.Id, cancellationToken);
 
             return Result.Success(VfxWriteOutcome.Saved(VfxDetailDto.From(saved)));
         }

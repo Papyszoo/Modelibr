@@ -690,8 +690,8 @@ namespace Infrastructure.Persistence
             });
 
             // Configure Vfx - a visual effect stored as one validated JSON definition.
-            // No tags, categories, thumbnails or soft delete: it is a small authored
-            // document, browsed and deleted as a unit.
+            // No tags, categories or soft delete: it is a small authored document,
+            // browsed and deleted as a unit. Its animated thumbnail is a path to a file.
             modelBuilder.Entity<Vfx>(entity =>
             {
                 entity.HasKey(v => v.Id);
@@ -699,6 +699,7 @@ namespace Infrastructure.Persistence
                 entity.Property(v => v.Name).IsRequired().HasMaxLength(200);
                 entity.Property(v => v.Description).HasMaxLength(1000);
                 entity.Property(v => v.DefinitionJson).IsRequired().HasColumnType("jsonb");
+                entity.Property(v => v.ThumbnailPath).HasMaxLength(500);
                 entity.Property(v => v.CreatedAt).IsRequired();
                 entity.Property(v => v.UpdatedAt).IsRequired();
 
@@ -1317,6 +1318,7 @@ namespace Infrastructure.Persistence
                 entity.Property(tj => tj.SceneId).IsRequired(false);
                 entity.Property(tj => tj.SceneViewpoint).IsRequired(false).HasMaxLength(20);
                 entity.Property(tj => tj.SceneRevision).IsRequired(false);
+                entity.Property(tj => tj.VfxId).IsRequired(false);
                 entity.Property(tj => tj.Status).IsRequired();
                 entity.Property(tj => tj.AttemptCount).IsRequired();
                 entity.Property(tj => tj.MaxAttempts).IsRequired();
@@ -1384,6 +1386,17 @@ namespace Infrastructure.Persistence
                 entity.HasIndex(tj => tj.EnvironmentMapVariantId)
                     .IsUnique()
                     .HasFilter("\"EnvironmentMapVariantId\" IS NOT NULL");
+
+                entity.HasOne(tj => tj.Vfx)
+                    .WithMany()
+                    .HasForeignKey(tj => tj.VfxId)
+                    .OnDelete(DeleteBehavior.Cascade)
+                    .IsRequired(false);
+
+                // One job per effect, reused on every re-render (like environment map variants).
+                entity.HasIndex(tj => tj.VfxId)
+                    .IsUnique()
+                    .HasFilter("\"VfxId\" IS NOT NULL");
 
                 entity.HasOne(tj => tj.Scene)
                     .WithMany()

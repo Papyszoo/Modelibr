@@ -12,9 +12,14 @@ import { ContainerVfxTab } from '../ContainerVfxTab'
 
 const mockGet = client.get as jest.Mock
 
-const effect = (id: number, name: string) => ({
+const effect = (
+  id: number,
+  name: string,
+  thumbnailUrl: string | null = null
+) => ({
   id,
   name,
+  thumbnailUrl,
   description: null,
   duration: 1.5,
   componentCount: 2,
@@ -39,6 +44,53 @@ describe('ContainerVfxTab', () => {
           })
         : Promise.reject(new Error(`unexpected GET ${url}`))
     )
+  })
+
+  // Regression: the project's effect tiles stayed on the placeholder because the
+  // member list carries no thumbnail - it has to be looked up in the library list.
+  it('shows the library thumbnail for a member and keeps the placeholder for one without', async () => {
+    mockGet.mockImplementation((url: string) =>
+      url === '/vfx'
+        ? Promise.resolve({
+            data: [
+              effect(1, 'Spark burst', '/vfx/1/thumbnail/file?v=abc'),
+              effect(2, 'Dust puff'),
+            ],
+          })
+        : Promise.reject(new Error(`unexpected GET ${url}`))
+    )
+    const twoMembers = {
+      ...container,
+      vfx: [
+        { id: 1, name: 'Spark burst' },
+        { id: 2, name: 'Dust puff' },
+      ],
+      vfxCount: 2,
+    } as unknown as ContainerDto
+
+    renderWithProviders(
+      <ContainerVfxTab
+        adapter={
+          {
+            type: 'project',
+            containerId: 7,
+            label: 'Project',
+          } as ContainerAdapter
+        }
+        container={twoMembers}
+        refetchContainer={jest.fn()}
+        showToast={jest.fn()}
+      />,
+      { tabId: 'project-7' }
+    )
+
+    const image = await screen.findByTestId('vfx-tile-thumbnail')
+    expect(image).toHaveAttribute(
+      'src',
+      expect.stringMatching(/\/vfx\/1\/thumbnail\/file\?v=abc$/)
+    )
+    // Only the first member has one; the second still shows the placeholder.
+    expect(screen.getAllByTestId('vfx-tile-thumbnail')).toHaveLength(1)
   })
 
   // The picker must offer only effects the project does not already hold, and

@@ -1,16 +1,15 @@
 import { Grid, OrbitControls } from '@react-three/drei'
 import { Canvas, useLoader } from '@react-three/fiber'
-import { useQueries } from '@tanstack/react-query'
 import { type JSX, Suspense, useEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 
 import { getFileUrl } from '@/features/models/api/modelApi'
-import { getSceneResourceQueryOptions } from '@/features/scenes/api/resourceQueries'
+import { SceneNodeErrorBoundary } from '@/features/scenes/components/SceneNodeErrorBoundary'
 import { SceneNodeObject } from '@/features/scenes/components/SceneNodeObject'
 import type { SceneAssetSource } from '@/features/scenes/hooks/useSceneAssetSources'
 import type { SceneNode } from '@/features/scenes/types'
-import { getFileExtension } from '@/utils/fileUtils'
 
+import { useVfxMeshSources } from '../hooks/useVfxMeshSources'
 import {
   createParticleBuffers,
   isComponentActive,
@@ -29,62 +28,20 @@ interface VfxPreviewProps {
   spriteFiles: Map<number, number>
 }
 
+/** The dark backdrop colour, shared by the editor and the thumbnail render. */
+const VFX_BACKGROUND = '#14161b'
+
 /**
- * The live preview: a three.js viewport drawing the effect at `time`.
- *
- * Mesh sources are resolved here, outside the Canvas, because the R3F
- * reconciler cannot see the app's QueryClient - the same split the scene
- * editor uses.
+ * Background and lights the effect is drawn under, with a dark floor unless
+ * `floor` is off (the thumbnail has no horizon to show, only the effect).
  */
-export function VfxPreview({
-  definition,
-  time,
-  selectedId,
-  spriteFiles,
-}: VfxPreviewProps): JSX.Element {
-  const meshComponents = definition.components.filter(
-    c => c.type === 'mesh' && c.mesh && c.mesh.modelId > 0
-  )
-  const resourceQueries = useQueries({
-    queries: meshComponents.map(c =>
-      getSceneResourceQueryOptions({
-        assetType: 'Model',
-        assetId: c.mesh!.modelId,
-        versionId: c.mesh!.versionId ?? null,
-      })
-    ),
-  })
-
-  const sources = new Map<string, SceneAssetSource>()
-  meshComponents.forEach((component, index) => {
-    const resource = resourceQueries[index]?.data
-    if (!resource?.resolved || !resource.original) return
-    const resources: Record<string, string> = {}
-    for (const auxiliary of resource.auxiliaries) {
-      resources[auxiliary.relativePath] = getFileUrl(String(auxiliary.fileId))
-    }
-    sources.set(component.id, {
-      kind: 'mesh',
-      url: getFileUrl(String(resource.original.fileId)),
-      extension: getFileExtension(resource.original.originalFileName),
-      resources,
-      isLoading: false,
-      totalSizeBytes: resource.totalSizeBytes,
-      triangleCount: resource.triangleCount,
-      materialCount: resource.materialCount,
-      hasPreview: resource.previews.length > 0,
-    })
-  })
-
+export function VfxStage({ floor = true }: { floor?: boolean }): JSX.Element {
   return (
-    <div className="vfx-preview" data-testid="vfx-preview">
-      <Canvas
-        camera={{ position: [2.6, 1.9, 3.4], fov: 45 }}
-        gl={{ antialias: true }}
-      >
-        <color attach="background" args={['#14161b']} />
-        <ambientLight intensity={0.35} />
-        <directionalLight position={[4, 6, 3]} intensity={0.8} />
+    <>
+      <color attach="background" args={[VFX_BACKGROUND]} />
+      <ambientLight intensity={0.35} />
+      <directionalLight position={[4, 6, 3]} intensity={0.8} />
+      {floor ? (
         <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.01, 0]}>
           <planeGeometry args={[40, 40]} />
           <meshStandardMaterial
@@ -93,6 +50,100 @@ export function VfxPreview({
             metalness={0}
           />
         </mesh>
+      ) : null}
+    </>
+  )
+}
+
+interface VfxLayersProps {
+  definition: VfxDefinition
+  /** Effect time in seconds; every frame is computed from it alone. */
+  time: number
+  selectedId: string | null
+  /** Sprite id -> file id, for particle textures. */
+  spriteFiles: Map<number, number>
+  sources: Map<string, SceneAssetSource>
+  /** Pixels per world unit at distance 1, for particle sizes. */
+  pointScale?: number
+}
+
+/**
+ * Every component of the effect drawn at `time`. This is the one place the
+ * effect is turned into pixels: the editor preview and the worker's thumbnail
+ * render both mount it, so they cannot disagree about what an effect looks like.
+ */
+export function VfxLayers({
+  definition,
+  time,
+  selectedId,
+  spriteFiles,
+  sources,
+  pointScale = DEFAULT_POINT_SCALE,
+}: VfxLayersProps): JSX.Element {
+  return (
+    <>
+      {definition.components.map(component => {
+        switch (component.type) {
+          case 'particles':
+            return (
+              <Suspense key={component.id} fallback={null}>
+                <ParticlesLayer
+                  component={component}
+                  time={time}
+                  pointScale={pointScale}
+                  spriteFileId={
+                    component.particles?.spriteId
+                      ? spriteFiles.get(component.particles.spriteId)
+                      : undefined
+                  }
+                />
+              </Suspense>
+            )
+          case 'mesh':
+            return (
+              <MeshLayer
+                key={component.id}
+                component={component}
+                time={time}
+                source={sources.get(component.id)}
+                selected={component.id === selectedId}
+              />
+            )
+          case 'light':
+            return (
+              <LightLayer
+                key={component.id}
+                component={component}
+                time={time}
+                selected={component.id === selectedId}
+              />
+            )
+          default:
+            return null
+        }
+      })}
+    </>
+  )
+}
+
+/**
+ * The live preview: a three.js viewport drawing the effect at `time`.
+ */
+export function VfxPreview({
+  definition,
+  time,
+  selectedId,
+  spriteFiles,
+}: VfxPreviewProps): JSX.Element {
+  const { sources } = useVfxMeshSources(definition)
+
+  return (
+    <div className="vfx-preview" data-testid="vfx-preview">
+      <Canvas
+        camera={{ position: [2.6, 1.9, 3.4], fov: 45 }}
+        gl={{ antialias: true }}
+      >
+        <VfxStage />
         <Grid
           args={[20, 20]}
           cellSize={0.5}
@@ -105,45 +156,13 @@ export function VfxPreview({
           infiniteGrid
         />
 
-        {definition.components.map(component => {
-          switch (component.type) {
-            case 'particles':
-              return (
-                <Suspense key={component.id} fallback={null}>
-                  <ParticlesLayer
-                    component={component}
-                    time={time}
-                    spriteFileId={
-                      component.particles?.spriteId
-                        ? spriteFiles.get(component.particles.spriteId)
-                        : undefined
-                    }
-                  />
-                </Suspense>
-              )
-            case 'mesh':
-              return (
-                <MeshLayer
-                  key={component.id}
-                  component={component}
-                  time={time}
-                  source={sources.get(component.id)}
-                  selected={component.id === selectedId}
-                />
-              )
-            case 'light':
-              return (
-                <LightLayer
-                  key={component.id}
-                  component={component}
-                  time={time}
-                  selected={component.id === selectedId}
-                />
-              )
-            default:
-              return null
-          }
-        })}
+        <VfxLayers
+          definition={definition}
+          time={time}
+          selectedId={selectedId}
+          spriteFiles={spriteFiles}
+          sources={sources}
+        />
 
         <OrbitControls
           makeDefault
@@ -155,6 +174,9 @@ export function VfxPreview({
     </div>
   )
 }
+
+/** Particle sizes in pixels at distance 1; sized for the editor's viewport. */
+const DEFAULT_POINT_SCALE = 600
 
 const particleVertexShader = /* glsl */ `
   attribute vec3 color;
@@ -191,45 +213,79 @@ function ParticlesLayer({
   component,
   time,
   spriteFileId,
+  pointScale,
 }: {
   component: VfxComponent
   time: number
   spriteFileId?: number
+  pointScale: number
 }): JSX.Element | null {
   if (!component.particles) return null
-  return spriteFileId ? (
-    <TexturedParticles
+  const untextured = (
+    <ParticlePoints
       component={component}
       time={time}
-      url={getFileUrl(String(spriteFileId))}
+      texture={null}
+      pointScale={pointScale}
     />
-  ) : (
-    <ParticlePoints component={component} time={time} texture={null} />
+  )
+  if (!spriteFileId) return untextured
+
+  const url = getFileUrl(String(spriteFileId))
+  // A sprite that cannot be loaded (deleted since the effect was saved) must
+  // not take the whole canvas down; the particles fall back to plain points.
+  return (
+    <SceneNodeErrorBoundary
+      nodeId={component.id}
+      resetKey={url}
+      onError={noop}
+      fallback={untextured}
+    >
+      <TexturedParticles
+        component={component}
+        time={time}
+        url={url}
+        pointScale={pointScale}
+      />
+    </SceneNodeErrorBoundary>
   )
 }
+
+function noop(): void {}
 
 /** Loads the sprite (suspending until it arrives) before drawing the points. */
 function TexturedParticles({
   component,
   time,
   url,
+  pointScale,
 }: {
   component: VfxComponent
   time: number
   url: string
+  pointScale: number
 }): JSX.Element {
   const texture = useLoader(THREE.TextureLoader, url)
-  return <ParticlePoints component={component} time={time} texture={texture} />
+  return (
+    <ParticlePoints
+      component={component}
+      time={time}
+      texture={texture}
+      pointScale={pointScale}
+    />
+  )
 }
 
 function ParticlePoints({
   component,
   time,
   texture,
+  pointScale,
 }: {
   component: VfxComponent
   time: number
   texture: THREE.Texture | null
+  pointScale: number
 }): JSX.Element {
   const particles = component.particles!
   const buffers = useMemo(() => createParticleBuffers(MAX_PARTICLES), [])
@@ -243,7 +299,7 @@ function ParticlePoints({
         transparent: true,
         depthWrite: false,
         uniforms: {
-          uScale: { value: 600 },
+          uScale: { value: DEFAULT_POINT_SCALE },
           uMap: { value: null },
           uHasMap: { value: false },
         },
@@ -260,6 +316,10 @@ function ParticlePoints({
     material.uniforms.uHasMap.value = texture !== null
     material.needsUpdate = true
   }, [material, particles.blending, texture])
+
+  useEffect(() => {
+    material.uniforms.uScale.value = pointScale
+  }, [material, pointScale])
 
   useEffect(() => () => material.dispose(), [material])
 

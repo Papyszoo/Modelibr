@@ -141,6 +141,54 @@ public class ThumbnailQueueTests
     }
 
     [Fact]
+    public async Task EnqueueVfxThumbnailAsync_WhenNoExistingJob_ShouldCreateJobAndNotifyWorkers()
+    {
+        var job = ThumbnailJob.CreateForVfx(6, DateTime.UtcNow);
+        _mockRepository.Setup(r => r.GetByVfxIdAsync(6, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((ThumbnailJob?)null);
+        _mockRepository.Setup(r => r.AddAsync(It.IsAny<ThumbnailJob>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(job);
+
+        var result = await _thumbnailQueue.EnqueueVfxThumbnailAsync(6);
+
+        Assert.Equal("Vfx", result.AssetType);
+        Assert.Equal(6, result.VfxId);
+        _mockQueueNotificationService.Verify(s => s.NotifyJobEnqueuedAsync(job, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    // Regression: re-rendering after an edit must reuse the effect's one job (the unique
+    // VfxId index rejects a second row) and put it back in the queue.
+    [Fact]
+    public async Task EnqueueVfxThumbnailAsync_WhenForced_ShouldResetTheExistingJobInsteadOfAddingAnother()
+    {
+        var existing = ThumbnailJob.CreateForVfx(6, DateTime.UtcNow.AddHours(-1));
+        existing.TryClaim("worker", DateTime.UtcNow.AddMinutes(-30));
+        existing.MarkAsCompleted(DateTime.UtcNow.AddMinutes(-29));
+        _mockRepository.Setup(r => r.GetByVfxIdAsync(6, It.IsAny<CancellationToken>())).ReturnsAsync(existing);
+
+        var result = await _thumbnailQueue.EnqueueVfxThumbnailAsync(6, forceRegenerate: true);
+
+        Assert.Same(existing, result);
+        Assert.Equal(ThumbnailJobStatus.Pending, existing.Status);
+        _mockRepository.Verify(r => r.AddAsync(It.IsAny<ThumbnailJob>(), It.IsAny<CancellationToken>()), Times.Never);
+        _mockQueueNotificationService.Verify(s => s.NotifyJobEnqueuedAsync(existing, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task EnqueueVfxThumbnailAsync_WhenNotForcedAndJobIsDone_ShouldLeaveItAlone()
+    {
+        var existing = ThumbnailJob.CreateForVfx(6, DateTime.UtcNow.AddHours(-1));
+        existing.TryClaim("worker", DateTime.UtcNow.AddMinutes(-30));
+        existing.MarkAsCompleted(DateTime.UtcNow.AddMinutes(-29));
+        _mockRepository.Setup(r => r.GetByVfxIdAsync(6, It.IsAny<CancellationToken>())).ReturnsAsync(existing);
+
+        await _thumbnailQueue.EnqueueVfxThumbnailAsync(6);
+
+        Assert.Equal(ThumbnailJobStatus.Done, existing.Status);
+        _mockQueueNotificationService.Verify(s => s.NotifyJobEnqueuedAsync(It.IsAny<ThumbnailJob>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
     public async Task DequeueAsync_WhenJobAvailable_ShouldClaimAndReturnJob()
     {
         // Arrange

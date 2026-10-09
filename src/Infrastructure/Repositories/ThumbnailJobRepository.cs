@@ -92,6 +92,12 @@ internal sealed class ThumbnailJobRepository : IThumbnailJobRepository
             .FirstOrDefaultAsync(tj => tj.EnvironmentMapVariantId == environmentMapVariantId, cancellationToken);
     }
 
+    public async Task<ThumbnailJob?> GetByVfxIdAsync(int vfxId, CancellationToken cancellationToken = default)
+    {
+        return await _context.ThumbnailJobs
+            .FirstOrDefaultAsync(tj => tj.VfxId == vfxId, cancellationToken);
+    }
+
     public async Task<ThumbnailJob?> GetNextPendingJobAsync(CancellationToken cancellationToken = default)
     {
         // Use a database transaction to ensure atomicity when claiming jobs.

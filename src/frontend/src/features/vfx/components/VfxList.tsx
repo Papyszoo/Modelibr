@@ -21,6 +21,7 @@ import {
 } from '../api/queries'
 import { DEFAULT_VFX_DEFINITION, formatSeconds } from '../lib/vfxDefaults'
 import type { VfxComponentType, VfxSummary } from '../types'
+import { VfxTileMedia } from './VfxTileMedia'
 
 const TYPE_ICONS: Record<VfxComponentType, string> = {
   particles: 'pi pi-sparkles',
@@ -146,9 +147,15 @@ export function VfxList(): JSX.Element {
                 setPendingDelete(effect)
               }}
               media={
-                <div className="vfx-list-tile-media">
-                  <i className="pi pi-sparkles" aria-hidden />
-                </div>
+                <VfxTileMedia
+                  name={effect.name}
+                  thumbnailUrl={effect.thumbnailUrl}
+                  placeholder={
+                    <div className="vfx-list-tile-media">
+                      <i className="pi pi-sparkles" aria-hidden />
+                    </div>
+                  }
+                />
               }
             />
           ))}

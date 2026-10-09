@@ -3313,6 +3313,9 @@ namespace Infrastructure.Migrations
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<int?>("VfxId")
+                        .HasColumnType("integer");
+
                     b.HasKey("Id");
 
                     b.HasIndex("EnvironmentMapId");
@@ -3334,6 +3337,10 @@ namespace Infrastructure.Migrations
                     b.HasIndex("SoundId");
 
                     b.HasIndex("TextureSetId");
+
+                    b.HasIndex("VfxId")
+                        .IsUnique()
+                        .HasFilter("\"VfxId\" IS NOT NULL");
 
                     b.HasIndex("ModelHash", "ModelVersionId")
                         .IsUnique()
@@ -3406,6 +3413,10 @@ namespace Infrastructure.Migrations
                         .IsRequired()
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
+
+                    b.Property<string>("ThumbnailPath")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
 
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -4555,6 +4566,11 @@ namespace Infrastructure.Migrations
                         .HasForeignKey("TextureSetId")
                         .OnDelete(DeleteBehavior.Cascade);
 
+                    b.HasOne("Domain.Models.Vfx", "Vfx")
+                        .WithMany()
+                        .HasForeignKey("VfxId")
+                        .OnDelete(DeleteBehavior.Cascade);
+
                     b.Navigation("EnvironmentMap");
 
                     b.Navigation("EnvironmentMapVariant");
@@ -4568,6 +4584,8 @@ namespace Infrastructure.Migrations
                     b.Navigation("Sound");
 
                     b.Navigation("TextureSet");
+
+                    b.Navigation("Vfx");
                 });
 
             modelBuilder.Entity("Domain.Models.ThumbnailJobEvent", b =>

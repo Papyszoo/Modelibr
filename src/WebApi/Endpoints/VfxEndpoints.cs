@@ -3,6 +3,8 @@ using Application.Abstractions.Messaging;
 using Application.Vfx;
 using Microsoft.AspNetCore.Mvc;
 using SharedKernel;
+using WebApi.Files;
+using WebApi.Infrastructure;
 
 namespace WebApi.Endpoints;
 
@@ -24,6 +26,28 @@ public static class VfxEndpoints
             .WithName("Export Vfx To Godot")
             .WithSummary("Downloads a visual effect as a Godot 4 scene with its referenced files, zipped")
             .WithOpenApi();
+
+        app.MapGet("/vfx/{id}/thumbnail/file", ServeVfxThumbnail)
+            .WithName("Serve Vfx Thumbnail")
+            .WithSummary("Serves the animated WebP thumbnail the worker rendered for a visual effect")
+            .WithTags("Thumbnails");
+
+        app.MapPost("/vfx/{id}/thumbnail/upload", UploadVfxThumbnail)
+            .WithName("Upload Vfx Thumbnail")
+            .WithSummary("Stores the animated WebP thumbnail rendered by the worker")
+            .WithTags("Thumbnails")
+            .AddEndpointFilter<WorkerApiKeyFilter>()
+            .DisableAntiforgery();
+
+        app.MapPost("/vfx/{id}/thumbnail/regenerate", RegenerateVfxThumbnail)
+            .WithName("Regenerate Vfx Thumbnail")
+            .WithSummary("Re-queues the animated thumbnail of one visual effect")
+            .WithTags("Thumbnails");
+
+        app.MapPost("/vfx/thumbnails/regenerate", RegenerateAllVfxThumbnails)
+            .WithName("Regenerate All Vfx Thumbnails")
+            .WithSummary("Re-queues the animated thumbnail of every visual effect (effects only)")
+            .WithTags("Thumbnails");
 
         app.MapPost("/vfx", CreateVfx)
             .WithName("Create Vfx")
@@ -62,6 +86,59 @@ public static class VfxEndpoints
         return result.IsFailure
             ? Results.NotFound(new { error = result.Error.Code, message = result.Error.Message })
             : Results.Ok(result.Value);
+    }
+
+    private static async Task<IResult> ServeVfxThumbnail(
+        int id,
+        IQueryHandler<GetVfxThumbnailQuery, string> queryHandler,
+        CancellationToken cancellationToken)
+    {
+        var result = await queryHandler.Handle(new GetVfxThumbnailQuery(id), cancellationToken);
+        if (result.IsFailure || !System.IO.File.Exists(result.Value))
+            return Results.NotFound();
+
+        return Results.File(result.Value, "image/webp");
+    }
+
+    private static async Task<IResult> RegenerateVfxThumbnail(
+        int id,
+        ICommandHandler<RegenerateVfxThumbnailCommand> commandHandler,
+        CancellationToken cancellationToken)
+    {
+        var result = await commandHandler.Handle(new RegenerateVfxThumbnailCommand(id), cancellationToken);
+
+        return result.IsFailure
+            ? Results.NotFound(new { error = result.Error.Code, message = result.Error.Message })
+            : Results.Ok(new { Message = "Vfx thumbnail regeneration queued", VfxId = id });
+    }
+
+    private static async Task<IResult> RegenerateAllVfxThumbnails(
+        ICommandHandler<RegenerateAllVfxThumbnailsCommand, RegenerateAllVfxThumbnailsResponse> commandHandler,
+        CancellationToken cancellationToken)
+    {
+        var result = await commandHandler.Handle(new RegenerateAllVfxThumbnailsCommand(), cancellationToken);
+
+        return result.IsFailure
+            ? BadRequest(result.Error)
+            : Results.Ok(new { enqueuedCount = result.Value.EnqueuedCount });
+    }
+
+    private static async Task<IResult> UploadVfxThumbnail(
+        int id,
+        IFormFile file,
+        ICommandHandler<UploadVfxThumbnailCommand, UploadVfxThumbnailResponse> commandHandler,
+        CancellationToken cancellationToken)
+    {
+        var result = await commandHandler.Handle(
+            new UploadVfxThumbnailCommand(id, new FormFileUpload(file)),
+            cancellationToken);
+
+        if (result.IsFailure)
+            return result.Error.Code == "VfxNotFound"
+                ? Results.NotFound(new { error = result.Error.Code, message = result.Error.Message })
+                : BadRequest(result.Error);
+
+        return Results.Ok(new { Message = "Vfx thumbnail uploaded", VfxId = id, result.Value.ThumbnailPath, result.Value.SizeBytes });
     }
 
     private static async Task<IResult> ExportVfxGodot(

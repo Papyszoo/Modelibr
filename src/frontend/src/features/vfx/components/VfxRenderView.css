@@ -1,0 +1,17 @@
+/*
+ * Full-bleed and fixed: the worker sets the viewport size and screenshots the
+ * whole page, so a margin or scrollbar would show up as a band in the picture.
+ */
+.vfx-render-view {
+  position: fixed;
+  inset: 0;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  background: #14161b;
+}
+
+.vfx-render-view > * {
+  width: 100%;
+  height: 100%;
+}

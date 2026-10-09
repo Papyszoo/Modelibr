@@ -165,4 +165,23 @@ public class VfxMcpToolsTests
         Assert.Contains("\"id\":7", json);
         Assert.Contains("\"definition\"", json);
     }
+
+    // The thumbnail is how an agent (and the UI) tells effects apart without opening them,
+    // so both read tools must carry its URL.
+    [Fact]
+    public async Task GetVfx_AndListVfx_CarryTheThumbnailUrl()
+    {
+        var url = "/vfx/7/thumbnail/file?v=abc";
+        var detail = Detail(7) with { ThumbnailUrl = url };
+        var list = new Mock<IQueryHandler<GetVfxListQuery, IReadOnlyList<VfxSummaryDto>>>();
+        list.Setup(h => h.Handle(It.IsAny<GetVfxListQuery>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result.Success<IReadOnlyList<VfxSummaryDto>>(
+                [new VfxSummaryDto(7, "Sparks", null, 2, 0, [], DateTime.UtcNow, url)]));
+
+        var got = Json(await VfxReadMcpTools.GetVfx(Reader(detail).Object, Caller(), vfxId: 7));
+        var listed = Json(await VfxReadMcpTools.ListVfx(list.Object, Caller()));
+
+        Assert.Contains($"\"thumbnailUrl\":\"{url}\"", got.Replace("\\u0026", "&"));
+        Assert.Contains("\"thumbnailUrl\":\"/vfx/7/thumbnail/file?v=abc\"", listed);
+    }
 }

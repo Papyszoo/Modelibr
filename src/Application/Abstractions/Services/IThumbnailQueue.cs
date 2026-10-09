@@ -54,6 +54,13 @@ public interface IThumbnailQueue
     Task<ThumbnailJob> EnqueueEnvironmentMapThumbnailAsync(int environmentMapId, int environmentMapVariantId, bool forceRegenerate = false, int maxAttempts = 3, int lockTimeoutMinutes = 10, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Enqueues the animated thumbnail render for a visual effect. One job per effect: an
+    /// existing one is reused (and reset when <paramref name="forceRegenerate"/> is set or
+    /// it is dead), so re-rendering after an edit never piles up jobs.
+    /// </summary>
+    Task<ThumbnailJob> EnqueueVfxThumbnailAsync(int vfxId, bool forceRegenerate = false, int maxAttempts = 3, int lockTimeoutMinutes = 10, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Queue a photograph of a scene from one viewpoint.
     ///
     /// No <c>forceRegenerate</c> and no reuse of an existing job, unlike every method
