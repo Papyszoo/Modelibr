@@ -41,6 +41,11 @@ describe('ModelDataService.saveTechnicalMetadata', () => {
       animationCount: 2,
       animationNames: ['Idle', 'Walk'],
       boneCount: 24,
+      animations: [
+        { name: 'Idle', durationSeconds: 1.5, kinds: ['skeletal'] },
+        { name: 'Walk', durationSeconds: 2, kinds: ['skeletal', 'morph'] },
+      ],
+      shapeKeys: [{ meshName: 'Body', shapeKeys: ['Squash', 'Stretch'] }],
     })
 
     expect(ok).toBe(true)
@@ -56,6 +61,11 @@ describe('ModelDataService.saveTechnicalMetadata', () => {
       animationCount: 2,
       animationNames: ['Idle', 'Walk'],
       boneCount: 24,
+      animations: [
+        { name: 'Idle', durationSeconds: 1.5, kinds: ['skeletal'] },
+        { name: 'Walk', durationSeconds: 2, kinds: ['skeletal', 'morph'] },
+      ],
+      shapeKeys: [{ meshName: 'Body', shapeKeys: ['Squash', 'Stretch'] }],
     })
   })
 
@@ -73,6 +83,8 @@ describe('ModelDataService.saveTechnicalMetadata', () => {
     expect(body.animationCount).toBeNull()
     expect(body.boneCount).toBeNull()
     expect(body.animationNames).toEqual([])
+    expect(body.animations).toEqual([])
+    expect(body.shapeKeys).toEqual([])
   })
 })
 
@@ -168,9 +180,9 @@ describe('ModelDataService.saveSceneGraph', () => {
       boneCount: 0,
       worldBounds: { min: [0, 0, 0], max: [1, 1, 1], dimensions: [1, 1, 1] },
       unitConfidence: 'medium',
-      animationCount: 0,
-      animationNames: [],
-      animations: [],
+      animationCount: 1,
+      animationNames: ['Wave'],
+      animations: [{ name: 'Wave', durationSeconds: 1, kinds: ['skeletal'] }],
       referencedImages: { resolvedCount: 0, unresolved: [] },
     },
     warnings: [],
@@ -197,6 +209,11 @@ describe('ModelDataService.saveSceneGraph', () => {
     expect(body.parts[0].geometryHash).toBe('aaaa000000000000')
     expect(body.parts[0].detail.materialSlots).toEqual(['Wood'])
     expect(body.parts[0].detail.vertexGroups).toBeNull()
+    // Per-clip kinds ride in the rollups so the raw payload can answer what
+    // each clip moves, not just its name.
+    expect(body.rollups.animations).toEqual([
+      { name: 'Wave', durationSeconds: 1, kinds: ['skeletal'] },
+    ])
   })
 
   it('returns false when the request fails, without throwing', async () => {

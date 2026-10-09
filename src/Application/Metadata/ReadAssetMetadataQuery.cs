@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
+using Application.Models;
 using Domain.Models;
 using SharedKernel;
 
@@ -25,15 +26,18 @@ internal sealed class ReadAssetMetadataQueryHandler
     private readonly IAssetEntityMetadata _entity;
     private readonly IAssetMetadataRepository _metadata;
     private readonly IAssetSearchDocumentRepository _searchDocuments;
+    private readonly IAssetExtractionRepository _assetExtractions;
 
     public ReadAssetMetadataQueryHandler(
         IAssetEntityMetadata entity,
         IAssetMetadataRepository metadata,
-        IAssetSearchDocumentRepository searchDocuments)
+        IAssetSearchDocumentRepository searchDocuments,
+        IAssetExtractionRepository assetExtractions)
     {
         _entity = entity;
         _metadata = metadata;
         _searchDocuments = searchDocuments;
+        _assetExtractions = assetExtractions;
     }
 
     public async Task<Result<AssetMetadataResponse>> Handle(
@@ -66,6 +70,11 @@ internal sealed class ReadAssetMetadataQueryHandler
                 field.Provenance, field.Storage, value));
         }
 
+        // The two extraction-recorded fields that the scalar schema cannot carry:
+        // clips as {name, durationSeconds, kinds} and shape keys as
+        // {meshName, names}, read from the asset's newest raw payload.
+        var animationMetadata = await ReadAnimationMetadataAsync(family, query.AssetId, cancellationToken);
+
         return Result.Success(new AssetMetadataResponse(
             family,
             query.AssetId,
@@ -74,7 +83,25 @@ internal sealed class ReadAssetMetadataQueryHandler
             AssetMetadataSchema.Version,
             values,
             Completeness(values),
-            entityState.Value.CategoryKind?.ToString()));
+            entityState.Value.CategoryKind?.ToString(),
+            animationMetadata.Animations,
+            animationMetadata.ShapeKeys));
+    }
+
+    /// <summary>
+    /// Clips and shape keys live in the raw extraction payload, not in a column;
+    /// this reads the asset's newest row. A missing row, an unknown family or an
+    /// unparseable payload all read as "nothing recorded", never an exception.
+    /// </summary>
+    private async Task<ModelAnimationMetadata> ReadAnimationMetadataAsync(
+        string family,
+        int assetId,
+        CancellationToken cancellationToken)
+    {
+        var extraction = await _assetExtractions.GetLatestForAssetAsync(
+            family, assetId, versionId: null, cancellationToken);
+
+        return ModelAnimationMetadata.Parse(extraction?.RawPayload);
     }
 
     private static object? ResolveValue(

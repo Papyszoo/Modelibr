@@ -28,6 +28,7 @@ public sealed class SceneReadMcpTools
     [McpServerTool(Name = "get_scene")]
     [Description("Get a scene: its document, and per node the world footprint (AABB after transform), the source asset's own dimensions, " +
                  "its origin convention and how far it sits off the ground - plus every overlapping node pair and scale warning in the scene. " +
+                 "Each node also reports its `animation` (clip, loop, speed, timeOffset) and `shapeKeys` (weights by key name) where it carries them. " +
                  "This is how to inspect a scene without a viewport; do not infer geometry from the document alone. " +
                  "When the scene belongs to a project, the response also carries that project's full brief under `project` - " +
                  "style, budget, world convention and guidance - so the constraints arrive with the scene rather than needing a second call.")]

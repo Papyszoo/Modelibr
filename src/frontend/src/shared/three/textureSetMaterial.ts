@@ -16,6 +16,7 @@ import {
   ensureAoMapUv2,
   resolveTextureMaterialConfig,
 } from '../../../../asset-processor/lib/textureMaterial.js'
+import { mergeMaterialChannels } from './mergeMaterialChannels'
 import {
   addSharedDisplacementNormal,
   applyDispNormalDisplacement,
@@ -136,6 +137,10 @@ export function applyMaterialTextures(
     mesh.castShadow = true
     mesh.receiveShadow = true
 
+    // Captured before the replacement below: a mesh that already wears a
+    // Modelibr material still needs the channel values it carried.
+    const originalMaterial = mesh.material
+
     const meshMatNames = getMeshMaterialNames(mesh)
 
     // Find matching material: check mesh material names against our map
@@ -159,6 +164,14 @@ export function applyMaterialTextures(
     // Strip embedded materials from unmatched meshes to match worker behavior
     if (!matched && !hasWildcard) {
       mesh.material = fallbackMaterial
+    }
+
+    // Fill every channel the Modelibr material leaves unset (and the COLOR_0
+    // vertex colours) from the model's own material, so binding a texture set
+    // never drops a glTF map the set does not cover. Only for a real Modelibr
+    // material - the neutral strip above deliberately removes the original.
+    if (appliedMaterial) {
+      mergeMaterialChannels(originalMaterial, appliedMaterial, mesh.geometry)
     }
 
     // AO maps sample the second UV set. Without uv2 the AO term collapses to

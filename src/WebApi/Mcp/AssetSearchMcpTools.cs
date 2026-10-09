@@ -321,6 +321,8 @@ public sealed class AssetSearchMcpTools
     [Description("Get the derived metadata, parts and material slots for SEVERAL assets in one call. " +
                  "Use this after a search rather than one get_asset per hit: comparing ten candidates was ten round trips. " +
                  "Pass each hit's versionId, or you get answers about whatever version is active rather than the one you saw. " +
+                 "Each answer carries `animations` (`{name, durationSeconds, kinds}`) and `shapeKeys` (`{meshName, names}`) " +
+                 "when the extraction recorded them. " +
                  "Answers come back in request order; one that cannot be read carries its own error and the rest still answer.")]
     public static async Task<object> GetAssets(
         IQueryHandler<GetAssetMetadataQuery, AssetMetadataResponse> handler,
@@ -389,6 +391,9 @@ public sealed class AssetSearchMcpTools
     [Description("Get the derived metadata, part list and material slot names for an asset. " +
                  "Pass the versionId from the search hit you are inspecting: without it this answers " +
                  "about the asset's active version, which is not necessarily the version that hit named. " +
+                 "When the source file carried them, the response also carries `animations` - one entry per clip " +
+                 "as `{name, durationSeconds, kinds}`, where kinds is skeletal / morph / material - and " +
+                 "`shapeKeys` as `{meshName, names}` per morph-capable mesh. " +
                  "The response also carries `surfaces`: the horizontal faces something can be rested on, " +
                  "largest first, each with an `index`, its HEIGHT ABOVE THE ASSET'S BASE and its extent. " +
                  "READ THESE BEFORE STACKING. place_asset(on:) alone rests a node on the target's whole-asset " +

@@ -127,6 +127,10 @@ The viewer includes floating control buttons:
 - **Thumbnail Details** - View and regenerate thumbnail
 - **UV Map** - Preview UV mapping
 
+If the model carries animation clips or shape keys, the **Model Info** panel grows
+an **Animation** section with playback and shape-key controls. See
+[Animations and Shape Keys](./animations) for what plays per format.
+
 ### Metadata
 
 The **Metadata** panel edits everything an asset can say about itself, laid out from the

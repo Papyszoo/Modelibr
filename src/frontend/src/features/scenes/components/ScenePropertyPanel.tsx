@@ -30,6 +30,13 @@ interface ScenePropertyPanelProps {
   onRename: (name: string) => void
   onGroundSnap: () => void
   /**
+   * The selected node's playback and shape-key controls, when its model carries
+   * any. Rendered in the panel body like `materials`, and for the same reason:
+   * it needs queries, so it follows the render-prop row rather than living
+   * inside the presentational panel.
+   */
+  animation?: ReactNode
+  /**
    * What dresses this node, rendered at the foot of the panel body.
    *
    * Passed in rather than rendered here because it needs queries and this panel
@@ -57,6 +64,7 @@ export function ScenePropertyPanel({
   onChangeTransform,
   onRename,
   onGroundSnap,
+  animation,
   materials,
 }: ScenePropertyPanelProps): JSX.Element {
   if (!node) {
@@ -178,6 +186,8 @@ export function ScenePropertyPanel({
             className="scene-properties-warning"
           />
         ))}
+
+        {animation}
 
         {materials}
       </div>

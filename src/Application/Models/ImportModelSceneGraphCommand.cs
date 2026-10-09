@@ -51,7 +51,10 @@ public record SceneGraphRollupsDto(
     int? BoneCount,
     SceneGraphWorldBoundsDto? WorldBounds,
     int? AnimationCount,
-    List<string>? AnimationNames);
+    List<string>? AnimationNames,
+    // Per clip {name, durationSeconds, kinds} from the worker's scene-graph walk.
+    // Round-trips into the verbatim raw payload; shape keys ride in each part's detail.
+    List<ModelAnimationDto>? Animations = null);
 
 /// <summary>
 /// The asset's world bounding box. <paramref name="Min"/> and <paramref name="Max"/> are

@@ -130,10 +130,50 @@ internal sealed class UpdateTechnicalMetadataCommandHandler : ICommandHandler<Up
             animationCount = command.AnimationCount,
             animationNames = SortedDistinct(command.AnimationNames),
             boneCount = command.BoneCount,
+            // Per clip {name, durationSeconds, kinds} and per mesh {meshName, shapeKeys}
+            // as posted by the worker; this raw JSON is the only home for them (no column).
+            animations = NormalizeAnimations(command.Animations),
+            shapeKeys = NormalizeShapeKeys(command.ShapeKeys),
         };
 
         return JsonSerializer.Serialize(payload);
     }
+
+    /// <summary>Kinds the clip vocabulary accepts, in reported order.</summary>
+    private static readonly string[] AnimationKindOrder = { "skeletal", "morph", "material" };
+
+    private static IReadOnlyList<object> NormalizeAnimations(IEnumerable<ModelAnimationDto>? values) =>
+        (values ?? Enumerable.Empty<ModelAnimationDto>())
+            .Where(a => a is not null && !string.IsNullOrWhiteSpace(a.Name))
+            .Select(a => new
+            {
+                name = a.Name.Trim(),
+                durationSeconds = double.IsFinite(a.DurationSeconds)
+                    ? Math.Round(a.DurationSeconds, 4, MidpointRounding.AwayFromZero)
+                    : 0,
+                kinds = AnimationKindOrder
+                    .Where(kind => (a.Kinds ?? Array.Empty<string>())
+                        .Any(value => string.Equals(value, kind, StringComparison.OrdinalIgnoreCase)))
+                    .ToList(),
+            })
+            .OrderBy(a => a.name, StringComparer.Ordinal)
+            .ToList();
+
+    private static IReadOnlyList<object> NormalizeShapeKeys(IEnumerable<ModelShapeKeysInput>? values) =>
+        (values ?? Enumerable.Empty<ModelShapeKeysInput>())
+            .Where(s => s is not null && !string.IsNullOrWhiteSpace(s.MeshName))
+            .Select(s => new
+            {
+                meshName = s.MeshName.Trim(),
+                shapeKeys = (s.ShapeKeys ?? Array.Empty<string>())
+                    .Where(name => !string.IsNullOrWhiteSpace(name))
+                    .Select(name => name.Trim())
+                    .Distinct(StringComparer.Ordinal)
+                    .ToList(),
+            })
+            .Where(s => s.shapeKeys.Count > 0)
+            .OrderBy(s => s.meshName, StringComparer.Ordinal)
+            .ToList();
 
     private static IReadOnlyList<string> SortedDistinct(IEnumerable<string>? values) =>
         (values ?? Enumerable.Empty<string>())
@@ -159,4 +199,6 @@ public record UpdateTechnicalMetadataCommand(
     double? BoundingBoxZ = null,
     int? AnimationCount = null,
     List<string>? AnimationNames = null,
-    int? BoneCount = null) : ICommand;
+    int? BoneCount = null,
+    List<ModelAnimationDto>? Animations = null,
+    List<ModelShapeKeysInput>? ShapeKeys = null) : ICommand;

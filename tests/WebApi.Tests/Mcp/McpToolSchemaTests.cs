@@ -127,4 +127,73 @@ public class McpToolSchemaTests
         Assert.True(properties.TryGetProperty("slotId", out _));
         Assert.True(properties.TryGetProperty("candidateId", out _));
     }
+
+    [Fact]
+    public void PlaceAsset_Describes_Shape_Keys_As_An_Object_Of_Numbers()
+    {
+        // A dictionary is the shape a client is most likely to send as a string ("{\"Squash\":0.8}"),
+        // which the handler could not read - the same trap set_asset_metadata's typeless patch
+        // fell into. The schema has to say object, and its values have to say number.
+        var shapeKeys = ObjectBody(Property(SchemaFor("place_asset", "PlaceAsset"), "shapeKeys"));
+
+        Assert.Contains("object", TypeNames(shapeKeys));
+        var values = shapeKeys.GetProperty("additionalProperties");
+        Assert.Contains("number", TypeNames(values));
+    }
+
+    [Fact]
+    public void PlaceAsset_Describes_Animation_As_An_Object_With_Its_Four_Fields()
+    {
+        var animation = ObjectBody(Property(SchemaFor("place_asset", "PlaceAsset"), "animation"));
+
+        Assert.Contains("object", TypeNames(animation));
+        var properties = animation.GetProperty("properties");
+        foreach (var name in new[] { "clip", "loop", "speed", "timeOffset" })
+        {
+            Assert.True(properties.TryGetProperty(name, out _), $"animation.{name} missing from the schema");
+        }
+    }
+
+    [Fact]
+    public void PlaceAssetsBatch_Entries_Describe_Animation_And_Shape_Keys_Too()
+    {
+        // The batch speaks the same placement vocabulary as place_asset; if these two drift,
+        // the batch path silently loses a field the single placement accepts.
+        var entry = Property(SchemaFor("place_assets_batch", "PlaceAssetsBatch"), "placements")
+            .GetProperty("items")
+            .GetProperty("properties");
+
+        var animation = ObjectBody(entry.GetProperty("animation"));
+        Assert.Contains("object", TypeNames(animation));
+        Assert.True(animation.GetProperty("properties").TryGetProperty("clip", out _));
+
+        var shapeKeys = ObjectBody(entry.GetProperty("shapeKeys"));
+        Assert.Contains("object", TypeNames(shapeKeys));
+        Assert.Contains("number", TypeNames(shapeKeys.GetProperty("additionalProperties")));
+    }
+
+    /// <summary>
+    /// The object half of a nullable schema node. A nullable parameter may be emitted as
+    /// <c>anyOf: [{object…}, {null}]</c> rather than a type array, so unwrap either form.
+    /// </summary>
+    private static JsonElement ObjectBody(JsonElement node)
+    {
+        if (node.TryGetProperty("properties", out _) || node.TryGetProperty("additionalProperties", out _))
+        {
+            return node;
+        }
+
+        if (node.TryGetProperty("anyOf", out var anyOf))
+        {
+            foreach (var option in anyOf.EnumerateArray())
+            {
+                if (option.TryGetProperty("properties", out _) || option.TryGetProperty("additionalProperties", out _))
+                {
+                    return option;
+                }
+            }
+        }
+
+        return node;
+    }
 }

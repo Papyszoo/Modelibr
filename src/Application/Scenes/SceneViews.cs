@@ -66,7 +66,11 @@ public sealed record SceneNodeView(
     SceneAnchor? Anchor = null,
     bool Suspended = false,
     /// <summary>Per-slot bindings layered over <see cref="Material"/>. Empty when the node is dressed as a whole.</summary>
-    IReadOnlyList<SceneMaterialBinding>? MaterialSlots = null);
+    IReadOnlyList<SceneMaterialBinding>? MaterialSlots = null,
+    /// <summary>The clip this node plays, or null when it holds the model's rest pose.</summary>
+    SceneAnimation? Animation = null,
+    /// <summary>Shape-key weights this placement sets, by the model's own key names; null when it sets none.</summary>
+    IReadOnlyDictionary<string, double>? ShapeKeys = null);
 
 /// <summary>
 /// A scene, its document, and everything derived from the two.
@@ -143,7 +147,9 @@ public static class SceneViewBuilder
             node.FrontAxis ?? SceneFrontAxes.Default,
             node.Anchor,
             node.Suspended ?? false,
-            node.MaterialSlots);
+            node.MaterialSlots,
+            node.Animation,
+            node.ShapeKeys);
     }
 
     /// <summary>

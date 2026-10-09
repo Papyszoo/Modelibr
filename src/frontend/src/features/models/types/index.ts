@@ -11,6 +11,25 @@ export interface ModelConceptImageDto {
   sortOrder: number
 }
 
+/**
+ * One animation clip extracted from a model file, as the API returns it:
+ * `{name, durationSeconds, kinds}`.
+ */
+export interface ModelAnimationDto {
+  name: string
+  durationSeconds: number
+  /** What the clip moves: any of skeletal / morph / material. */
+  kinds: Array<'skeletal' | 'morph' | 'material'>
+}
+
+/**
+ * One mesh's shape keys, as the API returns them: `{meshName, names}`.
+ */
+export interface ModelShapeKeysDto {
+  meshName: string
+  names: string[]
+}
+
 export interface ModelTechnicalMetadataDto {
   latestVersionId?: number | null
   latestVersionNumber?: number | null
@@ -23,6 +42,10 @@ export interface ModelTechnicalMetadataDto {
   boundingBoxZ?: number | null
   animationCount?: number | null
   animationNames?: string[]
+  /** Per-clip detail when the extraction recorded it; may be empty. */
+  animations?: ModelAnimationDto[]
+  /** Shape-key names per mesh when the extraction recorded them; may be empty. */
+  shapeKeys?: ModelShapeKeysDto[]
   boneCount?: number | null
   updatedAt?: string | null
 }

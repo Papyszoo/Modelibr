@@ -2,6 +2,8 @@ import * as THREE from 'three'
 
 import type { MaterialDto } from '@/features/materials/api/materialApi'
 
+import { mergeMaterialChannels } from './mergeMaterialChannels'
+
 /**
  * Parameter materials to apply to one placement, keyed by the model's material
  * slot name. The empty-string key is the default binding: it dresses every slot
@@ -96,7 +98,11 @@ export function applyParameterMaterials(
     const material = named ? built.get(named) : fallback
 
     if (material) {
+      // Carries the model's own maps and COLOR_0 onto the parameter material:
+      // it only overrides the factors it stores, never the texture channels.
+      const original = mesh.material
       mesh.material = material
+      mergeMaterialChannels(original, material, mesh.geometry)
     }
   })
 

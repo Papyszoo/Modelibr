@@ -350,6 +350,8 @@ export class ModelDataService {
    * @param {number|null} metadata.vertexCount - Total vertex count
    * @param {number|null} metadata.meshCount - Total mesh count
    * @param {number|null} metadata.materialCount - Total distinct material count
+   * @param {Array<{name: string, durationSeconds: number, kinds: string[]}>} [metadata.animations] - Per-clip name/duration/kinds
+   * @param {Array<{meshName: string, shapeKeys: string[]}>} [metadata.shapeKeys] - Shape-key names per morph-capable mesh
    * @returns {Promise<boolean>} True if saved successfully
    */
   async saveTechnicalMetadata(modelVersionId, metadata) {
@@ -377,6 +379,8 @@ export class ModelDataService {
           animationCount: metadata.animationCount ?? null,
           animationNames: metadata.animationNames ?? [],
           boneCount: metadata.boneCount ?? null,
+          animations: metadata.animations ?? [],
+          shapeKeys: metadata.shapeKeys ?? [],
         },
         {
           headers: {
@@ -438,6 +442,9 @@ export class ModelDataService {
             : null,
           animationCount: sceneGraph.rollups.animationCount ?? null,
           animationNames: sceneGraph.rollups.animationNames ?? [],
+          // Per-clip {name, durationSeconds, kinds} from the shared scene-graph
+          // walk, so the stored raw payload can answer what each clip moves.
+          animations: sceneGraph.rollups.animations ?? [],
         },
         parts: sceneGraph.parts.map(p => ({
           partPath: p.partPath,

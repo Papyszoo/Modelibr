@@ -42,7 +42,9 @@ internal static class ModelDtoMappings
         return string.Join(" / ", segments);
     }
 
-    public static ModelTechnicalMetadataDto ToTechnicalMetadataDto(ModelVersion? version)
+    public static ModelTechnicalMetadataDto ToTechnicalMetadataDto(
+        ModelVersion? version,
+        ModelAnimationMetadata? animationMetadata = null)
     {
         return new ModelTechnicalMetadataDto
         {
@@ -58,6 +60,8 @@ internal static class ModelDtoMappings
             AnimationCount = version?.AnimationCount,
             AnimationNames = version?.AnimationNames ?? new List<string>(),
             BoneCount = version?.BoneCount,
+            Animations = animationMetadata?.Animations ?? Array.Empty<ModelAnimationDto>(),
+            ShapeKeys = animationMetadata?.ShapeKeys ?? Array.Empty<ModelShapeKeysDto>(),
             UpdatedAt = version?.TechnicalDetailsUpdatedAt
         };
     }
@@ -96,5 +100,51 @@ public record ModelTechnicalMetadataDto
     public int? AnimationCount { get; init; }
     public IReadOnlyList<string> AnimationNames { get; init; } = Array.Empty<string>();
     public int? BoneCount { get; init; }
+
+    /// <summary>
+    /// Per-clip detail from the raw extraction payload: `{name, durationSeconds, kinds}`,
+    /// where kinds is any of skeletal / morph / material. Empty for assets whose
+    /// extraction predates clip kinds or that carry no clips.
+    /// </summary>
+    public IReadOnlyList<ModelAnimationDto> Animations { get; init; } = Array.Empty<ModelAnimationDto>();
+
+    /// <summary>
+    /// Per-mesh shape-key names from the raw extraction payload: `{meshName, names}`.
+    /// Empty for assets with no morph targets.
+    /// </summary>
+    public IReadOnlyList<ModelShapeKeysDto> ShapeKeys { get; init; } = Array.Empty<ModelShapeKeysDto>();
+
     public DateTime? UpdatedAt { get; init; }
+}
+
+/// <summary>
+/// One extracted animation clip, as stored in the raw payload and returned on
+/// the model DTO and the MCP reads: `{name, durationSeconds, kinds}`.
+/// </summary>
+public sealed record ModelAnimationDto
+{
+    public string Name { get; init; } = string.Empty;
+    public double DurationSeconds { get; init; }
+
+    /// <summary>Any of skeletal / morph / material, in that canonical order.</summary>
+    public IReadOnlyList<string> Kinds { get; init; } = Array.Empty<string>();
+}
+
+/// <summary>
+/// One mesh's shape keys, as returned to callers: `{meshName, names}`.
+/// </summary>
+public sealed record ModelShapeKeysDto
+{
+    public string MeshName { get; init; } = string.Empty;
+    public IReadOnlyList<string> Names { get; init; } = Array.Empty<string>();
+}
+
+/// <summary>
+/// The worker's shape-key input, matching the stored payload shape:
+/// `{meshName, shapeKeys}`. Mapped to <see cref="ModelShapeKeysDto"/> on read.
+/// </summary>
+public sealed record ModelShapeKeysInput
+{
+    public string MeshName { get; init; } = string.Empty;
+    public IReadOnlyList<string> ShapeKeys { get; init; } = Array.Empty<string>();
 }

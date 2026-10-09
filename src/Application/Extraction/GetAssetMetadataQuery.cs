@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
+using Application.Models;
 using SharedKernel;
 
 namespace Application.Extraction;
@@ -39,7 +40,11 @@ public record AssetMetadataResponse(
     // The horizontal faces something can be rested on, largest first. Derived from the part
     // boxes rather than stored: it is a reading of them, and a stored reading would go stale
     // the moment the derive step improved.
-    IReadOnlyList<AssetSurface>? Surfaces = null);
+    IReadOnlyList<AssetSurface>? Surfaces = null,
+    // Clips and shape keys from the version's raw extraction payload. Null for
+    // families that carry neither; for models, empty lists mean "none recorded".
+    IReadOnlyList<ModelAnimationDto>? Animations = null,
+    IReadOnlyList<ModelShapeKeysDto>? ShapeKeys = null);
 
 /// <param name="MaterialSlots">
 /// The part's own material slot names, as authored. These are the strings
@@ -69,13 +74,16 @@ internal sealed class GetAssetMetadataQueryHandler
 {
     private readonly IAssetDerivationRepository _derivationRepository;
     private readonly IAssetPartRepository _partRepository;
+    private readonly IAssetExtractionRepository _assetExtractionRepository;
 
     public GetAssetMetadataQueryHandler(
         IAssetDerivationRepository derivationRepository,
-        IAssetPartRepository partRepository)
+        IAssetPartRepository partRepository,
+        IAssetExtractionRepository assetExtractionRepository)
     {
         _derivationRepository = derivationRepository;
         _partRepository = partRepository;
+        _assetExtractionRepository = assetExtractionRepository;
     }
 
     public async Task<Result<AssetMetadataResponse>> Handle(
@@ -146,9 +154,27 @@ internal sealed class GetAssetMetadataQueryHandler
         var surfaces = AssetSurfaces.From(
             parts.Select(p => (p.PartPath, AssetPartDetail.Bounds(p.Detail))));
 
+        // Clips and shape keys are not in the derivation: they stay in the version's raw
+        // extraction payload, so the same row answers for whatever version was asked for.
+        var animationMetadata = await ReadAnimationMetadataAsync(
+            assetType, query.AssetId, derivation.VersionId, cancellationToken);
+
         return Result.Success(new AssetMetadataResponse(
             assetType, query.AssetId, derivation.VersionId, derivation.DeriveVersion, derived, partViews,
-            suggestedCategories, materialSlots, surfaces));
+            suggestedCategories, materialSlots, surfaces,
+            animationMetadata.Animations, animationMetadata.ShapeKeys));
+    }
+
+    private async Task<ModelAnimationMetadata> ReadAnimationMetadataAsync(
+        string assetType,
+        int assetId,
+        int? versionId,
+        CancellationToken cancellationToken)
+    {
+        var extraction = await _assetExtractionRepository.GetLatestForAssetAsync(
+            assetType, assetId, versionId, cancellationToken);
+
+        return ModelAnimationMetadata.Parse(extraction?.RawPayload);
     }
 
     /// <summary>Pull the token list out of the serialized DerivedAsset payload.</summary>

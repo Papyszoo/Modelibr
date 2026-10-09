@@ -1168,6 +1168,11 @@ export class PuppeteerRenderer {
                   ? child.material[0]?.name || ''
                   : child.material?.name || ''
 
+                // Kept so the merge below can carry over every channel the
+                // texture set does not set (and COLOR_0). Captured before the
+                // replacement, while this is still the loaded model's material.
+                const originalMaterial = child.material
+
                 // Material config from the shared gating rule (metalness/
                 // roughness/specular keyed on their own maps, not the base-color
                 // map). Same source of truth as the viewer.
@@ -1238,6 +1243,16 @@ export class PuppeteerRenderer {
                     }
                   }
                 }
+
+                // A texture set overrides only the channels it sets; every
+                // other glTF map and COLOR_0 stays on the mesh. Same shared
+                // rule as the viewer
+                // (asset-processor/lib/materialChannels.js).
+                window.modelibrMaterialChannels.mergeMaterialChannels(
+                  originalMaterial,
+                  child.material,
+                  child.geometry
+                )
               }
             })
 
@@ -1625,7 +1640,10 @@ export class PuppeteerRenderer {
 
   /**
    * Extract material names and technical mesh stats from the currently loaded model.
-   * @returns {Promise<{materialNames: string[], triangleCount: number, vertexCount: number, meshCount: number, materialCount: number}>}
+   * Clips travel as `{name, durationSeconds, kinds}` (kinds derived by the shared
+   * sceneGraph lib, exposed to this page context as window.modelibrAnimationKinds)
+   * and shape keys as `{meshName, shapeKeys}` per morph-capable mesh.
+   * @returns {Promise<{materialNames: string[], triangleCount: number, vertexCount: number, meshCount: number, materialCount: number, animations: Array<{name: string, durationSeconds: number, kinds: string[]}>, shapeKeys: Array<{meshName: string, shapeKeys: string[]}>}>}
    */
   async extractTechnicalMetadata() {
     if (!this.page || this.page.isClosed()) {
@@ -1676,12 +1694,35 @@ export class PuppeteerRenderer {
           }
         })
 
-        const animations = Array.isArray(model.animations)
-          ? model.animations
-          : []
-        const animationNames = animations.map(
-          (clip, index) => clip.name || `Animation ${index + 1}`
-        )
+        // What a clip animates, from the single shared rule in lib/sceneGraph.js
+        // (exposed as window.modelibrAnimationKinds). Empty when the page predates
+        // the binding; the names/durations still travel.
+        const animationKinds =
+          typeof window.modelibrAnimationKinds === 'function'
+            ? window.modelibrAnimationKinds
+            : () => []
+        const animations = (
+          Array.isArray(model.animations) ? model.animations : []
+        ).map((clip, index) => ({
+          name: clip.name || `Animation ${index + 1}`,
+          durationSeconds:
+            typeof clip.duration === 'number' ? clip.duration : 0,
+          kinds: animationKinds(clip),
+        }))
+        const animationNames = animations.map(animation => animation.name)
+
+        // One entry per morph-capable mesh, so the metadata can say which mesh
+        // owns "Squash" and "Stretch" rather than listing shape keys globally.
+        const shapeKeys = []
+        model.traverse(child => {
+          if (!child.isMesh) return
+          const names = child.morphTargetDictionary
+            ? Object.keys(child.morphTargetDictionary)
+            : []
+          if (names.length > 0) {
+            shapeKeys.push({ meshName: child.name || '', shapeKeys: names })
+          }
+        })
 
         const originalSize = window.modelRenderer.originalSize || null
 
@@ -1698,6 +1739,8 @@ export class PuppeteerRenderer {
           animationCount: animations.length,
           animationNames,
           boneCount,
+          animations,
+          shapeKeys,
         }
       })
 

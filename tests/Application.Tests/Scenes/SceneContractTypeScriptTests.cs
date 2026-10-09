@@ -50,6 +50,7 @@ public class SceneContractTypeScriptTests
                  {
                      "SceneDocument", "SceneNode", "SceneAssetRef", "ScenePrimitive", "SceneTransform",
                      "Vec3", "SceneMaterialBinding", "SceneLight", "SceneEnvironment", "SceneAnchor",
+                     "SceneAnimation",
                  })
         {
             Assert.Contains($"export interface {type} {{", generated);

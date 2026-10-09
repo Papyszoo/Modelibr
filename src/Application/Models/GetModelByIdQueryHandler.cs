@@ -1,5 +1,7 @@
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
+using Application.Extraction;
+using Domain.Models;
 using SharedKernel;
 
 namespace Application.Models
@@ -7,10 +9,14 @@ namespace Application.Models
     internal class GetModelByIdQueryHandler : IQueryHandler<GetModelByIdQuery, GetModelByIdQueryResponse>
     {
         private readonly IModelRepository _modelRepository;
+        private readonly IAssetExtractionRepository _assetExtractionRepository;
 
-        public GetModelByIdQueryHandler(IModelRepository modelRepository)
+        public GetModelByIdQueryHandler(
+            IModelRepository modelRepository,
+            IAssetExtractionRepository assetExtractionRepository)
         {
             _modelRepository = modelRepository;
+            _assetExtractionRepository = assetExtractionRepository;
         }
 
         public async Task<Result<GetModelByIdQueryResponse>> Handle(GetModelByIdQuery query, CancellationToken cancellationToken)
@@ -22,6 +28,9 @@ namespace Application.Models
                 return Result.Failure<GetModelByIdQueryResponse>(
                     new Error("ModelNotFound", $"Model with ID {query.ModelId} was not found."));
             }
+
+            var latestVersion = model.GetLatestVersion();
+            var animationMetadata = await ReadAnimationMetadataAsync(model.Id, latestVersion, cancellationToken);
 
             var modelDetailDto = new ModelDetailDto
             {
@@ -43,7 +52,7 @@ namespace Application.Models
                     .OrderBy(ci => ci.SortOrder)
                     .Select(ModelDtoMappings.ToConceptImageDto)
                     .ToList(),
-                TechnicalMetadata = ModelDtoMappings.ToTechnicalMetadataDto(model.GetLatestVersion()),
+                TechnicalMetadata = ModelDtoMappings.ToTechnicalMetadataDto(latestVersion, animationMetadata),
                 ActiveVersionId = model.ActiveVersionId,
                 ThumbnailUrl = model.ActiveVersion?.Thumbnail?.Status == Domain.ValueObjects.ThumbnailStatus.Ready 
                     ? $"/model-versions/{model.ActiveVersion.Id}/thumbnail/file?t={model.ActiveVersion.Thumbnail.UpdatedAt:yyyyMMddHHmmss}" 
@@ -78,6 +87,27 @@ namespace Application.Models
             };
 
             return Result.Success(new GetModelByIdQueryResponse(modelDetailDto));
+        }
+
+        /// <summary>
+        /// Clips and shape keys live in the version's raw extraction payload, not
+        /// in a column; this resolves the newest row for that version. Best-effort:
+        /// a missing row or payload reads as "nothing recorded".
+        /// </summary>
+        private async Task<ModelAnimationMetadata> ReadAnimationMetadataAsync(
+            int modelId,
+            ModelVersion? latestVersion,
+            CancellationToken cancellationToken)
+        {
+            if (latestVersion is null)
+            {
+                return ModelAnimationMetadata.Empty;
+            }
+
+            var extraction = await _assetExtractionRepository.GetLatestForAssetAsync(
+                ExtractionAssetTypes.Model, modelId, latestVersion.Id, cancellationToken);
+
+            return ModelAnimationMetadata.Parse(extraction?.RawPayload);
         }
     }
 

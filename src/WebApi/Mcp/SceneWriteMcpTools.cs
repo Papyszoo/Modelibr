@@ -62,6 +62,7 @@ public sealed class SceneWriteMcpTools
                  "Add onSurface=<index> to rest on a named surface instead: call get_asset on what you are stacking ONTO, read its `surfaces` list, and pass the index of the one you mean. " +
                  "To aim it, pass faceToward=[x,y,z] and it turns about Y to face that point, and keeps facing it. " +
                  "For something meant to hang with nothing under it - a pendant lamp, a sign - pass suspended=true, or it is reported as floating for the life of the scene. " +
+                 "For a model that carries clips or shape keys (get_asset lists both), pass animation to play a named clip on this instance and shapeKeys to pose its morph targets. " +
                  "Returns the placed node's world footprint plus any node it now overlaps and any scale warning it triggered.")]
     public static Task<object> PlaceAsset(
         ICommandHandler<PlaceSceneAssetCommand, ScenePlacementResponse> handler,
@@ -86,6 +87,8 @@ public sealed class SceneWriteMcpTools
         [Description("Turn the asset about Y to face this world point [x,y,z], and keep it facing there when either end moves.")] double[]? faceToward = null,
         [Description("Which local axis is this asset's front: '+Z' (assumed), '-Z', '+X' or '-X'. Nothing in the library derives this - state it when the asset ends up backwards.")] string? frontAxis = null,
         [Description("This node is meant to hang in mid-air with nothing under it. Cannot be combined with groundSnap or on.")] bool suspended = false,
+        [Description("Optional clip this instance plays, as the referenced model's `animations` list names it: { clip (required), loop (default true), speed (0.1-4, default 1), timeOffset (seconds, default 0) }. A name no clip carries renders the node static and logs a warning.")] SceneAnimation? animation = null,
+        [Description("Optional shape-key weights for this instance, as an object mapping the model's shape-key names to weights 0-1, e.g. {\"Squash\": 0.8}. At most 64 entries; an unmatched name is ignored.")] Dictionary<string, double>? shapeKeys = null,
         [Description("Optional expected scene revision; the write is refused if the scene has moved on.")] int? expectedRevision = null,
         [Description("Optional batch id. Writes sharing one can be undone together with reverse_operation.")] string? batchId = null,
         CancellationToken cancellationToken = default)
@@ -108,7 +111,8 @@ public sealed class SceneWriteMcpTools
                         sceneId, assetType, assetId, versionId, nodeId, name, slotId,
                         vectors.Values["position"], vectors.Values["rotationEuler"], vectors.Values["scale"],
                         groundSnap, snapToGrid, expectedRevision,
-                        vectors.Values["faceToward"], frontAxis, on, align, suspended, onSurface),
+                        vectors.Values["faceToward"], frontAxis, on, align, suspended, onSurface,
+                        Animation: animation, ShapeKeys: shapeKeys),
                     ct);
 
                 if (result.IsFailure)
@@ -155,14 +159,16 @@ public sealed class SceneWriteMcpTools
         [property: Description("Rest this asset on the node with this id - either one already in the scene, or one an EARLIER entry of this batch created. Naming a later entry is refused.")] string? On = null,
         [property: Description("How to sit it on that node: 'center' (default) or 'keep'.")] string? Align = null,
         [property: Description("Which of that node's resting surfaces to sit on - the `index` from get_asset's `surfaces` list. Omitted uses its whole-asset top face. Requires On.")] int? OnSurface = null,
-        [property: Description("This node is meant to hang in mid-air with nothing under it. Cannot be combined with groundSnap or on.")] bool Suspended = false);
+        [property: Description("This node is meant to hang in mid-air with nothing under it. Cannot be combined with groundSnap or on.")] bool Suspended = false,
+        [property: Description("Optional clip this instance plays: { clip (required, a name from the model's `animations`), loop (default true), speed (0.1-4, default 1), timeOffset (seconds, default 0) }.")] SceneAnimation? Animation = null,
+        [property: Description("Optional shape-key weights for this instance, as an object mapping the model's shape-key names to weights 0-1. At most 64 entries; an unmatched name is ignored.")] Dictionary<string, double>? ShapeKeys = null);
 
     [McpServerTool(Name = "place_assets_batch")]
     [Description("Place a whole layout of DIFFERENT assets - a sofa, a table, two lamps, a rug - in ONE write. " +
                  "Use this instead of a run of place_asset calls whenever you already know what the room contains: " +
                  "the scene's revision moves once, the user cannot edit the scene out from under you halfway through, " +
                  "and undoing it takes the whole layout back out rather than one node of it. " +
-                 "Every entry speaks exactly the same placement vocabulary as place_asset, including groundSnap, on/align, faceToward and suspended. " +
+                 "Every entry speaks exactly the same placement vocabulary as place_asset, including groundSnap, on/align, faceToward, suspended, animation and shapeKeys. " +
                  "Entries are applied IN ARRAY ORDER, so an entry may rest on a node an earlier entry created - put the table before the vase. " +
                  "Nothing is written unless every entry is valid: an error names the entry index and the node id it asked for, so you repair that one and resend. " +
                  "For many copies of ONE asset along a line, use distribute_assets instead - it computes the spacing for you. " +
@@ -207,7 +213,8 @@ public sealed class SceneWriteMcpTools
                         vectors.Values[$"placements[{index}].scale"],
                         entry.GroundSnap, entry.SnapToGrid,
                         vectors.Values[$"placements[{index}].faceToward"],
-                        entry.FrontAxis, entry.On, entry.Align, entry.Suspended, entry.OnSurface));
+                        entry.FrontAxis, entry.On, entry.Align, entry.Suspended, entry.OnSurface,
+                        entry.Animation, entry.ShapeKeys));
                 }
 
                 var result = await handler.Handle(
@@ -1026,7 +1033,9 @@ public sealed class SceneWriteMcpTools
 
     [McpServerTool(Name = "update_scene_document")]
     [Description("Replace a scene's whole document. Use for bulk edits an agent would otherwise make one call at a time. " +
-                 "An invalid document is rejected in full - it is never partially applied and never silently repaired.")]
+                 "An invalid document is rejected in full - it is never partially applied and never silently repaired. " +
+                 "A node may carry `animation` ({ clip, loop, speed, timeOffset }) to play a named clip of its model, " +
+                 "and `shapeKeys` (key name -> weight 0-1) to pose its morph targets.")]
     public static Task<object> UpdateSceneDocument(
         ICommandHandler<UpdateSceneDocumentCommand, SceneView> handler,
         IQueryHandler<GetSceneByIdQuery, SceneView> readHandler,
@@ -1064,6 +1073,11 @@ public sealed class SceneWriteMcpTools
                         {
                             status = "ok",
                             scene = result.Value.Scene,
+                            // The per-node views, so a bulk document write hands back the
+                            // animation and shape keys it just accepted - each node's
+                            // `animation` and `shapeKeys` ride out with the response - and
+                            // not merely the scene's counts.
+                            nodes = result.Value.Nodes,
                             overlaps = result.Value.Overlaps,
                             scaleWarnings = result.Value.ScaleWarnings,
                         },

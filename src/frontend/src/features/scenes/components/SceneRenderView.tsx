@@ -41,11 +41,19 @@ declare global {
 interface SceneRenderViewProps {
   sceneId: number
   viewpoint: SceneViewpoint
+  /**
+   * Deterministic time, in seconds, for every animated node's mixer. The
+   * worker's render URL carries it (default 0), and 0 shows each node's
+   * configured start-offset pose - so renders are reproducible rather than
+   * depending on how long the page happened to be open.
+   */
+  time?: number
 }
 
 export function SceneRenderView({
   sceneId,
   viewpoint,
+  time = 0,
 }: SceneRenderViewProps): JSX.Element {
   const { data: view, error } = useSceneByIdQuery({ sceneId })
   const [settled, setSettled] = useState<Map<string, boolean>>(() => new Map())
@@ -123,6 +131,7 @@ export function SceneRenderView({
         camera={frameSceneCamera(view, viewpoint)}
         showGrid={false}
         interactive={false}
+        renderTime={time}
       />
     </div>
   )

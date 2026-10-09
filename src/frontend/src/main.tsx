@@ -78,8 +78,28 @@ function renderTarget() {
     <SceneRenderView
       sceneId={sceneId}
       viewpoint={sceneViewpointFromName(params.get('view'))}
+      time={readRenderTime(params.get('t'))}
     />
   )
+}
+
+/**
+ * The deterministic pose time for `?render=scene`, in seconds.
+ *
+ * Passed through to every animated node's mixer, so a render does not depend
+ * on how long the page has been open and two renders of one scene match. The
+ * default is 0: each node shows its own configured start-offset pose. A
+ * missing or malformed value falls back to that default rather than failing
+ * the render - the picture is still answerable, just not at a caller-chosen
+ * time.
+ */
+function readRenderTime(raw: string | null): number {
+  if (raw === null || raw.trim() === '') {
+    return 0
+  }
+
+  const seconds = Number(raw)
+  return Number.isFinite(seconds) && seconds >= 0 ? seconds : 0
 }
 
 /** The effect page for `?render=vfx&vfxId=...`; the worker steps its time and photographs it. */

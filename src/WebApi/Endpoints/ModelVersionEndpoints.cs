@@ -297,7 +297,9 @@ public static class ModelVersionEndpoints
                 request.BoundingBoxZ,
                 request.AnimationCount,
                 request.AnimationNames,
-                request.BoneCount),
+                request.BoneCount,
+                request.Animations,
+                request.ShapeKeys),
             cancellationToken);
 
         if (result.IsFailure)
@@ -358,6 +360,8 @@ public record UpdateTechnicalMetadataRequest(
     double? BoundingBoxZ = null,
     int? AnimationCount = null,
     List<string>? AnimationNames = null,
-    int? BoneCount = null);
+    int? BoneCount = null,
+    List<ModelAnimationDto>? Animations = null,
+    List<ModelShapeKeysInput>? ShapeKeys = null);
 public record SetMainVariantRequest(string VariantName);
 public record AddVariantNameRequest(string VariantName);

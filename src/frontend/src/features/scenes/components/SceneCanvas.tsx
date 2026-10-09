@@ -72,6 +72,12 @@ interface SceneCanvasProps {
    * finished is how an agent's proposal quietly becomes the final answer.
    */
   undecidedNodeIds?: ReadonlySet<string>
+  /**
+   * The render page's deterministic time, in seconds. Set by the
+   * `?render=scene` bootstrap only: animated nodes are posed at exactly this
+   * time instead of advancing by the real frame delta. Omitted in the editor.
+   */
+  renderTime?: number
 }
 
 /** A camera placement. `target` defaults to the origin, `fov` to the editor's 50. */
@@ -99,6 +105,7 @@ export function SceneCanvas({
   interactive = true,
   blockout = false,
   undecidedNodeIds,
+  renderTime,
 }: SceneCanvasProps): JSX.Element {
   // Resolved out here on purpose: react-three-fiber renders the canvas subtree
   // through its own reconciler root, so the app's React context - the
@@ -219,6 +226,7 @@ export function SceneCanvas({
               originInBounds={facts?.originInBounds ?? null}
               blockout={blockout}
               undecided={undecidedNodeIds?.has(node.id) ?? false}
+              renderTime={renderTime}
               onLoadError={onNodeLoadError}
               onLoadSettled={(nodeId, loaded) => {
                 resourceAdmission.onNodeSettled(nodeId, loaded)

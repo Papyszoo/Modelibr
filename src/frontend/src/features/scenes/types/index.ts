@@ -1,5 +1,6 @@
 import type {
   SceneAnchor,
+  SceneAnimation,
   SceneAssetRef,
   SceneDocument,
   SceneEnvironment,
@@ -19,6 +20,7 @@ import type {
 
 export type {
   SceneAnchor,
+  SceneAnimation,
   SceneAssetRef,
   SceneDocument,
   SceneEnvironment,

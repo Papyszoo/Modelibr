@@ -4,6 +4,11 @@ export interface SceneGraphOptions {
   sourceFormat?: string
 }
 
+/** What a clip animates: any of skeletal / morph / material, canonically ordered. */
+export declare function animationKindsOf(clip: {
+  tracks?: Array<{ name?: string }>
+}): string[]
+
 export declare function extractSceneGraph(
   root: unknown,
   THREE: unknown,

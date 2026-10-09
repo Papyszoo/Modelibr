@@ -138,4 +138,56 @@ public class SceneDocumentCodecTests
         Assert.Equal("Scene.StoredDocumentUnreadable", result.Error.Code);
         Assert.Contains("preserved as-is", result.Error.Message);
     }
+
+    [Fact]
+    public void Serialize_Then_Parse_Round_Trips_Node_Animation_And_Shape_Keys()
+    {
+        // Shape-key names are matched against the model's own morph-target names, so the
+        // dictionary keys must survive exactly as authored - a camel-cased "squash" would
+        // match nothing and quietly do nothing.
+        var document = new SceneDocument(
+            SceneDocument.CurrentSchemaVersion,
+            new[]
+            {
+                new SceneNode(
+                    "kid-1",
+                    SceneTransform.Identity,
+                    Asset: new SceneAssetRef(SceneAssetTypes.Model, 42, 7),
+                    Animation: new SceneAnimation("Wave", Loop: false, Speed: 1.5, TimeOffset: 0.25),
+                    ShapeKeys: new Dictionary<string, double> { ["Squash"] = 0.8, ["Stretch"] = 0.1 }),
+            },
+            Array.Empty<SceneLight>());
+
+        var json = SceneDocumentCodec.Serialize(document);
+
+        Assert.Contains("\"animation\":{\"clip\":\"Wave\",\"loop\":false,\"speed\":1.5,\"timeOffset\":0.25}", json);
+        Assert.Contains("\"shapeKeys\":{\"Squash\":0.8,\"Stretch\":0.1}", json);
+
+        var round = SceneDocumentCodec.Parse(json);
+
+        Assert.True(round.IsSuccess);
+        var node = Assert.Single(round.Value.Nodes);
+        Assert.Equal(new SceneAnimation("Wave", Loop: false, Speed: 1.5, TimeOffset: 0.25), node.Animation);
+        Assert.Equal(0.8, node.ShapeKeys!["Squash"]);
+        Assert.Equal(0.1, node.ShapeKeys["Stretch"]);
+    }
+
+    [Fact]
+    public void Parse_When_A_Node_Predates_Animation_And_Shape_Keys_Leaves_Both_Unset()
+    {
+        // Documents written before these fields existed must stay legal exactly as they are -
+        // nothing in the scene format may require a rewrite of the stored scenes.
+        var json = """
+            {"schemaVersion":1,"lights":[],"nodes":[
+              {"id":"lamp","transform":{"position":{"x":0,"y":0,"z":0},"rotationEuler":{"x":0,"y":0,"z":0},"scale":{"x":1,"y":1,"z":1}},
+               "asset":{"assetType":"Model","assetId":1,"versionId":1}}]}
+            """;
+
+        var result = SceneDocumentCodec.Parse(json);
+
+        Assert.True(result.IsSuccess);
+        var node = Assert.Single(result.Value.Nodes);
+        Assert.Null(node.Animation);
+        Assert.Null(node.ShapeKeys);
+    }
 }

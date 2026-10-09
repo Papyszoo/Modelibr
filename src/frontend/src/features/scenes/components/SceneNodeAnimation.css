@@ -1,0 +1,90 @@
+/*
+ * Sits in the property panel's scrolling body as an ordinary block, between the
+ * transform fields and the materials section. Like SceneNodeMaterials it must
+ * not introduce a second scroll box or a height of its own.
+ */
+.scene-node-animation {
+  border-top: 1px solid var(--mod-color-border);
+  padding-top: var(--mod-space-sm);
+  display: flex;
+  flex-direction: column;
+  gap: var(--mod-space-sm);
+  flex: 0 0 auto;
+}
+
+.scene-node-animation-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mod-space-xs);
+}
+
+.scene-node-animation h4 {
+  margin: 0;
+  font-size: var(--mod-text-xs);
+  font-weight: var(--mod-font-weight-semibold);
+  color: var(--mod-color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.scene-node-animation-field {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--mod-space-2xs);
+  font-size: var(--mod-text-xs);
+  color: var(--mod-color-text-muted);
+}
+
+.scene-node-animation-field .p-dropdown {
+  flex: 1;
+  min-width: 0;
+}
+
+.scene-node-animation-row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mod-space-2xs);
+}
+
+.scene-node-animation-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--mod-space-2xs);
+  font-size: var(--mod-text-xs);
+  color: var(--mod-color-text-muted);
+}
+
+.scene-node-animation-option .p-inputnumber {
+  max-width: 7rem;
+}
+
+.scene-node-animation-shapekey {
+  display: flex;
+  align-items: center;
+  gap: var(--mod-space-2xs);
+  min-width: 0;
+}
+
+.scene-node-animation-shapekey-name {
+  flex: 0 0 30%;
+  font-size: var(--mod-text-xs);
+  color: var(--mod-color-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.scene-node-animation-shapekey-slider {
+  flex: 1;
+  min-width: 0;
+}
+
+.scene-node-animation-shapekey-value {
+  flex: 0 0 2.5rem;
+  text-align: right;
+  font-size: var(--mod-text-xs);
+  color: var(--mod-color-text-muted);
+  font-variant-numeric: tabular-nums;
+}

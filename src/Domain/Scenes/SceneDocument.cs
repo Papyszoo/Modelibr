@@ -132,7 +132,45 @@ public sealed record SceneNode(
     /// Contradicts both of the other two: something resting on the floor or on another node is
     /// not suspended, and the document validator rejects the combination rather than picking one.
     /// </summary>
-    bool? Suspended = null);
+    bool? Suspended = null,
+    /// <summary>
+    /// A clip this placement plays whenever the scene is drawn. Null means it holds the model's
+    /// rest pose - what every document written before this existed says.
+    ///
+    /// Per node rather than per asset because the same rigged model placed twice is two
+    /// performances: one guard is walking, one standing, and both read from one library asset.
+    /// </summary>
+    SceneAnimation? Animation = null,
+    /// <summary>
+    /// Shape-key weights for this placement, by shape-key name - "the ears droop on this one".
+    ///
+    /// The document's key is the name the model itself declares, so a weight here means the
+    /// same thing to the renderer, to an exporter and to a reader of the JSON. Weights are
+    /// absolute, not offsets: a key omitted from the map is left at the model's own default
+    /// rather than assumed to be zero.
+    /// </summary>
+    IReadOnlyDictionary<string, double>? ShapeKeys = null);
+
+/// <summary>
+/// A clip the scene plays on a node, and how.
+///
+/// Deliberately small: the clip is named rather than indexed, because an index re-points the
+/// moment the model gains or loses a clip, and the scene would silently play a different
+/// animation. A name that no longer exists renders the node static and says so in the console -
+/// it is never silently swapped for whatever is at the same position now.
+/// </summary>
+/// <param name="Clip">Name of a clip on the referenced model, as <c>get_asset</c> lists it.</param>
+/// <param name="Loop">Play forever (the default), or once and hold the last pose.</param>
+/// <param name="Speed">Playback rate multiplier. Defaults to 1; the validator accepts 0.1-4.</param>
+/// <param name="TimeOffset">
+/// Seconds into the clip this node starts at, so several instances of one model can be out of
+/// phase. A still render drawn at its default time shows this pose.
+/// </param>
+public sealed record SceneAnimation(
+    string Clip,
+    bool Loop = true,
+    double Speed = 1,
+    double TimeOffset = 0);
 
 /// <summary>
 /// Rests this node on top of another node, and keeps it there.

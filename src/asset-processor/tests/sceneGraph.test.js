@@ -82,7 +82,8 @@ describe('extractSceneGraph', () => {
     expect(result.rollups.animationCount).toBe(1)
     expect(result.rollups.animations[0]).toMatchObject({
       name: 'Idle',
-      duration: 1.5,
+      durationSeconds: 1.5,
+      kinds: [],
     })
     expect(result.rollups.unitConfidence).toBe('medium')
   })
@@ -93,7 +94,7 @@ describe('extractSceneGraph', () => {
   })
 
   it('reports the version stamps', () => {
-    expect(result.extractorVersion).toBe(2)
+    expect(result.extractorVersion).toBe(3)
     expect(result.geometryHashVersion).toBe(1)
     expect(result.partPathVersion).toBe(1)
   })

@@ -248,4 +248,121 @@ public class SceneDocumentValidatorTests
 
         Assert.Contains(issues, i => i.Code == "InvalidEnvironmentMapRef");
     }
+
+    [Fact]
+    public void Validate_When_Animation_And_ShapeKeys_Are_In_Range_Returns_No_Issues()
+    {
+        var node = ModelNode("kid") with
+        {
+            Animation = new SceneAnimation("Wave", Loop: true, Speed: 1.5, TimeOffset: 0.25),
+            ShapeKeys = new Dictionary<string, double> { ["Squash"] = 0.5 },
+        };
+
+        Assert.Empty(SceneDocumentValidator.Validate(DocumentWith(node)));
+    }
+
+    [Fact]
+    public void Validate_When_Animation_Speed_Is_Out_Of_Range_Returns_AnimationSpeedOutOfRange()
+    {
+        // Below the floor: a speed of 0 freezes the node while the document claims it animates.
+        var tooSlow = ModelNode("kid") with { Animation = new SceneAnimation("Wave", Speed: 0.05) };
+        // Above the ceiling: a clip at 5x is a flicker, not a performance.
+        var tooFast = ModelNode("kid") with { Animation = new SceneAnimation("Wave", Speed: 5) };
+
+        Assert.Contains(
+            SceneDocumentValidator.Validate(DocumentWith(tooSlow)),
+            i => i.Code == "AnimationSpeedOutOfRange" && i.Path == "nodes[0].animation.speed");
+        Assert.Contains(
+            SceneDocumentValidator.Validate(DocumentWith(tooFast)),
+            i => i.Code == "AnimationSpeedOutOfRange" && i.Path == "nodes[0].animation.speed");
+    }
+
+    [Fact]
+    public void Validate_When_Animation_Has_A_Blank_Clip_Returns_AnimationClipRequired()
+    {
+        var node = ModelNode("kid") with { Animation = new SceneAnimation("  ") };
+
+        var issues = SceneDocumentValidator.Validate(DocumentWith(node));
+
+        Assert.Contains(issues, i => i.Code == "AnimationClipRequired" && i.Path == "nodes[0].animation.clip");
+    }
+
+    [Fact]
+    public void Validate_When_Animation_TimeOffset_Is_Negative_Returns_AnimationTimeOffsetInvalid()
+    {
+        var node = ModelNode("kid") with { Animation = new SceneAnimation("Wave", TimeOffset: -1) };
+
+        var issues = SceneDocumentValidator.Validate(DocumentWith(node));
+
+        Assert.Contains(issues, i => i.Code == "AnimationTimeOffsetInvalid" && i.Path == "nodes[0].animation.timeOffset");
+    }
+
+    [Fact]
+    public void Validate_When_A_ShapeKey_Weight_Is_Out_Of_Range_Returns_ShapeKeyWeightOutOfRange()
+    {
+        var above = ModelNode("kid") with
+        {
+            ShapeKeys = new Dictionary<string, double> { ["Squash"] = 1.1 },
+        };
+        var below = ModelNode("kid") with
+        {
+            ShapeKeys = new Dictionary<string, double> { ["Squash"] = -0.1 },
+        };
+
+        Assert.Contains(
+            SceneDocumentValidator.Validate(DocumentWith(above)),
+            i => i.Code == "ShapeKeyWeightOutOfRange" && i.Path == "nodes[0].shapeKeys['Squash']");
+        Assert.Contains(
+            SceneDocumentValidator.Validate(DocumentWith(below)),
+            i => i.Code == "ShapeKeyWeightOutOfRange");
+    }
+
+    [Fact]
+    public void Validate_When_A_Node_Sets_More_Shape_Keys_Than_The_Cap_Returns_TooManyShapeKeys()
+    {
+        var overCap = Enumerable.Range(0, SceneDocumentValidator.MaxShapeKeys + 1)
+            .ToDictionary(i => $"key-{i}", _ => 0.5);
+
+        var issues = SceneDocumentValidator.Validate(DocumentWith(ModelNode("kid") with { ShapeKeys = overCap }));
+
+        Assert.Contains(issues, i => i.Code == "TooManyShapeKeys" && i.Path == "nodes[0].shapeKeys");
+    }
+
+    [Fact]
+    public void Validate_When_A_Node_Sets_Exactly_The_Shape_Key_Cap_Is_Accepted()
+    {
+        var atCap = Enumerable.Range(0, SceneDocumentValidator.MaxShapeKeys)
+            .ToDictionary(i => $"key-{i}", _ => 1.0);
+
+        Assert.Empty(SceneDocumentValidator.Validate(DocumentWith(ModelNode("kid") with { ShapeKeys = atCap })));
+    }
+
+    [Fact]
+    public void Validate_When_A_ShapeKey_Weight_Is_1_5_Is_Rejected()
+    {
+        // 1 is fully posed; 1.5 has no pose it could mean. Clamping it would silently render
+        // something other than what the caller wrote.
+        var node = ModelNode("kid") with
+        {
+            ShapeKeys = new Dictionary<string, double> { ["Squash"] = 1.5 },
+        };
+
+        var issues = SceneDocumentValidator.Validate(DocumentWith(node));
+
+        Assert.Contains(
+            issues,
+            i => i.Code == "ShapeKeyWeightOutOfRange" && i.Path == "nodes[0].shapeKeys['Squash']");
+    }
+
+    [Fact]
+    public void Validate_When_A_Document_Predates_Animation_And_Shape_Keys_Is_Accepted()
+    {
+        // Backward compatibility at the rule layer: a node written before these fields
+        // existed carries neither, and that is a complete node - not a defect to report.
+        var node = ModelNode("lamp");
+
+        Assert.Null(node.Animation);
+        Assert.Null(node.ShapeKeys);
+        Assert.Empty(SceneDocumentValidator.Validate(DocumentWith(node)));
+    }
 }

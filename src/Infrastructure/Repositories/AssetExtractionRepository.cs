@@ -42,6 +42,28 @@ internal sealed class AssetExtractionRepository : IAssetExtractionRepository
                 cancellationToken);
     }
 
+    public async Task<AssetExtraction?> GetLatestForAssetAsync(
+        string assetType,
+        int assetId,
+        int? versionId = null,
+        CancellationToken cancellationToken = default)
+    {
+        var query = _context.AssetExtractions
+            .AsNoTracking()
+            .Where(e => e.AssetType == assetType && e.AssetId == assetId);
+
+        // Exact version when one is named; any version (newest first) otherwise.
+        if (versionId is { } version)
+        {
+            query = query.Where(e => e.VersionId == version);
+        }
+
+        return await query
+            .OrderByDescending(e => e.UpdatedAt)
+            .ThenByDescending(e => e.Id)
+            .FirstOrDefaultAsync(cancellationToken);
+    }
+
     public async Task<IReadOnlyList<AssetExtraction>> GetStaleAsync(
         string assetType,
         int currentExtractorVersion,

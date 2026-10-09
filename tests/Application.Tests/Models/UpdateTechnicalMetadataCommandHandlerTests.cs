@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Application.Abstractions;
 using Application.Abstractions.Repositories;
 using Application.Models;
@@ -204,5 +205,94 @@ public class UpdateTechnicalMetadataCommandHandlerTests
         _mockModelVersionRepository.Verify(
             x => x.UpdateAsync(It.Is<ModelVersion>(v => v.AnimationCount == 3),
             It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public void Deserialize_WhenWorkerSendsClipMetadata_BindsTheCommandFields()
+    {
+        // The exact PUT /model-versions/{id}/technical-metadata body shape the
+        // worker posts; the minimal API binds it with web defaults (camelCase,
+        // case-insensitive).
+        const string json = """
+        {
+          "modelVersionId": 42,
+          "materialNames": ["Body"],
+          "animations": [
+            { "name": "Wave", "durationSeconds": 1, "kinds": ["skeletal"] }
+          ],
+          "shapeKeys": [
+            { "meshName": "Box", "shapeKeys": ["Squash", "Stretch"] }
+          ]
+        }
+        """;
+
+        var command = JsonSerializer.Deserialize<UpdateTechnicalMetadataCommand>(
+            json, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+
+        Assert.NotNull(command);
+        Assert.Equal(42, command!.ModelVersionId);
+        var clip = Assert.Single(command.Animations!);
+        Assert.Equal("Wave", clip.Name);
+        Assert.Equal(1, clip.DurationSeconds);
+        Assert.Equal(new[] { "skeletal" }, clip.Kinds);
+        var mesh = Assert.Single(command.ShapeKeys!);
+        Assert.Equal("Box", mesh.MeshName);
+        Assert.Equal(new[] { "Squash", "Stretch" }, mesh.ShapeKeys);
+    }
+
+    [Fact]
+    public async Task Handle_WhenClipsAndShapeKeysProvided_StoresThemInRawPayload()
+    {
+        var version = VersionWithModelFile();
+        _mockModelVersionRepository.Setup(x => x.GetByIdAsync(1, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(version);
+        _mockModelVersionRepository.Setup(x => x.UpdateAsync(It.IsAny<ModelVersion>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((ModelVersion mv, CancellationToken _) => mv);
+
+        AssetExtraction? stored = null;
+        _mockAssetExtractionRepository
+            .Setup(x => x.AddAsync(It.IsAny<AssetExtraction>(), It.IsAny<CancellationToken>()))
+            .Callback<AssetExtraction, CancellationToken>((extraction, _) => stored = extraction)
+            .Returns(Task.CompletedTask);
+
+        var command = new UpdateTechnicalMetadataCommand(
+            1, new List<string> { "Metal" }, 1200, 600, 5, 1,
+            Animations: new List<ModelAnimationDto>
+            {
+                // Deliberately unordered kinds: storage normalizes to the canonical order.
+                new() { Name = "Wave", DurationSeconds = 1.0, Kinds = new[] { "morph", "skeletal", "unknown" } },
+                new() { Name = "Pulse", DurationSeconds = 2.0, Kinds = new[] { "morph" } },
+            },
+            ShapeKeys: new List<ModelShapeKeysInput>
+            {
+                new() { MeshName = "Box", ShapeKeys = new[] { "Squash", "Stretch", "Squash" } },
+            });
+
+        var result = await _handler.Handle(command, CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(stored);
+
+        using var payload = JsonDocument.Parse(stored!.RawPayload);
+        var animations = payload.RootElement.GetProperty("animations");
+
+        // Sorted by name so the raw payload stays reproducible.
+        Assert.Equal(2, animations.GetArrayLength());
+        Assert.Equal("Pulse", animations[0].GetProperty("name").GetString());
+        Assert.Equal(2.0, animations[0].GetProperty("durationSeconds").GetDouble());
+        Assert.Equal(
+            new[] { "morph" },
+            animations[0].GetProperty("kinds").EnumerateArray().Select(k => k.GetString()).ToArray());
+        Assert.Equal("Wave", animations[1].GetProperty("name").GetString());
+        Assert.Equal(
+            new[] { "skeletal", "morph" },
+            animations[1].GetProperty("kinds").EnumerateArray().Select(k => k.GetString()).ToArray());
+
+        var shapeKeys = payload.RootElement.GetProperty("shapeKeys");
+        Assert.Equal(1, shapeKeys.GetArrayLength());
+        Assert.Equal("Box", shapeKeys[0].GetProperty("meshName").GetString());
+        Assert.Equal(
+            new[] { "Squash", "Stretch" },
+            shapeKeys[0].GetProperty("shapeKeys").EnumerateArray().Select(k => k.GetString()).ToArray());
     }
 }

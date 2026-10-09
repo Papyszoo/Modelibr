@@ -31,6 +31,7 @@ import { SceneAssetPicker } from './SceneAssetPicker'
 import { SceneCanvas } from './SceneCanvas'
 import { SceneChoicesPanel } from './SceneChoicesPanel'
 import { SceneHierarchy } from './SceneHierarchy'
+import { SceneNodeAnimation } from './SceneNodeAnimation'
 import { SceneNodeMaterials } from './SceneNodeMaterials'
 import { SceneProjectBrief } from './SceneProjectBrief'
 import { ScenePropertyPanel } from './ScenePropertyPanel'
@@ -1007,6 +1008,16 @@ export function SceneEditor({
                     : undefined
                 }
                 onBind={handleBindMaterial}
+              />
+            }
+            animation={
+              <SceneNodeAnimation
+                node={selectedNode}
+                onChange={patch => {
+                  if (selectedNodeId) {
+                    updateNode(selectedNodeId, patch)
+                  }
+                }}
               />
             }
           />

@@ -139,8 +139,14 @@ public class StoreImportSinkStampTests
             var clock = new Mock<IDateTimeProvider>();
             clock.SetupGet(c => c.UtcNow).Returns(ImportedAt);
 
+            var extractions = new Mock<IAssetExtractionRepository>();
+            extractions
+                .Setup(e => e.GetLatestForAssetAsync(
+                    It.IsAny<string>(), It.IsAny<int>(), It.IsAny<int?>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync((Domain.Models.AssetExtraction?)null);
+
             var read = new ReadAssetMetadataQueryHandler(
-                Entity.Object, Repository.Object, SearchDocuments.Object);
+                Entity.Object, Repository.Object, SearchDocuments.Object, extractions.Object);
             var set = new SetAssetMetadataCommandHandler(
                 Entity.Object, Repository.Object, SearchDocuments.Object, read, clock.Object, UnitOfWork.Object);
 

@@ -29,7 +29,9 @@ public sealed record ScenePlacementRequest(
     string? AnchorTo = null,
     string? AnchorAlign = null,
     bool Suspended = false,
-    int? OnSurface = null)
+    int? OnSurface = null,
+    SceneAnimation? Animation = null,
+    IReadOnlyDictionary<string, double>? ShapeKeys = null)
 {
     public SceneAssetRef Reference => new(AssetType, AssetId, VersionId);
 }
@@ -281,7 +283,9 @@ public static class ScenePlacementRules
             Suspended: placement.Suspended ? true : null,
             FrontAxis: frontAxis,
             FaceToward: placement.FaceToward,
-            Anchor: anchor);
+            Anchor: anchor,
+            Animation: placement.Animation,
+            ShapeKeys: placement.ShapeKeys);
 
         return ApplyGridSnap(node, facts, placement.SnapToGrid);
     }

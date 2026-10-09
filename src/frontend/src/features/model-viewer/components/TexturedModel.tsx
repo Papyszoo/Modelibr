@@ -7,7 +7,10 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader'
 import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader'
 import { STLLoader } from 'three/examples/jsm/loaders/STLLoader'
 
+import { useModelAnimationController } from '@/features/model-viewer/animation/ModelAnimationContext'
+import { type ModelAnimationController } from '@/features/model-viewer/animation/ModelAnimationController'
 import { useModelObject } from '@/features/model-viewer/hooks/useModelObject'
+import { cloneSkinnedModel } from '@/shared/three/cloneSkinnedModel'
 import {
   createResourceManager,
   safeLoadingManager,
@@ -21,6 +24,10 @@ import {
 import { buildStlModel } from '../../../../../asset-processor/lib/stlMesh.js'
 
 export type { MaterialTextureSets } from '@/shared/three/textureSetMaterial'
+
+// Stable empty clip list for formats that never carry animation, so it can sit
+// in a dependency array without retriggering the clone effect every render.
+const NO_ANIMATIONS: THREE.AnimationClip[] = []
 
 interface TexturedModelProps {
   modelUrl: string
@@ -66,15 +73,17 @@ function disposePreviousClone(group: THREE.Object3D): void {
 /** Shared logic: clone model, apply per-material textures, scale and center */
 function setupModel(
   model: THREE.Group | THREE.Object3D,
+  animations: THREE.AnimationClip[] | undefined,
   materialTextureSets: MaterialTextureSets,
   loadedTextures: Record<string, THREE.Texture | null>,
   texturesReady: boolean,
   meshRef: React.RefObject<THREE.Group | null>,
-  scaledRef: React.MutableRefObject<boolean>
+  scaledRef: React.MutableRefObject<boolean>,
+  animation: ModelAnimationController | null
 ) {
   if (!model || scaledRef.current) return
 
-  const clonedModel = model.clone()
+  const clonedModel = cloneSkinnedModel(model)
 
   applyMaterialTextures(
     clonedModel,
@@ -108,6 +117,10 @@ function setupModel(
     meshRef.current.add(clonedModel)
   }
 
+  // Hand the rendered clone (not the cached original) to the animation
+  // controller so its single mixer drives exactly what is on screen.
+  animation?.setRoot(clonedModel, animations)
+
   scaledRef.current = true
 }
 
@@ -131,6 +144,8 @@ function OBJModelWithTextures({
   const model = useLoader(OBJLoader, modelUrl, loader => {
     loader.manager = safeLoadingManager
   })
+  const animation = useModelAnimationController()
+  const animations = NO_ANIMATIONS
   const { loadedTextures, texturesReady } = usePerMaterialTextures(
     materialTextureSets,
     renderer,
@@ -144,13 +159,22 @@ function OBJModelWithTextures({
   useEffect(() => {
     setupModel(
       model,
+      animations,
       materialTextureSets,
       loadedTextures,
       texturesReady,
       meshRef,
-      scaledRef
+      scaledRef,
+      animation
     )
-  }, [model, materialTextureSets, loadedTextures, texturesReady])
+  }, [
+    model,
+    animations,
+    materialTextureSets,
+    loadedTextures,
+    texturesReady,
+    animation,
+  ])
 
   useEffect(() => {
     if (model) setModelObject(model)
@@ -185,6 +209,8 @@ function GLTFModelWithTextures({
     loader.manager = manager
   })
   const model = gltf?.scene
+  const animation = useModelAnimationController()
+  const animations = gltf?.animations
   const { loadedTextures, texturesReady } = usePerMaterialTextures(
     materialTextureSets,
     renderer,
@@ -199,13 +225,22 @@ function GLTFModelWithTextures({
     if (model)
       setupModel(
         model,
+        animations,
         materialTextureSets,
         loadedTextures,
         texturesReady,
         meshRef,
-        scaledRef
+        scaledRef,
+        animation
       )
-  }, [model, materialTextureSets, loadedTextures, texturesReady])
+  }, [
+    model,
+    animations,
+    materialTextureSets,
+    loadedTextures,
+    texturesReady,
+    animation,
+  ])
 
   useEffect(() => {
     if (model) setModelObject(model)
@@ -235,6 +270,8 @@ function FBXModelWithTextures({
   const model = useLoader(FBXLoader, modelUrl, loader => {
     loader.manager = safeLoadingManager
   })
+  const animation = useModelAnimationController()
+  const animations = model?.animations
   const { loadedTextures, texturesReady } = usePerMaterialTextures(
     materialTextureSets,
     renderer,
@@ -248,13 +285,22 @@ function FBXModelWithTextures({
   useEffect(() => {
     setupModel(
       model,
+      animations,
       materialTextureSets,
       loadedTextures,
       texturesReady,
       meshRef,
-      scaledRef
+      scaledRef,
+      animation
     )
-  }, [model, materialTextureSets, loadedTextures, texturesReady])
+  }, [
+    model,
+    animations,
+    materialTextureSets,
+    loadedTextures,
+    texturesReady,
+    animation,
+  ])
 
   useEffect(() => {
     if (model) setModelObject(model)
@@ -287,6 +333,8 @@ function STLModelWithTextures({
   })
   // Shared wrap; setupModel's per-material textures replace this material.
   const model = useMemo(() => buildStlModel(THREE, geometry), [geometry])
+  const animation = useModelAnimationController()
+  const animations = NO_ANIMATIONS
   const { loadedTextures, texturesReady } = usePerMaterialTextures(
     materialTextureSets,
     renderer,
@@ -300,13 +348,22 @@ function STLModelWithTextures({
   useEffect(() => {
     setupModel(
       model,
+      animations,
       materialTextureSets,
       loadedTextures,
       texturesReady,
       meshRef,
-      scaledRef
+      scaledRef,
+      animation
     )
-  }, [model, materialTextureSets, loadedTextures, texturesReady])
+  }, [
+    model,
+    animations,
+    materialTextureSets,
+    loadedTextures,
+    texturesReady,
+    animation,
+  ])
 
   useEffect(() => {
     if (model) setModelObject(model)
@@ -336,6 +393,8 @@ function ThreeMFModelWithTextures({
   const model = useLoader(ThreeMFLoader, modelUrl, loader => {
     loader.manager = safeLoadingManager
   })
+  const animation = useModelAnimationController()
+  const animations = NO_ANIMATIONS
   const { loadedTextures, texturesReady } = usePerMaterialTextures(
     materialTextureSets,
     renderer,
@@ -349,13 +408,22 @@ function ThreeMFModelWithTextures({
   useEffect(() => {
     setupModel(
       model,
+      animations,
       materialTextureSets,
       loadedTextures,
       texturesReady,
       meshRef,
-      scaledRef
+      scaledRef,
+      animation
     )
-  }, [model, materialTextureSets, loadedTextures, texturesReady])
+  }, [
+    model,
+    animations,
+    materialTextureSets,
+    loadedTextures,
+    texturesReady,
+    animation,
+  ])
 
   useEffect(() => {
     if (model) setModelObject(model)
