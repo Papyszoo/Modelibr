@@ -50,6 +50,22 @@ public class GetMaterialLibraryQueryHandlerTests
     }
 
     [Fact]
+    public async Task Entries_CarryTheStoredEffectsDocument()
+    {
+        var material = Material.Create("Glow Jelly", MaterialParameters.Default, Now);
+        material.SetEffects(
+            """{"version":1,"effects":[{"type":"rim","color":"#7CFF2A","power":3,"intensity":1}]}""", Now);
+        GivenMaterials(material);
+        GivenGlobalMaterials();
+
+        var result = await Handler().Handle(new GetMaterialLibraryQuery(), CancellationToken.None);
+
+        var entry = Assert.Single(result.Value.Entries);
+        Assert.NotNull(entry.Effects);
+        Assert.Equal("#7CFF2A", entry.Effects!.Value.GetProperty("effects")[0].GetProperty("color").GetString());
+    }
+
+    [Fact]
     public async Task Entries_CarryRequiresUvs_SoACallerNeverHasToKnowTheTable()
     {
         GivenMaterials(Material.Create("Brass", MaterialParameters.Default, Now));

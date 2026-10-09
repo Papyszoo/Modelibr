@@ -142,6 +142,49 @@ public class MaterialDomainTests
     }
 
     [Fact]
+    public void Create_HasNoEffects()
+    {
+        // Null is the normal state: a material is complete with no effects at all.
+        Assert.Null(Material.Create("Oak", MaterialParameters.Default, Now).EffectsJson);
+    }
+
+    [Fact]
+    public void SetEffects_StoresTheDocumentAndTouchesUpdatedAt()
+    {
+        const string effects = """{"version":1,"effects":[]}""";
+        var material = Material.Create("Oak", MaterialParameters.Default, Now);
+        var later = Now.AddMinutes(5);
+
+        material.SetEffects(effects, later);
+
+        Assert.Equal(effects, material.EffectsJson);
+        Assert.Equal(later, material.UpdatedAt);
+    }
+
+    [Fact]
+    public void SetEffects_RejectsNullAndEmpty()
+    {
+        var material = Material.Create("Oak", MaterialParameters.Default, Now);
+
+        Assert.Throws<ArgumentException>(() => material.SetEffects(null, Now));
+        Assert.Throws<ArgumentException>(() => material.SetEffects("  ", Now));
+        Assert.Null(material.EffectsJson);
+    }
+
+    [Fact]
+    public void ClearEffects_RemovesTheDocumentAndTouchesUpdatedAt()
+    {
+        var material = Material.Create("Oak", MaterialParameters.Default, Now);
+        material.SetEffects("""{"version":1,"effects":[]}""", Now);
+
+        var later = Now.AddMinutes(5);
+        material.ClearEffects(later);
+
+        Assert.Null(material.EffectsJson);
+        Assert.Equal(later, material.UpdatedAt);
+    }
+
+    [Fact]
     public void SoftDelete_ThenRestore_ClearsTheDeletionStamp()
     {
         var material = Material.Create("Oak", MaterialParameters.Default, Now);

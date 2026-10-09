@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Text.Json.Serialization;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
@@ -49,7 +50,8 @@ public record MaterialLibraryEntryDto(
     MaterialTilingDto? Tiling,
     IReadOnlyList<string> Tags,
     DateTime CreatedAt,
-    DateTime UpdatedAt);
+    DateTime UpdatedAt,
+    JsonElement? Effects = null);
 
 /// <summary>
 /// Which table a library entry came from.
@@ -162,7 +164,8 @@ internal sealed class GetMaterialLibraryQueryHandler
         Tiling: null,
         material.Tags.Select(tag => tag.Name).OrderBy(name => name, StringComparer.OrdinalIgnoreCase).ToList(),
         material.CreatedAt,
-        material.UpdatedAt);
+        material.UpdatedAt,
+        MaterialEffectsDefinition.Parse(material.EffectsJson));
 
     private static MaterialLibraryEntryDto ToEntry(TextureSet textureSet) => new(
         MaterialLibraryEntryKind.GlobalMaterial,

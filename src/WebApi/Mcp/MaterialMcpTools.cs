@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using System.Text.Json;
 using Application.Abstractions.Messaging;
 using Application.Agents;
 using Application.Materials;
@@ -25,7 +26,8 @@ public sealed class MaterialReadMcpTools
     [McpServerTool(Name = "list_materials")]
     [Description("Browse the material library: parameter materials (a colour and a roughness - no UVs needed) and tiling global materials " +
                  "(image channels - they need UVs) in one list, because both attach to a model's material slot. " +
-                 "Every hit carries requiresUvs; pass requiresUvs=false to see only what is safe on an asset with bad or missing UVs. " +
+                 "Every hit carries requiresUvs (pass requiresUvs=false to see only what is safe on an asset with bad or missing UVs) " +
+                 "and effects (the v1 effects document, null when none). " +
                  "Bind a hit to a scene node with apply_material.")]
     public static async Task<object> ListMaterials(
         IQueryHandler<GetMaterialLibraryQuery, GetMaterialLibraryResponse> handler,
@@ -67,7 +69,8 @@ public sealed class MaterialReadMcpTools
     }
 
     [McpServerTool(Name = "get_material")]
-    [Description("Read one parameter material in full - every factor, its render state, its category and tags.")]
+    [Description("Read one parameter material in full - every factor, its v1 effects document (null when it has none), " +
+                 "its render state, its category and tags.")]
     public static async Task<object> GetMaterial(
         IQueryHandler<GetMaterialByIdQuery, MaterialDto> handler,
         McpCallerContext caller,
@@ -95,6 +98,12 @@ public sealed class MaterialWriteMcpTools
     [Description("Create a material from parameters alone - no files, no channels, no UVs. " +
                  "baseColorHex plus roughness covers most of what a scene needs (\"matte black plastic\": #1A1A1A at roughness 0.6); " +
                  "metallic 1 for metals, alphaMode 'Blend' with baseColorAlpha for glass. " +
+                 "Optional effects (v1 document): {version:1, effects:[0-4 items, each type at most once]}. " +
+                 "Types: jelly_wobble {amplitude 0-0.5, frequency 0-10, waveScale 0-20, seed int 0-1000}; " +
+                 "rim {color #RRGGBB, power 0.5-8, intensity 0-10}; translucency {interiorColor #RRGGBB, thickness 0-1}; " +
+                 "emission_pulse {color #RRGGBB, intensity 0-10, rate 0-20}. Any effect may carry drivers " +
+                 "{numericParam: {input speed|impulse|charge, scale -100..100}}; optional previewInputs " +
+                 "{speed 0-20, impulse 0-1, charge 0-1}. An invalid document is rejected whole. " +
                  "Bind the result to a node with apply_material.")]
     public static Task<object> CreateMaterial(
         ICommandHandler<CreateMaterialCommand, CreateMaterialResponse> handler,
@@ -111,6 +120,7 @@ public sealed class MaterialWriteMcpTools
         [Description("Optional description.")] string? description = null,
         [Description("Optional category id, from the shared Universal vocabulary.")] int? categoryId = null,
         [Description("Optional tags.")] string[]? tags = null,
+        [Description("Optional v1 effects document as a JSON object; omitted or null means no effects.")] JsonElement? effects = null,
         [Description("Optional batch id. Writes sharing one can be undone together with reverse_operation.")] string? batchId = null,
         CancellationToken cancellationToken = default)
     {
@@ -150,7 +160,8 @@ public sealed class MaterialWriteMcpTools
                         description,
                         categoryId,
                         PreviewGeometryType: null,
-                        Tags: tags),
+                        Tags: tags,
+                        Effects: effects),
                     ct);
 
                 return result.IsFailure
@@ -163,7 +174,10 @@ public sealed class MaterialWriteMcpTools
     }
 
     [McpServerTool(Name = "update_material")]
-    [Description("Change a material's parameters. Omitted fields are left alone, so this is a patch, not a replacement.")]
+    [Description("Change a material's parameters. Omitted fields are left alone, so this is a patch, not a replacement. " +
+                 "effects is the same v1 document as create_material {version:1, effects:[0-4, each type once], " +
+                 "jelly_wobble/rim/translucency/emission_pulse with their parameter ranges, optional drivers and previewInputs}; " +
+                 "an explicit null clears the effects, omitting it leaves them unchanged.")]
     public static Task<object> UpdateMaterial(
         ICommandHandler<UpdateMaterialCommand, MaterialDto> handler,
         IQueryHandler<GetMaterialByIdQuery, MaterialDto> getHandler,
@@ -178,6 +192,7 @@ public sealed class MaterialWriteMcpTools
         [Description("Opacity 0..1.")] float? baseColorAlpha = null,
         [Description("Opaque, Mask or Blend.")] string? alphaMode = null,
         [Description("Render back faces too.")] bool? doubleSided = null,
+        [Description("Replacement v1 effects document; null clears it, omitted leaves it unchanged.")] JsonElement? effects = null,
         [Description("Optional batch id.")] string? batchId = null,
         CancellationToken cancellationToken = default)
     {
@@ -212,6 +227,10 @@ public sealed class MaterialWriteMcpTools
                     return Failed(before.Error);
                 }
 
+                // An explicit JSON null clears the document; an omitted parameter (C# null)
+                // leaves it alone. They are different values on purpose.
+                var clearEffects = effects is { ValueKind: JsonValueKind.Null };
+
                 var result = await handler.Handle(
                     new UpdateMaterialCommand(
                         materialId,
@@ -222,7 +241,9 @@ public sealed class MaterialWriteMcpTools
                             Roughness: roughness,
                             Metallic: metallic,
                             AlphaMode: parsedAlphaMode,
-                            DoubleSided: doubleSided)),
+                            DoubleSided: doubleSided),
+                        Effects: clearEffects ? null : effects,
+                        ClearEffects: clearEffects),
                     ct);
 
                 return result.IsFailure

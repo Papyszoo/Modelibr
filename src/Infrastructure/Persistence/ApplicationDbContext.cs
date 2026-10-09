@@ -623,6 +623,9 @@ namespace Infrastructure.Persistence
                     .HasDefaultValue("sphere");
                 entity.Property(m => m.ThumbnailPath).HasMaxLength(500);
                 entity.Property(m => m.PngThumbnailPath).HasMaxLength(500);
+                // The v1 effects document, stored whole - effects are authored and rendered
+                // as a unit and nothing filters on their internals. Null means no effects.
+                entity.Property(m => m.EffectsJson).HasColumnType("jsonb").IsRequired(false);
                 entity.Property(m => m.CreatedAt).IsRequired();
                 entity.Property(m => m.UpdatedAt).IsRequired();
                 entity.Property(m => m.IsDeleted).IsRequired();
