@@ -2,6 +2,7 @@ import { BaseProcessor } from './baseProcessor.js'
 import { ModelFileService } from '../modelFileService.js'
 import { ModelDataService } from '../modelDataService.js'
 import { RendererPool } from '../rendererPool.js'
+import { planAnimationFrames } from '../puppeteerRenderer.js'
 import { FrameEncoderService } from '../frameEncoderService.js'
 import { ThumbnailStorageService } from '../thumbnailStorageService.js'
 import { ThumbnailApiService } from '../thumbnailApiService.js'
@@ -282,19 +283,38 @@ export class ThumbnailProcessor extends BaseProcessor {
         renderer
       )
 
-      // Step 4: Render orbit frames
-      if (!config.orbit.enabled) {
-        throw new Error(
-          'Orbit rendering is disabled - cannot generate thumbnails'
+      // Step 4: Render frames. A model that carries clips plays its FIRST clip
+      // at explicit instants on a fixed camera; everything else orbits exactly
+      // as before.
+      const clipInfo = await renderer.getAnimationClipInfo()
+
+      let frames
+      let encodingOptions = {}
+      if (clipInfo.hasAnimation) {
+        const animation = await this._renderAnimationFrames(
+          job,
+          jobLogger,
+          polygonCount,
+          renderer,
+          signal,
+          clipInfo
+        )
+        frames = animation.frames
+        encodingOptions = { frameDelayMs: animation.frameDelayMs }
+      } else {
+        if (!config.orbit.enabled) {
+          throw new Error(
+            'Orbit rendering is disabled - cannot generate thumbnails'
+          )
+        }
+
+        frames = await this._renderOrbitFrames(
+          job,
+          jobLogger,
+          polygonCount,
+          renderer
         )
       }
-
-      const frames = await this._renderOrbitFrames(
-        job,
-        jobLogger,
-        polygonCount,
-        renderer
-      )
 
       // Step 5: Encode frames
       if (!config.encoding.enabled) {
@@ -303,7 +323,12 @@ export class ThumbnailProcessor extends BaseProcessor {
         )
       }
 
-      const encodingResult = await this._encodeFrames(job, jobLogger, frames)
+      const encodingResult = await this._encodeFrames(
+        job,
+        jobLogger,
+        frames,
+        encodingOptions
+      )
 
       // Step 6: Upload thumbnails
       if (!this.thumbnailStorage.enabled) {
@@ -574,10 +599,67 @@ export class ThumbnailProcessor extends BaseProcessor {
   }
 
   /**
-   * Encode rendered frames into WebP animation and poster.
+   * Render animation frames by playing the model's first clip at explicit
+   * instants. The camera is fixed by the renderer on the union of the clip's
+   * motion, and the Node-computed plan fixes both the instants and the per-frame
+   * hold time so the loop plays at the clip's real speed.
    * @private
    */
-  async _encodeFrames(job, jobLogger, frames) {
+  async _renderAnimationFrames(
+    job,
+    jobLogger,
+    polygonCount,
+    renderer = null,
+    signal,
+    clipInfo
+  ) {
+    const plan = planAnimationFrames(clipInfo.duration, config.animationClip)
+
+    await this.jobEventService.logFrameRenderingStarted(
+      job.id,
+      plan.frameCount,
+      {
+        outputWidth: config.rendering.outputWidth,
+        outputHeight: config.rendering.outputHeight,
+        clipName: clipInfo.name,
+        clipDuration: clipInfo.duration,
+        frameDelayMs: plan.frameDelayMs,
+      }
+    )
+
+    const renderStartTime = Date.now()
+    const result = await renderer.renderAnimationFrames(jobLogger, signal, plan)
+    const renderTime = Date.now() - renderStartTime
+
+    const memoryStats = renderer.getMemoryStats(result.frames)
+    jobLogger.info('Animation frames rendered', {
+      polygonCount,
+      clipName: result.clipName,
+      clipDuration: result.clipDuration,
+      frameDelayMs: result.frameDelayMs,
+      ...memoryStats,
+      renderTimeMs: renderTime,
+    })
+
+    await this.jobEventService.logFrameRenderingCompleted(
+      job.id,
+      result.frames.length,
+      renderTime
+    )
+
+    return {
+      frames: result.frames,
+      frameDelayMs: result.frameDelayMs,
+    }
+  }
+
+  /**
+   * Encode rendered frames into WebP animation and poster.
+   * @param {Object} options - Forwarded to FrameEncoderService.encodeFrames;
+   *   `frameDelayMs` holds animated clip frames at the clip's own rate.
+   * @private
+   */
+  async _encodeFrames(job, jobLogger, frames, options = {}) {
     await this.jobEventService.logEncodingStarted(job.id, frames.length)
 
     if (!this.frameEncoder) {
@@ -586,7 +668,8 @@ export class ThumbnailProcessor extends BaseProcessor {
 
     const encodingResult = await this.frameEncoder.encodeFrames(
       frames,
-      jobLogger
+      jobLogger,
+      options
     )
 
     jobLogger.info('Encoding completed', {

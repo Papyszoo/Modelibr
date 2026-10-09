@@ -81,6 +81,12 @@
       // THREE injected) and exposes bound fns for the classic-script
       // page.evaluate in puppeteerRenderer, mirroring the texture helpers above.
       import { animationKindsOf, extractSceneGraph } from './lib/sceneGraph.js'
+      // Framing math and animated-bounds sampling, shared with the unit tests so
+      // the animated path cannot drift from its coverage contract.
+      import {
+        computeFramingDistance,
+        sampleAnimatedBounds,
+      } from './lib/modelFraming.js'
 
       // Global state for external control
       window.modelRenderer = {
@@ -105,6 +111,9 @@
         rawSceneGraph: null,
         // External glTF references the resolver refused (offline invariant).
         blockedResourceUrls: [],
+        // One AnimationMixer for the loaded model while an animated thumbnail
+        // is being rendered (see setupModelAnimation).
+        animation: null,
       }
 
       // Bound scene-graph extractor for the classic-script page.evaluate context.
@@ -730,6 +739,71 @@
         return window.modelRenderer.renderer.domElement.toDataURL('image/png')
       }
 
+      // Animated thumbnails: play the FIRST clip at explicit instants instead of
+      // orbiting. One mixer is built here; the Node side asks for a time per
+      // frame (never real-time playback), so the render stays reproducible. The
+      // union of the model's bounds is taken across the whole clip and the model
+      // is recentred on it, so the fixed camera frames all of the motion.
+      function setupModelAnimation(baseDistance, sampleCount, coverage) {
+        const model = window.modelRenderer.model
+        const clips = Array.isArray(model?.animations) ? model.animations : []
+        if (clips.length === 0) {
+          return { hasAnimation: false }
+        }
+
+        const clip = clips[0]
+        const mixer = new THREE.AnimationMixer(model)
+        const action = mixer.clipAction(clip)
+        action.play()
+
+        const union = sampleAnimatedBounds(THREE, model, mixer, {
+          duration: clip.duration,
+          samples: sampleCount,
+        })
+
+        let distance = baseDistance
+        if (union) {
+          // Recentre on the union so the fixed camera frames every pose, not
+          // just the bind pose the model was normalized around.
+          const center = union.getCenter(new THREE.Vector3())
+          model.position.sub(center)
+          model.updateMatrixWorld(true)
+
+          // Fit the union to the frame (70-80% of the vertical FOV) instead of
+          // pushing the camera out by the box's space diagonal with a fixed pad,
+          // which left the model a small dot.
+          distance = computeFramingDistance(
+            union.getSize(new THREE.Vector3()),
+            {
+              coverage,
+              minDistance: baseDistance,
+            }
+          )
+        }
+
+        // Back to the first instant for the still/PNG frame; the Node side sets
+        // every later time explicitly.
+        mixer.setTime(0)
+        model.updateMatrixWorld(true)
+        window.modelRenderer.animation = { mixer, clipDuration: clip.duration }
+
+        return {
+          hasAnimation: true,
+          name: clip.name,
+          duration: clip.duration,
+          distance,
+        }
+      }
+
+      function setAnimationTime(time) {
+        const animation = window.modelRenderer.animation
+        if (!animation) {
+          return false
+        }
+        animation.mixer.setTime(time)
+        return true
+      }
+
       // Count polygons in model
       function countPolygons(model) {
         let count = 0
@@ -810,6 +884,15 @@
           }
         }
 
+        if (window.modelRenderer.animation) {
+          try {
+            window.modelRenderer.animation.mixer.stopAllAction()
+          } catch (error) {
+            console.warn('Failed to stop animation mixer:', error)
+          }
+        }
+        window.modelRenderer.animation = null
+
         window.modelRenderer.environmentRoot = null
         window.modelRenderer.model = null
         window.modelRenderer.modelContainer = null
@@ -828,6 +911,8 @@
       window.positionCamera = positionCamera
       window.renderScene = renderScene
       window.getCanvasDataURL = getCanvasDataURL
+      window.setupModelAnimation = setupModelAnimation
+      window.setAnimationTime = setAnimationTime
       window.countPolygons = countPolygons
       window.clearScene = clearScene
       window.applyDefaultSceneEnvironment = applyDefaultSceneEnvironment

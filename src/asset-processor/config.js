@@ -71,6 +71,25 @@ export const config = {
     enabled: process.env.ORBIT_ENABLED !== 'false', // enable orbit rendering
   },
 
+  // Animated model thumbnails. When the loaded model carries clips, the FIRST
+  // clip is played at explicit instants instead of orbiting (see
+  // puppeteerRenderer.renderAnimationFrames). Same density rule as the vfx loop:
+  // sampled across the whole clip at up to targetFps, capped so a long clip
+  // stays a small file, each frame held for duration / frames so the loop plays
+  // in real time. boundingSamples sets how many instants the union of the
+  // model's bounds is taken over, so the fixed camera frames every pose.
+  animationClip: {
+    targetFps: 15,
+    maxFrames: 90,
+    minFrames: 2,
+    boundingSamples: 12,
+    // Fraction of the frame's vertical FOV the animated union box should fill.
+    // Kept inside the 70-80% band (and just under its middle) so the whole clip
+    // stays inside the frame, instead of the diagonal-plus-pad estimate that
+    // left the model a small dot.
+    framingCoverage: 0.72,
+  },
+
   // Scene render-back (03-D / 11-M). Unlike every other render here, this one
   // photographs the running frontend rather than assembling geometry itself -
   // see sceneRenderer.js for why - so it needs the app's address, not just the
