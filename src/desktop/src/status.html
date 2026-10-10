@@ -243,6 +243,16 @@
       A saved port was in use, so Modelibr is running on a free one.
     </div>
 
+    <!-- Only shown when "Allow access from my network" is on. The address a
+         device on the same network opens; the local address and Copy button
+         above stay pointed at this machine. -->
+    <div id="lan-block" style="display:none">
+      <div class="config-subnote">Reachable on your network at:</div>
+      <div class="address-line">
+        <code id="lan-url">-</code>
+      </div>
+    </div>
+
     <div class="install">
       <div class="text">
         <b>Desktop client</b> - <span id="install-text">open Modelibr in its own app window instead of a browser tab.</span>
@@ -410,6 +420,16 @@
 
         if (status.frontendUrl) $('frontend-url').textContent = status.frontendUrl
         $('address-note').style.display = status.portsAutoAdjusted ? '' : 'none'
+
+        // Shown only while network access is on; the address to type on another
+        // device. Copy stays bound to the local address above.
+        const lanBlock = $('lan-block')
+        if (status.lanFrontendUrl) {
+          $('lan-url').textContent = status.lanFrontendUrl
+          lanBlock.style.display = ''
+        } else {
+          lanBlock.style.display = 'none'
+        }
 
         // A saved port / data-folder change only goes live after a relaunch, so
         // nudge the user to restart (the address shown is still the working one).

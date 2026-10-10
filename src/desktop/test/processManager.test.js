@@ -4,7 +4,7 @@ import fs from 'fs/promises'
 import os from 'os'
 import path from 'path'
 
-import { ProcessManager } from '../src/processManager.js'
+import { ProcessManager, findLanIPv4Address, buildLanUrl } from '../src/processManager.js'
 import { sanitizeRuntimeConfig } from '../src/runtimeConfig.js'
 import { readMigrationMarker } from '../src/dataMigration.js'
 
@@ -282,4 +282,73 @@ test('a runtime with only the server binaries passes the asset check', async () 
   } finally {
     await fs.rm(root, { recursive: true, force: true })
   }
+})
+
+test('the desktop marks the WebApi as native so it binds loopback only', () => {
+  // Regression: the desktop launched the WebApi with ListenAnyIP, so its private
+  // (unauthenticated) port was reachable from the LAN even with network access
+  // off. The marker is what makes the WebApi bind localhost; Docker never sets it.
+  const pm = makePM()
+  pm.markRunning()
+
+  assert.equal(pm.buildWebApiEnvironment().MODELIBR_DESKTOP, 'true')
+})
+
+test('the desktop marks workers as native so their health servers bind loopback only', () => {
+  // Same regression, worker side: the asset-processor health server (health,
+  // status, metrics) was listening on every interface, so the desktop's private
+  // ports were reachable from the LAN with network access off. The marker makes
+  // it bind 127.0.0.1; Docker never sets it.
+  const pm = makePM()
+  pm.markRunning()
+
+  assert.equal(pm.buildWorkerEnvironment(0).MODELIBR_DESKTOP, 'true')
+})
+
+test('findLanIPv4Address returns the first non-internal IPv4 interface', () => {
+  const interfaces = {
+    lo0: [{ family: 'IPv4', address: '127.0.0.1', internal: true }],
+    en0: [{ family: 'IPv6', address: 'fe80::1', internal: false }],
+    en1: [
+      { family: 'IPv4', address: '192.168.1.63', internal: false },
+      { family: 'IPv4', address: '10.0.0.5', internal: false },
+    ],
+  }
+
+  assert.equal(findLanIPv4Address(interfaces), '192.168.1.63')
+  // Loopback-only (offline / IPv6-only) yields nothing rather than a dead URL.
+  assert.equal(
+    findLanIPv4Address({
+      lo0: [{ family: 'IPv4', address: '127.0.0.1', internal: true }],
+    }),
+    null
+  )
+})
+
+test('buildLanUrl builds the address a LAN device uses, or null when there is none', () => {
+  assert.equal(
+    buildLanUrl(3010, {
+      en0: [{ family: 'IPv4', address: '192.168.1.63', internal: false }],
+    }),
+    'http://192.168.1.63:3010'
+  )
+  assert.equal(
+    buildLanUrl(3010, {
+      lo0: [{ family: 'IPv4', address: '127.0.0.1', internal: true }],
+    }),
+    null
+  )
+})
+
+test('probeStatus advertises the LAN URL only when network access is on', async () => {
+  // Regression: the status window never told the user what to type on another
+  // device. It must appear only while the opt-in is on, and must match the host
+  // helper so the window and the tray agree.
+  const off = makePM({ appPort: 3010, allowNetworkAccess: false })
+  off.markRunning()
+  assert.equal((await off.probeStatus()).lanFrontendUrl, null)
+
+  const on = makePM({ appPort: 3010, allowNetworkAccess: true })
+  on.markRunning()
+  assert.equal((await on.probeStatus()).lanFrontendUrl, buildLanUrl(3010))
 })

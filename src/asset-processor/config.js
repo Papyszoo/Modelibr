@@ -212,6 +212,23 @@ export const config = {
 }
 
 /**
+ * Host the health server should bind.
+ *
+ * The desktop app launches each worker itself and fronts it with its edge
+ * server, so the unauthenticated health/status/metrics endpoints must stay on
+ * loopback; otherwise they are reachable from the LAN even with network access
+ * off. MODELIBR_DESKTOP is the marker ProcessManager passes to child processes.
+ * Docker leaves it unset and keeps listening on every interface, since the
+ * container publishes WORKER_PORT to the host.
+ *
+ * @returns {string|undefined} '127.0.0.1' under the desktop app, undefined
+ *   (Node's default, every interface) otherwise.
+ */
+export function healthServerHost() {
+  return process.env.MODELIBR_DESKTOP ? '127.0.0.1' : undefined
+}
+
+/**
  * Get a validated Blender executable path.
  * Rejects paths with shell metacharacters and resolves to an absolute path.
  * @returns {string} Validated blender path

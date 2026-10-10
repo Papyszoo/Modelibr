@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { createJSONStorage, persist } from 'zustand/middleware'
 
+import { generateId } from '@/shared/utils/generateId'
 import { type Tab, type TabType } from '@/types'
 
 // ─── Constants ────────────────────────────────────────────────────────
@@ -901,7 +902,7 @@ export const useNavigationStore = create<NavigationStore>()(
 export function getWindowId(): string {
   let id = sessionStorage.getItem(SESSION_WINDOW_ID_KEY)
   if (!id) {
-    id = crypto.randomUUID()
+    id = generateId()
     sessionStorage.setItem(SESSION_WINDOW_ID_KEY, id)
   }
   return id

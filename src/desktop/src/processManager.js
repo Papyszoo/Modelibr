@@ -26,6 +26,28 @@ function platformExecutable(baseName) {
   return process.platform === 'win32' ? `${baseName}.exe` : baseName
 }
 
+// The address another device on the LAN should use to reach this host: the first
+// non-internal IPv4 interface the OS reports. Null when there is none (offline,
+// IPv6-only, loopback only), so the status window never shows a dead address.
+// `interfaces` is injectable so the lookup is deterministic in tests.
+export function findLanIPv4Address(interfaces = os.networkInterfaces()) {
+  for (const addresses of Object.values(interfaces)) {
+    for (const entry of addresses ?? []) {
+      // Node reports the family as 'IPv4' on current releases; older ones used
+      // the number 4. Accept both so the lookup doesn't silently find nothing.
+      if ((entry.family === 'IPv4' || entry.family === 4) && !entry.internal) {
+        return entry.address
+      }
+    }
+  }
+  return null
+}
+
+export function buildLanUrl(port, interfaces = os.networkInterfaces()) {
+  const host = findLanIPv4Address(interfaces)
+  return host ? `http://${host}:${port}` : null
+}
+
 async function exists(targetPath) {
   try {
     await fs.access(targetPath)
@@ -305,6 +327,11 @@ export class ProcessManager {
         configured: this.config.workerProcessCount,
       },
       frontendUrl: `http://127.0.0.1:${active.appPort}`,
+      // Only meaningful when the user has opted into network access; null
+      // otherwise so the status window hides the line entirely.
+      lanFrontendUrl: active.allowNetworkAccess
+        ? buildLanUrl(active.appPort)
+        : null,
       webDavUrl: `http://127.0.0.1:${active.appPort}/modelibr`,
       dataDirectory: this.paths.data,
       pendingRestart: this.hasPendingRestart(),
@@ -692,6 +719,10 @@ export class ProcessManager {
       ASPNETCORE_ENVIRONMENT: 'Production',
       DisableHttpsRedirection: 'true',
       DISABLE_HTTPS_LISTENER: 'true',
+      // Marks this as the in-process WebApi launched by the desktop app (not
+      // the Docker image). The WebApi then binds loopback only, so the private
+      // API port is reachable only through the desktop's edge server.
+      MODELIBR_DESKTOP: 'true',
       HTTP_PORT: String(this.runningConfig.internalApiPort),
       EXPOSE_443_PORT: 'false',
       WEBDAV_HTTP_PORT: String(this.runningConfig.appPort),
@@ -768,6 +799,11 @@ export class ProcessManager {
     return {
       ...process.env,
       NODE_ENV: 'production',
+      // Marks this as the in-process worker launched by the desktop app (not the
+      // Docker image). The worker's health server then binds loopback only, so
+      // its unauthenticated health/status/metrics endpoints are not reachable
+      // from the LAN. Docker leaves it unset and keeps binding every interface.
+      MODELIBR_DESKTOP: 'true',
       WORKER_ID: `worker-${index + 1}`,
       WORKER_PORT: String(healthPort),
       // Target the WebApi the workers can actually reach right now (active

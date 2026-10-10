@@ -1,7 +1,10 @@
 import './CodePanel.css'
 
 import { Button } from 'primereact/button'
-import { type JSX, useState } from 'react'
+import { Toast } from 'primereact/toast'
+import { type JSX, useRef, useState } from 'react'
+
+import { copyTextToClipboard } from '@/shared/utils/clipboard'
 
 import { type StageConfig } from './SceneEditor'
 
@@ -11,6 +14,7 @@ interface CodePanelProps {
 
 export function CodePanel({ stageConfig }: CodePanelProps): JSX.Element {
   const [copied, setCopied] = useState(false)
+  const toast = useRef<Toast>(null)
 
   const generateCode = (): string => {
     const header = `function Scene() {
@@ -141,13 +145,22 @@ ${allElements}${footer}`
 
   const handleCopyCode = async () => {
     const code = generateCode()
-    try {
-      await navigator.clipboard.writeText(code)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
-    } catch (err) {
-      console.error('Failed to copy code:', err)
+    // navigator.clipboard is undefined over plain http (a LAN client), so the
+    // helper reports failure instead of throwing; surface the same error
+    // feedback other copy actions show.
+    const copiedOk = await copyTextToClipboard(code)
+    if (!copiedOk) {
+      toast.current?.show({
+        severity: 'error',
+        summary: 'Failed',
+        detail: 'Failed to copy code to clipboard',
+        life: 5000,
+      })
+      return
     }
+
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
   }
 
   const code = generateCode()
@@ -166,6 +179,7 @@ ${allElements}${footer}`
       <pre className="code-content">
         <code>{code}</code>
       </pre>
+      <Toast ref={toast} />
     </div>
   )
 }

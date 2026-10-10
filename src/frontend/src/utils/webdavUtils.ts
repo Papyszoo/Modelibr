@@ -3,6 +3,8 @@
  * Provides platform detection and generates native file system paths for WebDAV resources.
  */
 
+import { copyTextToClipboard } from '@/shared/utils/clipboard'
+
 export type OperatingSystem = 'windows' | 'macos' | 'linux' | 'unknown'
 
 /**
@@ -203,12 +205,10 @@ export async function copyPathToClipboard(
   const { buildWebDavPath } = await import('@/stores/webDavStore')
   const pathInfo = buildWebDavPath(virtualPath)
 
-  try {
-    await navigator.clipboard.writeText(pathInfo.nativePath)
-    return { success: true, path: pathInfo.nativePath }
-  } catch {
-    return { success: false, path: pathInfo.nativePath }
-  }
+  // Guarded by the shared helper: navigator.clipboard is undefined over plain
+  // http (a LAN client), so this reports failure instead of throwing.
+  const success = await copyTextToClipboard(pathInfo.nativePath)
+  return { success, path: pathInfo.nativePath }
 }
 
 /**

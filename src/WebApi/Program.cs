@@ -35,6 +35,20 @@ namespace WebApi
 
             var disableHttpsListener = builder.Configuration.GetValue<bool>("DISABLE_HTTPS_LISTENER");
             var httpPort = builder.Configuration.GetValue<int?>("HTTP_PORT");
+            // Set by the desktop launcher only (see ProcessManager.buildWebApiEnvironment).
+            // Docker leaves it unset, so the container keeps ListenAnyIP.
+            var nativeMode = builder.Configuration.GetValue<bool>("MODELIBR_DESKTOP");
+
+            // The plain-HTTP port is chosen here, not in appsettings: a
+            // "Kestrel:Endpoints" section is merged with the Listen* calls below
+            // rather than replaced by them, so leaving an http://*:8080 endpoint
+            // there kept the container's network-facing listener alive on the
+            // host too, next to the loopback one. The desktop sets HTTP_PORT
+            // (loopback); the container sets neither and keeps 8080 on all
+            // interfaces for nginx.
+            var httpListenPort = httpPort is > 0
+                ? httpPort.Value
+                : (nativeMode ? (int?)null : 8080);
 
             X509Certificate2? selfSignedCert = null;
             if (!disableHttpsListener)
@@ -47,9 +61,21 @@ namespace WebApi
             {
                 options.Limits.MaxRequestBodySize = maxFileSize;
 
-                if (httpPort is > 0)
+                if (httpListenPort is > 0)
                 {
-                    options.ListenAnyIP(httpPort.Value);
+                    // The desktop app launches this process itself and fronts it
+                    // with its edge server, so it must stay on loopback: with
+                    // network access off the private port must not be reachable
+                    // from the LAN. Docker (MODELIBR_DESKTOP unset) keeps
+                    // ListenAnyIP because nginx proxies to it over the network.
+                    if (nativeMode)
+                    {
+                        options.ListenLocalhost(httpListenPort.Value);
+                    }
+                    else
+                    {
+                        options.ListenAnyIP(httpListenPort.Value);
+                    }
                 }
 
                 if (disableHttpsListener)

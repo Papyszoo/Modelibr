@@ -1,5 +1,5 @@
 import express from 'express'
-import { config } from './config.js'
+import { config, healthServerHost } from './config.js'
 import logger from './logger.js'
 
 /**
@@ -138,13 +138,17 @@ export class HealthServer {
     }
 
     return new Promise((resolve, reject) => {
-      this.server = this.app.listen(config.port, err => {
+      // Loopback under the desktop app, every interface for Docker (see
+      // healthServerHost). Node's listen takes the host as an optional 2nd
+      // argument, so only pass it when there is one.
+      const onListen = err => {
         if (err) {
           logger.error('Failed to start health server', { error: err.message })
           reject(err)
         } else {
           logger.info('Health server started', {
             port: config.port,
+            host: healthServerHost() ?? 'all interfaces',
             endpoints: [
               config.healthcheck.endpoint,
               '/status',
@@ -154,7 +158,12 @@ export class HealthServer {
           })
           resolve()
         }
-      })
+      }
+
+      const host = healthServerHost()
+      this.server = host
+        ? this.app.listen(config.port, host, onListen)
+        : this.app.listen(config.port, onListen)
     })
   }
 

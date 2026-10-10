@@ -6,6 +6,34 @@ import path from 'path'
 
 import { sanitizeRuntimeConfig, saveRuntimeConfig } from './runtimeConfig.js'
 
+// Loopback clients only. Accepts the IPv4 loopback range (127.0.0.0/8) and the
+// IPv6 loopback, including the IPv4-mapped form Node hands back when a socket is
+// dual-stack. Used to gate the native admin surface.
+export function isLoopbackAddress(address) {
+  if (!address) {
+    return false
+  }
+
+  const normalized = address.startsWith('::ffff:') ? address.slice(7) : address
+  return normalized === '::1' || normalized.startsWith('127.')
+}
+
+// PUT /api/native/runtime rewrites ports and the data folder. With network
+// access on the edge server also binds 0.0.0.0, so without this guard any device
+// on the LAN could reconfigure the host. Requests that reach the server over a
+// non-loopback socket are refused.
+export function requireLocalClient(request, response, next) {
+  if (isLoopbackAddress(request.socket?.remoteAddress)) {
+    next()
+    return
+  }
+
+  response.status(403).json({
+    error: 'forbidden',
+    message: 'This endpoint is only available from this machine.',
+  })
+}
+
 export async function startEdgeServer({ runtimeDir, configPath, runtimeManager, log = console.log }) {
   const app = express()
   // Proxy to the API port the WebApi actually bound (a free fallback if the
@@ -24,7 +52,7 @@ export async function startEdgeServer({ runtimeDir, configPath, runtimeManager, 
     response.json(runtimeManager.buildRuntimeSnapshot())
   })
 
-  app.put('/api/native/runtime', express.json(), async (request, response) => {
+  app.put('/api/native/runtime', requireLocalClient, express.json(), async (request, response) => {
     const previousConfig = runtimeManager.config
     const nextConfig = sanitizeRuntimeConfig({
       ...previousConfig,

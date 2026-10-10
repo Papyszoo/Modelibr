@@ -1,5 +1,10 @@
-import { describe, it, expect, beforeEach } from 'vitest'
-import { config, validateConfig, getBlenderPath } from '../config.js'
+import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import {
+  config,
+  validateConfig,
+  getBlenderPath,
+  healthServerHost,
+} from '../config.js'
 
 // Save original values to restore between tests
 const originalRendering = { ...config.rendering }
@@ -234,6 +239,27 @@ describe('validateConfig', () => {
     expect(() => validateConfig()).toThrow(
       /RENDER_WIDTH.*\n.*RENDER_HEIGHT.*\n.*CAMERA_DISTANCE/
     )
+  })
+})
+
+describe('healthServerHost', () => {
+  const original = process.env.MODELIBR_DESKTOP
+  afterEach(() => {
+    if (original === undefined) {
+      delete process.env.MODELIBR_DESKTOP
+    } else {
+      process.env.MODELIBR_DESKTOP = original
+    }
+  })
+
+  it('binds loopback when the desktop app launched the worker', () => {
+    process.env.MODELIBR_DESKTOP = 'true'
+    expect(healthServerHost()).toBe('127.0.0.1')
+  })
+
+  it('leaves the host unset otherwise so Docker keeps every interface', () => {
+    delete process.env.MODELIBR_DESKTOP
+    expect(healthServerHost()).toBeUndefined()
   })
 })
 

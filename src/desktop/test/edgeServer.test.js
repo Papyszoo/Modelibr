@@ -6,8 +6,8 @@ import net from 'net'
 import os from 'os'
 import path from 'path'
 
-import { startEdgeServer } from '../src/edgeServer.js'
-import { ProcessManager } from '../src/processManager.js'
+import { startEdgeServer, requireLocalClient } from '../src/edgeServer.js'
+import { ProcessManager, findLanIPv4Address } from '../src/processManager.js'
 import { loadRuntimeConfig } from '../src/runtimeConfig.js'
 
 // Unlike the other suites (which exercise the config logic in isolation), this
@@ -100,6 +100,97 @@ test('saving a new app port keeps the live server on the bound port', async () =
 
     // ...and nothing is listening on the just-saved port yet (no silent rebind).
     await assert.rejects(request('GET', `http://127.0.0.1:${savedPort}/`))
+  } finally {
+    await edge.close()
+    await fs.rm(userData, { recursive: true, force: true })
+  }
+})
+
+// Regression: with "Allow access from my network" on the edge server binds
+// 0.0.0.0, so any LAN device could rewrite ports and the data folder through
+// PUT /api/native/runtime. That endpoint must answer 403 to a non-local client.
+function fakeResponse() {
+  const captured = { status: null, body: null }
+  return {
+    captured,
+    status(code) {
+      captured.status = code
+      return this
+    },
+    json(payload) {
+      captured.body = payload
+      return this
+    },
+  }
+}
+
+test('native runtime PUT answers 403 to a non-loopback client', () => {
+  const response = fakeResponse()
+  let nextCalled = false
+
+  requireLocalClient(
+    { socket: { remoteAddress: '192.168.1.20' } },
+    response,
+    () => {
+      nextCalled = true
+    }
+  )
+
+  assert.equal(response.captured.status, 403)
+  assert.equal(response.captured.body.error, 'forbidden')
+  assert.equal(nextCalled, false)
+})
+
+test('native runtime PUT lets loopback clients through', () => {
+  for (const address of ['127.0.0.1', '::1', '::ffff:127.0.0.1']) {
+    const response = fakeResponse()
+    let nextCalled = false
+
+    requireLocalClient({ socket: { remoteAddress: address } }, response, () => {
+      nextCalled = true
+    })
+
+    assert.equal(nextCalled, true, `expected ${address} to count as local`)
+    assert.equal(response.captured.status, null)
+  }
+})
+
+test('a real LAN client is refused over HTTP', { skip: !findLanIPv4Address() }, async () => {
+  const userData = await fs.mkdtemp(path.join(os.tmpdir(), 'modelibr-lan-'))
+  const runtimeDir = path.join(userData, 'runtime')
+  await fs.mkdir(path.join(runtimeDir, 'frontend'), { recursive: true })
+  await fs.writeFile(
+    path.join(runtimeDir, 'frontend', 'index.html'),
+    '<!doctype html><title>modelibr-ok</title>'
+  )
+
+  const appPort = await freePort()
+  const internalApiPort = await freePort()
+  const lanHost = findLanIPv4Address()
+
+  const { config, configPath } = await loadRuntimeConfig(userData)
+  const runtimeManager = new ProcessManager({
+    runtimeDir,
+    userDataDir: userData,
+    config: { ...config, appPort, internalApiPort, allowNetworkAccess: true },
+    log: () => {},
+  })
+  runtimeManager.markRunning() // bound on 0.0.0.0 because network access is on
+
+  const edge = await startEdgeServer({ runtimeDir, configPath, runtimeManager, log: () => {} })
+  try {
+    const refusal = await request(
+      'PUT',
+      `http://${lanHost}:${appPort}/api/native/runtime`,
+      { appPort: 4010 }
+    )
+    assert.equal(refusal.status, 403)
+
+    // The same call from this machine still works.
+    const allowed = await request('PUT', `http://127.0.0.1:${appPort}/api/native/runtime`, {
+      appPort: 4010,
+    })
+    assert.equal(allowed.status, 200)
   } finally {
     await edge.close()
     await fs.rm(userData, { recursive: true, force: true })
