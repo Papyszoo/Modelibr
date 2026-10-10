@@ -1,6 +1,7 @@
 using Application.Abstractions;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
+using Application.Abstractions.Services;
 using Domain.Services;
 using SharedKernel;
 
@@ -25,18 +26,18 @@ internal sealed class SetSceneLevelCommandHandler
     private readonly ISceneRepository _scenes;
     private readonly IProjectLevelRepository _levels;
     private readonly IDateTimeProvider _clock;
-    private readonly IUnitOfWork _unitOfWork;
+    private readonly ISceneDocumentCommit _commit;
 
     public SetSceneLevelCommandHandler(
         ISceneRepository scenes,
         IProjectLevelRepository levels,
         IDateTimeProvider clock,
-        IUnitOfWork unitOfWork)
+        ISceneDocumentCommit commit)
     {
         _scenes = scenes;
         _levels = levels;
         _clock = clock;
-        _unitOfWork = unitOfWork;
+        _commit = commit;
     }
 
     public async Task<Result<SetSceneLevelResponse>> Handle(
@@ -91,7 +92,15 @@ internal sealed class SetSceneLevelCommandHandler
 
         scene.SetLevel(command.ProjectLevelId, isPrimary, now);
         await _scenes.UpdateAsync(scene, cancellationToken);
-        await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+        // Owned commit, so a concurrent edit is reported as Scene.RevisionConflict rather
+        // than escaping as an unhandled concurrency exception.
+        var saved = await _commit.SaveAsync(cancellationToken);
+        if (saved.IsFailure)
+        {
+            return Result.Failure<SetSceneLevelResponse>(saved.Error);
+        }
+
         return Result.Success(Response(scene));
     }
 

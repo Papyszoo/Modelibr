@@ -64,10 +64,13 @@ internal sealed class StoreCatalogClient : IStoreCatalogClient
         _logger = logger;
         _endpoints = new StoreEndpointGuard(logger);
 
+        // Canonicalized the same way the importer canonicalizes it: the store URL is also the
+        // key the "already imported" probe matches against, and a raw uppercase host or an
+        // explicit :443 would make every comparison miss, so the import guard never fired.
         var configured = configuration.GetValue<string?>("STORE_URL");
         StoreUrl = string.IsNullOrWhiteSpace(configured)
             ? null
-            : configured.Trim().TrimEnd('/');
+            : StoreUrlCanonicalizer.Canonicalize(configured);
     }
 
     public string? StoreUrl { get; }
@@ -296,7 +299,7 @@ internal sealed class StoreCatalogClient : IStoreCatalogClient
     }
 
     private static StoreCatalogAsset MapSummary(StoreAssetDto dto, Uri baseUrl) => new(
-        dto.Id.ToString(),
+        dto.Id.ToString().ToLowerInvariant(),
         dto.Title ?? string.Empty,
         NullIfBlank(dto.Description),
         NullIfBlank(dto.Author),

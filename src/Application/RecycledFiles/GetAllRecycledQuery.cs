@@ -16,7 +16,8 @@ public record GetAllRecycledQueryResponse(
     IEnumerable<RecycledSoundDto> Sounds,
     IEnumerable<RecycledScriptDto> Scripts,
     IEnumerable<RecycledEnvironmentMapDto> EnvironmentMaps,
-    IEnumerable<RecycledEnvironmentMapVariantDto> EnvironmentMapVariants
+    IEnumerable<RecycledEnvironmentMapVariantDto> EnvironmentMapVariants,
+    IEnumerable<RecycledMaterialDto> Materials
 );
 
 public record RecycledModelDto(
@@ -98,6 +99,14 @@ public record RecycledEnvironmentMapVariantDto(
     DateTime DeletedAt
 );
 
+/// <summary>A recycled parameter material - parameters only, so it has no file but may have a thumbnail.</summary>
+public record RecycledMaterialDto(
+    int Id,
+    string Name,
+    DateTime DeletedAt,
+    string? ThumbnailPath
+);
+
 internal sealed class GetAllRecycledQueryHandler : IQueryHandler<GetAllRecycledQuery, GetAllRecycledQueryResponse>
 {
     private readonly IModelRepository _modelRepository;
@@ -108,6 +117,7 @@ internal sealed class GetAllRecycledQueryHandler : IQueryHandler<GetAllRecycledQ
     private readonly ISoundRepository _soundRepository;
     private readonly IScriptRepository _scriptRepository;
     private readonly IEnvironmentMapRepository _environmentMapRepository;
+    private readonly IMaterialRepository _materialRepository;
 
     public GetAllRecycledQueryHandler(
         IModelRepository modelRepository,
@@ -117,7 +127,8 @@ internal sealed class GetAllRecycledQueryHandler : IQueryHandler<GetAllRecycledQ
         ISpriteRepository spriteRepository,
         ISoundRepository soundRepository,
         IScriptRepository scriptRepository,
-        IEnvironmentMapRepository environmentMapRepository)
+        IEnvironmentMapRepository environmentMapRepository,
+        IMaterialRepository materialRepository)
     {
         _modelRepository = modelRepository;
         _modelVersionRepository = modelVersionRepository;
@@ -127,6 +138,7 @@ internal sealed class GetAllRecycledQueryHandler : IQueryHandler<GetAllRecycledQ
         _soundRepository = soundRepository;
         _scriptRepository = scriptRepository;
         _environmentMapRepository = environmentMapRepository;
+        _materialRepository = materialRepository;
     }
 
     public async Task<Result<GetAllRecycledQueryResponse>> Handle(GetAllRecycledQuery request, CancellationToken cancellationToken)
@@ -245,6 +257,13 @@ internal sealed class GetAllRecycledQueryHandler : IQueryHandler<GetAllRecycledQ
                     v.DeletedAt!.Value))))
             .ToList();
 
+        var materials = await _materialRepository.GetAllDeletedAsync(cancellationToken);
+        var materialDtos = materials.Select(m => new RecycledMaterialDto(
+            m.Id,
+            m.Name,
+            m.DeletedAt!.Value,
+            m.ThumbnailPath)).ToList();
+
         var response = new GetAllRecycledQueryResponse(
             modelDtos,
             modelVersionDtos,
@@ -255,7 +274,8 @@ internal sealed class GetAllRecycledQueryHandler : IQueryHandler<GetAllRecycledQ
             soundDtos,
             scriptDtos,
             environmentMapDtos,
-            environmentMapVariantDtos
+            environmentMapVariantDtos,
+            materialDtos
         );
 
         return Result.Success(response);

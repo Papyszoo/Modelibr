@@ -461,15 +461,12 @@ public static class ThumbnailEndpoints
 
     private static Result ValidateThumbnailFile(IFormFile file, long maxThumbnailSizeBytes)
     {
-        if (file == null || file.Length <= 0)
+        // The empty/size half is shared with the VFX thumbnail upload; only the content-type
+        // check below is specific to a model thumbnail.
+        var shape = ThumbnailFileValidator.Validate(file, maxThumbnailSizeBytes);
+        if (shape.IsFailure)
         {
-            return Result.Failure(new Error("InvalidThumbnailFile", "Thumbnail file is empty or invalid."));
-        }
-
-        if (file.Length > maxThumbnailSizeBytes)
-        {
-            var maxSizeMB = maxThumbnailSizeBytes / 1_048_576;
-            return Result.Failure(new Error("ThumbnailFileTooLarge", $"Thumbnail file size cannot exceed {maxSizeMB}MB."));
+            return shape;
         }
 
         // Validate content type

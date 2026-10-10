@@ -104,6 +104,7 @@ public class SearchProjectionLifecycleTests
         new Mock<ISoundRepository>().Object,
         new Mock<IScriptRepository>().Object,
         new Mock<IEnvironmentMapRepository>().Object,
+        new Mock<IMaterialRepository>().Object,
         _searchDocs.Object,
         _clock.Object,
         _uow.Object);

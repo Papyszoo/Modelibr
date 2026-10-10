@@ -87,7 +87,7 @@ internal sealed class CreateMaterialCommandHandler : ICommandHandler<CreateMater
 
             if (command.Tags is { Count: > 0 })
             {
-                var tags = await MaterialTags.ResolveAsync(
+                var tags = await AssetTagResolver.ResolveAsync(
                     _modelTagRepository, command.Tags, _dateTimeProvider.UtcNow, cancellationToken);
                 material.SetTags(tags, _dateTimeProvider.UtcNow);
             }

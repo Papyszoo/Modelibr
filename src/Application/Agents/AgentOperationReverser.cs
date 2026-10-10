@@ -1247,9 +1247,10 @@ internal sealed class AgentOperationReverser : IAgentOperationReverser
                 // claiming a decision nobody ever opened.
                 var slot = ReadPayload<SceneSlot>(before.Value, "slot");
                 var node = ReadPayload<SceneSlotNodeState>(before.Value, "node");
+                var produced = ReadPayload<SceneSlotProduced>(before.Value, "produced");
 
                 var result = await _restoreSceneSlot.Handle(
-                    new RestoreSceneSlotCommand(entry.AssetId!.Value, slotId, slot, node), cancellationToken);
+                    new RestoreSceneSlotCommand(entry.AssetId!.Value, slotId, slot, node, produced), cancellationToken);
 
                 return result.IsFailure
                     ? Result.Failure<string>(result.Error)
@@ -1312,7 +1313,10 @@ internal sealed class AgentOperationReverser : IAgentOperationReverser
             case "delete-scene":
             {
                 var before = Read(entry.PayloadBefore);
-                var document = before is null ? null : ReadString(before.Value, "document");
+                // The scene document is recorded as an object, not a string - the writer
+                // stores the whole SceneDocument. Reading it as a string returned null for
+                // every real row, so undoing a delete always answered NoPriorState.
+                var document = before is null ? null : ReadPayload<SceneDocument>(before.Value, "document");
                 if (document is null)
                 {
                     return Result.Failure<string>(new Error(
@@ -1324,7 +1328,7 @@ internal sealed class AgentOperationReverser : IAgentOperationReverser
                 var description = before is null ? null : ReadString(before.Value, "description");
 
                 var result = await _createScene.Handle(
-                    new CreateSceneCommand(name, description, document), cancellationToken);
+                    new CreateSceneCommand(name, description, SceneDocumentCodec.Serialize(document)), cancellationToken);
 
                 // The new id is said out loud rather than glossed over. A scene comes back
                 // with its content intact and its identity changed, and a caller that assumed

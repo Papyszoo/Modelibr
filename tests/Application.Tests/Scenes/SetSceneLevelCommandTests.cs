@@ -1,10 +1,11 @@
-using Application.Abstractions;
 using Application.Abstractions.Repositories;
+using Application.Abstractions.Services;
 using Application.Scenes;
 using Domain.Models;
 using Domain.Projects;
 using Domain.Services;
 using Moq;
+using SharedKernel;
 using Xunit;
 
 namespace Application.Tests.Scenes;
@@ -53,7 +54,7 @@ public class SetSceneLevelCommandTests
             scenes.Object,
             levels.Object,
             Clock(),
-            new Mock<IUnitOfWork>().Object);
+            Commit());
 
         var result = await handler.Handle(
             new SetSceneLevelCommand(1, 2, IsPrimary: true),
@@ -124,13 +125,38 @@ public class SetSceneLevelCommandTests
             repository.Object,
             projects.Object,
             Clock(),
-            new Mock<IUnitOfWork>().Object);
+            Commit());
 
         var result = await handler.Handle(new SetSceneProjectCommand(1, 9), CancellationToken.None);
 
         Assert.True(result.IsFailure);
         Assert.Equal("SceneLevelProjectMismatch", result.Error.Code);
         Assert.Equal(1, scene.ProjectId);
+    }
+
+    /// <summary>
+    /// A concurrent edit is reported, never thrown. Both level- and project-link writes moved
+    /// to an owned commit for exactly this: the revision is a database concurrency token, and
+    /// leaving the commit to the trailing decorator turned a race into a 500.
+    /// </summary>
+    [Fact]
+    public async Task AWriteThatLosesTheConcurrencyRace_ReturnsRevisionConflict()
+    {
+        var scene = Scene.Create("Crossing", "{\"schemaVersion\":1}", 1, Now, projectId: 1).Value;
+        var scenes = new Mock<ISceneRepository>();
+        scenes.Setup(r => r.GetByIdAsync(1, It.IsAny<CancellationToken>())).ReturnsAsync(scene);
+        var levels = new Mock<IProjectLevelRepository>();
+        levels.Setup(r => r.GetByIdAsync(1, 2, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(ProjectLevel.Create(1, "Crossing", null, ProjectLevelStatuses.Planned, 0, Now));
+        var commit = new Mock<ISceneDocumentCommit>();
+        commit.Setup(c => c.SaveAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result.Failure(new Error("Scene.RevisionConflict", "raced")));
+        var handler = new SetSceneLevelCommandHandler(scenes.Object, levels.Object, Clock(), commit.Object);
+
+        var result = await handler.Handle(new SetSceneLevelCommand(1, 2), CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("Scene.RevisionConflict", result.Error.Code);
     }
 
     private static void SetId(Scene scene, int id)
@@ -161,7 +187,14 @@ public class SetSceneLevelCommandTests
             scenes.Object,
             levels.Object,
             Clock(),
-            new Mock<IUnitOfWork>().Object);
+            Commit());
+    }
+
+    private static ISceneDocumentCommit Commit()
+    {
+        var commit = new Mock<ISceneDocumentCommit>();
+        commit.Setup(c => c.SaveAsync(It.IsAny<CancellationToken>())).ReturnsAsync(Result.Success());
+        return commit.Object;
     }
 
     private static IDateTimeProvider Clock()

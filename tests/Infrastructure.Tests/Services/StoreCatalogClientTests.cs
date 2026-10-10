@@ -604,4 +604,15 @@ public class StoreCatalogClientTests
             "the follow-up request carried no pinned address, so the socket would re-resolve");
         Assert.Equal(IPAddress.Parse("93.184.216.34"), pinned);
     }
+
+    [Fact]
+    public void StoreUrl_IsCanonicalized_TheSameWayTheImporterStoresIt()
+    {
+        // The store URL is also the key the importer's provenance rows carry, and those are
+        // canonicalized (lowercase host, default port stripped). A raw "Store.X.com:443" here
+        // meant every already-imported lookup missed and the import guard never fired.
+        var (client, _) = Build(_ => Json(OnePage), storeUrl: "https://Store.Example.COM:443/");
+
+        Assert.Equal("https://store.example.com", client.StoreUrl);
+    }
 }

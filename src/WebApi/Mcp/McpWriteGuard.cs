@@ -94,6 +94,20 @@ internal static class McpWriteGuard
         // an unattributed row by forgetting to pass it.
         write = write with { Actor = caller.Actor };
 
+        // Refused before the claim, so a bad id does not burn the idempotency key. The audit
+        // row's own guard also rejects an id <= 0, but it does so by throwing - which for a
+        // tool that passed a raw 0 surfaced as an unhandled fault instead of the {error,
+        // message} every other validation failure returns.
+        if (write.AssetId is <= 0)
+        {
+            // .Response on purpose: every other refusal returns the inner {error, message},
+            // and returning the ToolOutcome itself would serialize the wrapper's Response and
+            // Succeeded properties into the MCP payload instead.
+            return Failed(new SharedKernel.Error(
+                "InvalidAssetId",
+                $"'{write.Operation}' needs a positive asset id; got {write.AssetId}.")).Response;
+        }
+
         var claim = await audit.TryBeginAsync(write, cancellationToken);
         switch (claim.Outcome)
         {

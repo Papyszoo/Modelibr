@@ -1,3 +1,4 @@
+using Application.Abstractions;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
 using Application.Extraction;
@@ -41,13 +42,16 @@ internal sealed class CollapseDuplicateAssetsCommandHandler
 {
     private readonly IAssetSearchDocumentRepository _searchDocuments;
     private readonly ICommandHandler<SoftDeleteModelCommand, SoftDeleteModelResponse> _softDelete;
+    private readonly IUnitOfWork _unitOfWork;
 
     public CollapseDuplicateAssetsCommandHandler(
         IAssetSearchDocumentRepository searchDocuments,
-        ICommandHandler<SoftDeleteModelCommand, SoftDeleteModelResponse> softDelete)
+        ICommandHandler<SoftDeleteModelCommand, SoftDeleteModelResponse> softDelete,
+        IUnitOfWork unitOfWork)
     {
         _searchDocuments = searchDocuments;
         _softDelete = softDelete;
+        _unitOfWork = unitOfWork;
     }
 
     public async Task<Result<CollapseDuplicateAssetsResponse>> Handle(
@@ -98,16 +102,23 @@ internal sealed class CollapseDuplicateAssetsCommandHandler
                 command.SurvivorModelId, redundant, true));
         }
 
-        foreach (var id in redundant)
+        // One transaction around the whole collapse. Each soft delete commits through the
+        // unit-of-work decorator, so a failure on a later id would leave the earlier ones
+        // recycled while the response said nothing was changed - the exact half-applied
+        // outcome the caller cannot see. Inside the transaction the failure rolls them back.
+        return await _unitOfWork.InTransactionAsync(async ct =>
         {
-            var result = await _softDelete.Handle(new SoftDeleteModelCommand(id), cancellationToken);
-            if (result.IsFailure)
+            foreach (var id in redundant)
             {
-                return Result.Failure<CollapseDuplicateAssetsResponse>(result.Error);
+                var result = await _softDelete.Handle(new SoftDeleteModelCommand(id), ct);
+                if (result.IsFailure)
+                {
+                    return Result.Failure<CollapseDuplicateAssetsResponse>(result.Error);
+                }
             }
-        }
 
-        return Result.Success(new CollapseDuplicateAssetsResponse(
-            command.SurvivorModelId, redundant, false));
+            return Result.Success(new CollapseDuplicateAssetsResponse(
+                command.SurvivorModelId, redundant, false));
+        }, cancellationToken);
     }
 }

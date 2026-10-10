@@ -573,6 +573,20 @@ internal sealed class RestoreSceneSlotCommandHandler : ICommandHandler<RestoreSc
                 var slots = document.Slots?.ToList() ?? new List<SceneSlot>();
                 var index = SceneSlotHandlerBase.IndexOfSlot(document, command.SlotId);
 
+                // What carries the id now is only overwritable (or removable) while it is still
+                // the slot the write produced. A slot removed and recreated under the same id
+                // holds unrelated candidates, and clobbering it would discard a decision the
+                // undo never touched - so a mismatch is refused rather than applied.
+                if (index >= 0
+                    && command.Produced is { } produced
+                    && !produced.Matches(slots[index]))
+                {
+                    return Result.Failure<SceneDocument>(new Error(
+                        "Scene.SlotNotFound",
+                        $"Slot '{command.SlotId}' cannot be restored: it is no longer the slot this operation recorded " +
+                        "(it was removed and recreated, or changed since). Re-read the slots and undo the current one."));
+                }
+
                 if (command.Slot is null)
                 {
                     // The slot did not exist before the write being undone, so putting things
@@ -596,14 +610,22 @@ internal sealed class RestoreSceneSlotCommandHandler : ICommandHandler<RestoreSc
                 if (command.Node is { } state)
                 {
                     var nodeIndex = MoveSceneNodeCommandHandler.IndexOfNode(document, state.NodeId);
-                    if (nodeIndex >= 0)
+                    if (nodeIndex < 0)
                     {
-                        var updated = document.Nodes.ToArray();
-                        // Exact, like every other undo in this codebase: a node that wore no
-                        // material is only restorable while null means null.
-                        updated[nodeIndex] = updated[nodeIndex] with { Asset = state.Asset, Material = state.Material };
-                        nodes = updated;
+                        // The write being undone changed what a node wore, and that node is
+                        // gone. Restoring only the slot would leave the slot's chosen
+                        // candidate pointing at a node that no longer exists, so the whole
+                        // restore is refused rather than half-applied.
+                        return Result.Failure<SceneDocument>(new Error(
+                            "Scene.SlotNodeNotFound",
+                            $"Slot '{command.SlotId}' cannot be restored: node '{state.NodeId}' is no longer in the scene. Restore the node first."));
                     }
+
+                    var updated = document.Nodes.ToArray();
+                    // Exact, like every other undo in this codebase: a node that wore no
+                    // material is only restorable while null means null.
+                    updated[nodeIndex] = updated[nodeIndex] with { Asset = state.Asset, Material = state.Material };
+                    nodes = updated;
                 }
 
                 return Result.Success(document with { Nodes = nodes, Slots = slots.Count == 0 ? null : slots });

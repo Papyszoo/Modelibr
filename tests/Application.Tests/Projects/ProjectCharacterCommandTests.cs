@@ -25,9 +25,12 @@ public class ProjectCharacterCommandTests
         var enemy = ProjectCharacterTag.Create(1, "enemy", Now);
         tags.Setup(r => r.GetOrCreateAsync(1, It.IsAny<IEnumerable<string>>(), Now, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new[] { enemy });
+        var characters = new Mock<IProjectCharacterRepository>();
+        characters.Setup(r => r.NameExistsAsync(1, It.IsAny<string>(), null, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(false);
         var handler = new CreateProjectCharacterCommandHandler(
             projects.Object,
-            new Mock<IProjectCharacterRepository>().Object,
+            characters.Object,
             tags.Object,
             Clock(),
             new Mock<IUnitOfWork>().Object);
@@ -43,12 +46,42 @@ public class ProjectCharacterCommandTests
     }
 
     [Fact]
+    public async Task CreateCharacter_WhenNameAlreadyExists_RefusesWithAValidationError()
+    {
+        // Without this check the unique (ProjectId, Name) index throws a DbUpdateException and
+        // the endpoint answers 500. A clashing name is an ordinary validation error.
+        var projects = new Mock<IProjectRepository>();
+        projects.Setup(r => r.GetByIdAsync(1, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Project.Create("Nightfall", null, Now));
+        var characters = new Mock<IProjectCharacterRepository>();
+        characters.Setup(r => r.NameExistsAsync(1, "Ashen Warden", null, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
+        var handler = new CreateProjectCharacterCommandHandler(
+            projects.Object,
+            characters.Object,
+            new Mock<IProjectCharacterTagRepository>().Object,
+            Clock(),
+            new Mock<IUnitOfWork>().Object);
+
+        var result = await handler.Handle(
+            new CreateProjectCharacterCommand(1, "Ashen Warden", null),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("ProjectCharacterNameAlreadyExists", result.Error.Code);
+        characters.Verify(
+            r => r.AddAsync(It.IsAny<ProjectCharacter>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
     public async Task UpdateCharacter_ReplacesTagsAndReturnsTheCharacter()
     {
         var character = ProjectCharacter.Create(1, "Ashen Warden", "Old description", Now).WithId(7);
         var characters = new Mock<IProjectCharacterRepository>();
         characters.Setup(r => r.GetByIdAsync(1, 7, It.IsAny<CancellationToken>()))
             .ReturnsAsync(character);
+        characters.Setup(r => r.NameExistsAsync(1, "Ashen Warden", 7, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(false);
         var tags = new Mock<IProjectCharacterTagRepository>();
         var boss = ProjectCharacterTag.Create(1, "boss", Now);
         tags.Setup(r => r.GetOrCreateAsync(1, It.IsAny<IEnumerable<string>>(), Now, It.IsAny<CancellationToken>()))
@@ -76,12 +109,38 @@ public class ProjectCharacterCommandTests
             .ReturnsAsync((ProjectCharacter?)null);
         var handler = new DeleteProjectCharacterCommandHandler(
             characters.Object,
+            new Mock<IProjectReferenceRepository>().Object,
             new Mock<IUnitOfWork>().Object);
 
         var result = await handler.Handle(new DeleteProjectCharacterCommand(1, 7), CancellationToken.None);
 
         Assert.True(result.IsFailure);
         Assert.Equal("ProjectCharacterNotFound", result.Error.Code);
+    }
+
+    [Fact]
+    public async Task DeleteCharacter_UnlinksReferenceImagesBeforeRemovingIt()
+    {
+        // The link FK is SET NULL, and CK_ProjectReferenceLinks_OneTarget requires a link to
+        // keep exactly one target - so clearing the column alone is refused by the database
+        // and the delete answers 500. The reference images stay; only the links go.
+        var character = ProjectCharacter.Create(1, "Ashen Warden", null, Now).WithId(7);
+        var characters = new Mock<IProjectCharacterRepository>();
+        characters.Setup(r => r.GetByIdAsync(1, 7, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(character);
+        var references = new Mock<IProjectReferenceRepository>();
+        var handler = new DeleteProjectCharacterCommandHandler(
+            characters.Object,
+            references.Object,
+            new Mock<IUnitOfWork>().Object);
+
+        var result = await handler.Handle(new DeleteProjectCharacterCommand(1, 7), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        references.Verify(
+            r => r.DeleteLinksForCharacterAsync(1, 7, It.IsAny<CancellationToken>()), Times.Once);
+        characters.Verify(
+            r => r.DeleteAsync(character, It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]

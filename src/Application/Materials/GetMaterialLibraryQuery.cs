@@ -139,12 +139,16 @@ internal sealed class GetMaterialLibraryQueryHandler
 
         var totalCount = ordered.Count;
 
-        if (query.Page is { } page2 && query.PageSize is { } pageSize && pageSize > 0)
+        if (query.PageSize is { } pageSize && pageSize > 0)
         {
-            var paged = ordered.Skip((page2 - 1) * pageSize).Take(pageSize).ToList();
+            // pageSize alone is enough: it is what the scene's material picker sends, and
+            // reading it as "no paging" returned the whole library for one page's worth of
+            // cards. An explicit page still wins when it is one.
+            var page = query.Page is { } requested && requested > 0 ? requested : 1;
+            var paged = ordered.Skip((page - 1) * pageSize).Take(pageSize).ToList();
             var totalPages = (int)Math.Ceiling((double)totalCount / pageSize);
 
-            return Result.Success(new GetMaterialLibraryResponse(paged, totalCount, page2, pageSize, totalPages));
+            return Result.Success(new GetMaterialLibraryResponse(paged, totalCount, page, pageSize, totalPages));
         }
 
         return Result.Success(new GetMaterialLibraryResponse(ordered, totalCount));

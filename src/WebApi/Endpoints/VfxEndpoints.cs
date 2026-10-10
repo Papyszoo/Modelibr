@@ -126,9 +126,20 @@ public static class VfxEndpoints
     private static async Task<IResult> UploadVfxThumbnail(
         int id,
         IFormFile file,
+        Application.Settings.ISettingsService settingsService,
         ICommandHandler<UploadVfxThumbnailCommand, UploadVfxThumbnailResponse> commandHandler,
         CancellationToken cancellationToken)
     {
+        // The command validates the bytes; empty and oversized uploads are refused here the
+        // same way the model thumbnail endpoint refuses them, rather than reaching the
+        // command and being turned into a failure deeper in.
+        var settings = await settingsService.GetSettingsAsync(cancellationToken);
+        var validation = ThumbnailFileValidator.Validate(file, settings.MaxThumbnailSizeBytes);
+        if (validation.IsFailure)
+        {
+            return Results.BadRequest(new { error = validation.Error.Code, message = validation.Error.Message });
+        }
+
         var result = await commandHandler.Handle(
             new UploadVfxThumbnailCommand(id, new FormFileUpload(file)),
             cancellationToken);

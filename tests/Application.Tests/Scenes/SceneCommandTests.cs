@@ -1024,6 +1024,28 @@ public class SceneCommandTests
         Assert.Equal("shelf", moved.Value.Node.Anchor!.OnNodeId);
     }
 
+    [Fact]
+    public async Task ReSeating_A_Node_On_The_Same_Surface_Does_Not_Drift()
+    {
+        // The offset a surface records is absolute - the vector from the target's reference
+        // point to the seat - not a nudge added to whatever offset the node already carried.
+        // Adding the prior offset double-counted it, so every repeat re-seated the node
+        // further away; the only tested case was the first seating, where the offset is zero.
+        GivenSurfaces(3.0, 1.5);
+        await Place.Handle(PlaceCommand(nodeId: "shelf", groundSnap: true), CancellationToken.None);
+        await Place.Handle(
+            new PlaceSceneAssetCommand(
+                SceneId, SceneAssetTypes.Model, ModelId, VersionId, "book",
+                AnchorTo: "shelf", OnSurface: 1),
+            CancellationToken.None);
+
+        var again = await new MoveSceneNodeCommandHandler(_writer, _facts.Object, _profiles.Object, _surfaces.Object).Handle(
+            new MoveSceneNodeCommand(SceneId, "book", OnSurface: 1), CancellationToken.None);
+
+        Assert.True(again.IsSuccess);
+        Assert.Equal(1.5, again.Value.Node.Footprint!.Value.Min.Y, 6);
+    }
+
     private PlaceSceneAssetsBatchCommandHandler Batch => new(_writer, _facts.Object, _profiles.Object, _surfaces.Object);
 
     private static ScenePlacementRequest BatchEntry(

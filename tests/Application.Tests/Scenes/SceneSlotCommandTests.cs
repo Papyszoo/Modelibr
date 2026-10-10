@@ -439,13 +439,79 @@ public class SceneSlotCommandTests
             new ResolveSceneSlotCommand(SceneId, Slot, "B", SceneSlotResolvers.Agent), CancellationToken.None);
 
         var undone = await Restore.Handle(
-            new RestoreSceneSlotCommand(SceneId, Slot, chosen.Value.Previous.Slot, chosen.Value.Previous.Node),
+            new RestoreSceneSlotCommand(
+                SceneId, Slot, chosen.Value.Previous.Slot, chosen.Value.Previous.Node,
+                SceneSlotProduced.Of(chosen.Value.Slot)),
             CancellationToken.None);
 
         Assert.True(undone.IsSuccess);
         var document = SceneDocumentCodec.Parse(_scene.DocumentJson).Value;
         Assert.Null(document.Slots!.Single().ChosenCandidateId);
         Assert.Equal(LampId, document.Nodes.Single().Asset!.AssetId);
+    }
+
+    [Fact]
+    public async Task Restoring_A_Slot_Removed_And_Recreated_Under_The_Same_Id_Is_Refused()
+    {
+        // The stale undo: the agent resolved the slot, then the node (and its slot) was
+        // removed and a new slot was opened under the same id. Overwriting it with the
+        // recorded one would silently discard candidates the undo never touched, so the
+        // restore refuses instead of clobbering a slot that is no longer the one it recorded.
+        await ProposeTwo();
+        var chosen = await Resolve.Handle(
+            new ResolveSceneSlotCommand(SceneId, Slot, "B", SceneSlotResolvers.Agent), CancellationToken.None);
+        var produced = SceneSlotProduced.Of(chosen.Value.Slot);
+
+        GivenScene(new SceneDocument(
+            SceneDocument.CurrentSchemaVersion,
+            new[]
+            {
+                new SceneNode(
+                    "lamp-1",
+                    SceneTransform.Identity,
+                    Asset: new SceneAssetRef(SceneAssetTypes.Model, OtherLampId, VersionId),
+                    SlotId: Slot),
+            },
+            Array.Empty<SceneLight>(),
+            SceneEnvironment.Default,
+            Slots: new[]
+            {
+                new SceneSlot(Slot, new[]
+                {
+                    new SceneSlotCandidate("A", new SceneAssetRef(SceneAssetTypes.Model, OtherLampId, VersionId)),
+                }),
+            }));
+
+        var undone = await Restore.Handle(
+            new RestoreSceneSlotCommand(
+                SceneId, Slot, chosen.Value.Previous.Slot, chosen.Value.Previous.Node, produced),
+            CancellationToken.None);
+
+        Assert.True(undone.IsFailure);
+        Assert.Equal("Scene.SlotNotFound", undone.Error.Code);
+        Assert.Equal(
+            new[] { "A" },
+            SceneDocumentCodec.Parse(_scene.DocumentJson).Value.Slots!.Single().Candidates.Select(c => c.Id));
+    }
+
+    [Fact]
+    public async Task Restoring_A_Slot_Whose_Node_Was_Removed_Is_Refused_Rather_Than_Half_Applied()
+    {
+        // The stale undo: the choice was made, then the node was deleted, then the choice is
+        // undone. Restoring only the slot would leave it naming a node that is not there -
+        // and a document is validated in full, so the write is refused anyway. Refusing it
+        // with a clear error beats a silent skip that leaves slot and node disagreeing.
+        await ProposeTwo();
+        var chosen = await Resolve.Handle(
+            new ResolveSceneSlotCommand(SceneId, Slot, "B", SceneSlotResolvers.Agent), CancellationToken.None);
+        await Remove.Handle(new RemoveSceneNodeCommand(SceneId, "lamp-1"), CancellationToken.None);
+
+        var undone = await Restore.Handle(
+            new RestoreSceneSlotCommand(SceneId, Slot, chosen.Value.Previous.Slot, chosen.Value.Previous.Node),
+            CancellationToken.None);
+
+        Assert.True(undone.IsFailure);
+        Assert.Equal("Scene.SlotNodeNotFound", undone.Error.Code);
     }
 
     [Fact]
@@ -554,6 +620,40 @@ public class SceneSlotCommandTests
         Assert.True(restored.IsSuccess);
         var slot = Assert.Single(SceneDocumentCodec.Parse(_scene.DocumentJson).Value.Slots!);
         Assert.Equal(new[] { "A", "B", "C" }, slot.Candidates.Select(c => c.Id));
+    }
+
+    [Fact]
+    public async Task Restoring_A_Recommendation_For_A_Slot_That_No_Longer_Holds_That_Candidate_Drops_It()
+    {
+        // The slot was removed and recreated under the same id since the recommendation was
+        // given, so its candidate ids now name unrelated proposals. Restoring the old id
+        // would point the advice at the wrong asset.
+        GivenScene(new SceneDocument(
+            SceneDocument.CurrentSchemaVersion,
+            new[]
+            {
+                new SceneNode(
+                    "lamp-1",
+                    SceneTransform.Identity,
+                    Asset: new SceneAssetRef(SceneAssetTypes.Model, LampId, VersionId),
+                    SlotId: Slot),
+            },
+            Array.Empty<SceneLight>(),
+            SceneEnvironment.Default,
+            Slots: new[]
+            {
+                new SceneSlot(Slot, new[]
+                {
+                    new SceneSlotCandidate("A", new SceneAssetRef(SceneAssetTypes.Model, OtherLampId, VersionId)),
+                }),
+            }));
+
+        var restored = await RestoreRecommendations.Handle(
+            new RestoreSceneRecommendationsCommand(SceneId, new[] { new SceneRecommendation(Slot, "B") }, null),
+            CancellationToken.None);
+
+        Assert.True(restored.IsSuccess);
+        Assert.Null(SceneDocumentCodec.Parse(_scene.DocumentJson).Value.Slots!.Single().RecommendedCandidateId);
     }
 
     [Fact]

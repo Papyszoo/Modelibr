@@ -113,6 +113,20 @@ public class VfxThumbnailIntegrationTests : IClassFixture<ModelibrWebFactory>, I
         Assert.Equal(JsonValueKind.Null, detail.GetProperty("thumbnailUrl").ValueKind);
     }
 
+    [Fact]
+    public async Task Upload_OfAnEmptyFile_IsRejectedWithAValidationError()
+    {
+        // The endpoint used to hand a zero-length file straight to the command. It is refused
+        // at the boundary the same way the model thumbnail endpoint refuses it.
+        var id = await CreateVfxAsync("Rejects empty");
+
+        var upload = await UploadAsync(id, Array.Empty<byte>(), "image/webp");
+
+        Assert.Equal(HttpStatusCode.BadRequest, upload.StatusCode);
+        var body = await upload.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("InvalidThumbnailFile", body.GetProperty("error").GetString());
+    }
+
     // Regression: the unique VfxId index means a second Add would 500 the update. An edit
     // must put the one existing job back in the queue and keep the old picture showing.
     [Fact]

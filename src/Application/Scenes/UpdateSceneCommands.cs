@@ -1,6 +1,7 @@
 using Application.Abstractions;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
+using Application.Abstractions.Services;
 using Domain.Services;
 using SharedKernel;
 
@@ -50,11 +51,16 @@ internal sealed class RenameSceneCommandHandler : ICommandHandler<RenameSceneCom
 {
     private readonly ISceneRepository _scenes;
     private readonly IDateTimeProvider _dateTimeProvider;
+    private readonly ISceneDocumentCommit _commit;
 
-    public RenameSceneCommandHandler(ISceneRepository scenes, IDateTimeProvider dateTimeProvider)
+    public RenameSceneCommandHandler(
+        ISceneRepository scenes,
+        IDateTimeProvider dateTimeProvider,
+        ISceneDocumentCommit commit)
     {
         _scenes = scenes;
         _dateTimeProvider = dateTimeProvider;
+        _commit = commit;
     }
 
     public async Task<Result<SceneSummary>> Handle(RenameSceneCommand command, CancellationToken cancellationToken)
@@ -79,6 +85,14 @@ internal sealed class RenameSceneCommandHandler : ICommandHandler<RenameSceneCom
 
         await _scenes.UpdateAsync(scene, cancellationToken);
 
+        // Owned commit: a rename races the document writers through the same revision token,
+        // and this is where that race becomes Scene.RevisionConflict instead of a 500.
+        var saved = await _commit.SaveAsync(cancellationToken);
+        if (saved.IsFailure)
+        {
+            return Result.Failure<SceneSummary>(saved.Error);
+        }
+
         // Renaming does not touch the document, so its counts are read straight off the
         // stored copy; a document that no longer parses reports -1 rather than blocking a
         // rename the user is quite possibly performing in order to go and fix it.
@@ -96,10 +110,12 @@ public sealed record DeleteSceneCommand(int SceneId) : ICommand;
 internal sealed class DeleteSceneCommandHandler : ICommandHandler<DeleteSceneCommand>
 {
     private readonly ISceneRepository _scenes;
+    private readonly ISceneDocumentCommit _commit;
 
-    public DeleteSceneCommandHandler(ISceneRepository scenes)
+    public DeleteSceneCommandHandler(ISceneRepository scenes, ISceneDocumentCommit commit)
     {
         _scenes = scenes;
+        _commit = commit;
     }
 
     public async Task<Result> Handle(DeleteSceneCommand command, CancellationToken cancellationToken)
@@ -111,6 +127,8 @@ internal sealed class DeleteSceneCommandHandler : ICommandHandler<DeleteSceneCom
         }
 
         await _scenes.DeleteAsync(command.SceneId, cancellationToken);
-        return Result.Success();
+
+        // Owned commit, so a delete that races another write is reported rather than thrown.
+        return await _commit.SaveAsync(cancellationToken);
     }
 }

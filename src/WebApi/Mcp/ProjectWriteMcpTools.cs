@@ -110,7 +110,7 @@ public sealed class ProjectWriteMcpTools
         [Description("New body; omit to keep the current one.")] string? body = null,
         [Description("New pinned (decision) flag; omit to keep the current one.")] bool? pinned = null,
         [Description("open or resolved; omit to keep the current status.")] string? status = null,
-        [Description("What changed, recorded with a resolved comment. Omit to keep the current one.")] string? resolution = null,
+        [Description("What changed, recorded with a resolved comment. A resolution is only recorded on a resolved comment, so pass status=resolved with it; on an open comment it is refused. Omit to keep the current one.")] string? resolution = null,
         [Description("Optional batch id. Writes sharing one can be undone together with reverse_operation.")] string? batchId = null,
         CancellationToken cancellationToken = default)
     {

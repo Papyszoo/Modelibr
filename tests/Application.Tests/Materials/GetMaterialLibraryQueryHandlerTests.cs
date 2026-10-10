@@ -152,6 +152,27 @@ public class GetMaterialLibraryQueryHandlerTests
         Assert.Equal(2, result.Value.TotalPages);
     }
 
+    [Fact]
+    public async Task PageSize_Alone_PagesFromTheFirstPage()
+    {
+        // The scene's material picker sends pageSize alone. Reading that as "no paging"
+        // returned the whole library for one page's worth of cards.
+        GivenMaterials(
+            Material.Create("A material", MaterialParameters.Default, Now),
+            Material.Create("B material", MaterialParameters.Default, Now),
+            Material.Create("C material", MaterialParameters.Default, Now));
+        GivenGlobalMaterials();
+
+        var result = await Handler().Handle(
+            new GetMaterialLibraryQuery(PageSize: 2), CancellationToken.None);
+
+        Assert.Equal(new[] { "A material", "B material" }, result.Value.Entries.Select(e => e.Name));
+        Assert.Equal(3, result.Value.TotalCount);
+        Assert.Equal(1, result.Value.Page);
+        Assert.Equal(2, result.Value.PageSize);
+        Assert.Equal(2, result.Value.TotalPages);
+    }
+
     private static TextureSet OakPlanksIn(int categoryId)
     {
         var textureSet = TextureSet.Create("Oak Planks", Now, TextureSetKind.Universal);

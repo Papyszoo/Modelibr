@@ -1023,12 +1023,16 @@ public sealed class SceneWriteMcpTools
     /// One shape for all three, because all three amount to replacing one slot. The node half
     /// is only filled in by <c>resolve_slot</c> - the other two never touch what is on stage -
     /// and a null slot means the write created it, which the restore reads as "remove it again".
+    ///
+    /// The produced half is what the write actually left, so the restore can refuse to touch a
+    /// slot that carries the same id but is no longer this one.
     /// </summary>
     private static object SlotBefore(string slotId, SceneSlotWriteResponse response) => new
     {
         slotId,
         slot = response.Previous.Slot,
         node = response.Previous.Node,
+        produced = SceneSlotProduced.Of(response.Slot),
     };
 
     [McpServerTool(Name = "update_scene_document")]

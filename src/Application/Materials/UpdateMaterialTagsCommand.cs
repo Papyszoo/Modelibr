@@ -1,6 +1,7 @@
 using Application.Abstractions;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
+using Application.Models;
 using Domain.Services;
 using SharedKernel;
 
@@ -44,7 +45,7 @@ internal sealed class UpdateMaterialTagsCommandHandler
         }
 
         var now = _dateTimeProvider.UtcNow;
-        var assignedTags = await MaterialTags.ResolveAsync(_modelTagRepository, command.Tags, now, cancellationToken);
+        var assignedTags = await AssetTagResolver.ResolveAsync(_modelTagRepository, command.Tags, now, cancellationToken);
 
         material.SetTags(assignedTags, now);
         await _materialRepository.UpdateAsync(material, cancellationToken);

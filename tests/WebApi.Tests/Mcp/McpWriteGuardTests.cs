@@ -61,6 +61,55 @@ public class McpWriteGuardTests
             It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
 
     [Fact]
+    public async Task A_NonPositive_Asset_Id_Is_Refused_Before_The_Key_Is_Claimed()
+    {
+        // add_to_pack and its siblings passed a raw id straight into the audit row, whose own
+        // guard rejects id <= 0 by throwing - so the tool answered an unhandled fault instead
+        // of {error, message}. Refusing here also means the bad id does not burn the key.
+        var audit = ClaimGranted();
+        var ran = false;
+
+        var result = await McpWriteGuard.Guarded(
+            audit.Object,
+            Caller(),
+            new AgentWrite(Key, "add-to-pack", "Pack", 0),
+            _ =>
+            {
+                ran = true;
+                return Task.FromResult(McpWriteGuard.Applied(new { ok = true }, "Pack", 1, new { }));
+            },
+            CancellationToken.None);
+
+        Assert.False(ran);
+        audit.Verify(a => a.TryBeginAsync(It.IsAny<AgentWrite>(), It.IsAny<CancellationToken>()), Times.Never);
+        Assert.Contains("InvalidAssetId", Json(result));
+    }
+
+    [Fact]
+    public async Task A_NonPositive_Asset_Id_Returns_The_Plain_Error_Payload_Not_The_Outcome_Wrapper()
+    {
+        // The refusal used to return the ToolOutcome itself, so the response carried the
+        // wrapper's Response/Succeeded properties instead of the {error, message} shape every
+        // other failure returns. A substring assertion cannot see that, so this pins the shape:
+        // the top level is the error object itself, with no wrapper properties leaked into it.
+        var result = await McpWriteGuard.Guarded(
+            ClaimGranted().Object,
+            Caller(),
+            new AgentWrite(Key, "set-category", "Model", 0),
+            _ => Task.FromResult(McpWriteGuard.Applied(new { ok = true }, "Model", 1, new { })),
+            CancellationToken.None);
+
+        using var document = JsonDocument.Parse(Json(result));
+        var root = document.RootElement;
+
+        Assert.Equal(JsonValueKind.Object, root.ValueKind);
+        Assert.False(root.TryGetProperty("Response", out _));
+        Assert.False(root.TryGetProperty("Succeeded", out _));
+        Assert.Equal("InvalidAssetId", root.GetProperty("error").GetString());
+        Assert.False(string.IsNullOrWhiteSpace(root.GetProperty("message").GetString()));
+    }
+
+    [Fact]
     public async Task A_Mutation_That_Committed_Before_Completion_Threw_Interrupts_The_Key()
     {
         // The exact reported hole: the command committed, CompleteAsync blew up, and the

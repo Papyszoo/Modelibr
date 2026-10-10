@@ -365,4 +365,17 @@ public class SceneDocumentValidatorTests
         Assert.Null(node.ShapeKeys);
         Assert.Empty(SceneDocumentValidator.Validate(DocumentWith(node)));
     }
+
+    [Fact]
+    public void Validate_When_A_Material_Slot_Entry_Is_Null_Reports_It_Rather_Than_Throwing()
+    {
+        // `materialSlots:[null]` deserializes to a null element, and the binding rules
+        // dereference it. A validator that threw on it would fail the very documents it
+        // exists to describe.
+        var node = ModelNode("lamp") with { MaterialSlots = new SceneMaterialBinding[] { null! } };
+
+        var issues = SceneDocumentValidator.Validate(DocumentWith(node));
+
+        Assert.Contains(issues, i => i.Code == "MaterialSlotNull" && i.Path == "nodes[0].materialSlots[0]");
+    }
 }

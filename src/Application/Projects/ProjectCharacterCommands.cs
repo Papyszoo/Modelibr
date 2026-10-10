@@ -183,6 +183,14 @@ internal sealed class CreateProjectCharacterCommandHandler
             return Result.Failure<ProjectCharacterDto>(new Error(
                 "ProjectNotFound", $"Project with ID {command.ProjectId} was not found."));
 
+        // Checked here, not left to the unique index. Without it a duplicate name throws a
+        // DbUpdateException and the endpoint answers 500; a project character name is a
+        // user-facing label and a clash is an ordinary validation error.
+        if (await _characters.NameExistsAsync(command.ProjectId, command.Name, cancellationToken: cancellationToken))
+            return Result.Failure<ProjectCharacterDto>(new Error(
+                "ProjectCharacterNameAlreadyExists",
+                $"A character named '{command.Name.Trim()}' already exists in this project."));
+
         try
         {
             var now = _clock.UtcNow;
@@ -228,6 +236,12 @@ internal sealed class UpdateProjectCharacterCommandHandler
             return Result.Failure<ProjectCharacterDto>(new Error(
                 "ProjectCharacterNotFound", $"Character {command.CharacterId} was not found in project {command.ProjectId}."));
 
+        if (await _characters.NameExistsAsync(
+                command.ProjectId, command.Name, command.CharacterId, cancellationToken))
+            return Result.Failure<ProjectCharacterDto>(new Error(
+                "ProjectCharacterNameAlreadyExists",
+                $"A character named '{command.Name.Trim()}' already exists in this project."));
+
         try
         {
             var now = _clock.UtcNow;
@@ -247,13 +261,16 @@ internal sealed class UpdateProjectCharacterCommandHandler
 internal sealed class DeleteProjectCharacterCommandHandler : ICommandHandler<DeleteProjectCharacterCommand>
 {
     private readonly IProjectCharacterRepository _characters;
+    private readonly IProjectReferenceRepository _references;
     private readonly IUnitOfWork _unitOfWork;
 
     public DeleteProjectCharacterCommandHandler(
         IProjectCharacterRepository characters,
+        IProjectReferenceRepository references,
         IUnitOfWork unitOfWork)
     {
         _characters = characters;
+        _references = references;
         _unitOfWork = unitOfWork;
     }
 
@@ -265,6 +282,11 @@ internal sealed class DeleteProjectCharacterCommandHandler : ICommandHandler<Del
         if (character is null)
             return Result.Failure(new Error(
                 "ProjectCharacterNotFound", $"Character {command.CharacterId} was not found in project {command.ProjectId}."));
+
+        // Reference images stay; their link to this character goes. The FK is SET NULL, so
+        // leaving the rows would leave a link with no target - refused by
+        // CK_ProjectReferenceLinks_OneTarget, which turns the delete into a 500.
+        await _references.DeleteLinksForCharacterAsync(command.ProjectId, character.Id, cancellationToken);
 
         await _characters.DeleteAsync(character, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);

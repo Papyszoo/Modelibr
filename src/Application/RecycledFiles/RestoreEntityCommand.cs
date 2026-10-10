@@ -24,6 +24,7 @@ internal sealed class RestoreEntityCommandHandler : ICommandHandler<RestoreEntit
     private readonly ISoundRepository _soundRepository;
     private readonly IScriptRepository _scriptRepository;
     private readonly IEnvironmentMapRepository _environmentMapRepository;
+    private readonly IMaterialRepository _materialRepository;
     private readonly IAssetSearchDocumentRepository _searchDocumentRepository;
     private readonly IDateTimeProvider _dateTimeProvider;
     private readonly IUnitOfWork _unitOfWork;
@@ -37,6 +38,7 @@ internal sealed class RestoreEntityCommandHandler : ICommandHandler<RestoreEntit
         ISoundRepository soundRepository,
         IScriptRepository scriptRepository,
         IEnvironmentMapRepository environmentMapRepository,
+        IMaterialRepository materialRepository,
         IAssetSearchDocumentRepository searchDocumentRepository,
         IDateTimeProvider dateTimeProvider,
         IUnitOfWork unitOfWork)
@@ -49,6 +51,7 @@ internal sealed class RestoreEntityCommandHandler : ICommandHandler<RestoreEntit
         _soundRepository = soundRepository;
         _scriptRepository = scriptRepository;
         _environmentMapRepository = environmentMapRepository;
+        _materialRepository = materialRepository;
         _searchDocumentRepository = searchDocumentRepository;
         _dateTimeProvider = dateTimeProvider;
         _unitOfWork = unitOfWork;
@@ -158,6 +161,16 @@ internal sealed class RestoreEntityCommandHandler : ICommandHandler<RestoreEntit
                 await _environmentMapRepository.UpdateAsync(parent, cancellationToken);
                 await _unitOfWork.SaveChangesAsync(cancellationToken);
                 return Result.Success(new RestoreEntityResponse(true, "Environment map variant restored successfully"));
+
+            case "material":
+                var material = await _materialRepository.GetDeletedByIdAsync(request.EntityId, cancellationToken);
+                if (material == null)
+                    return Result.Failure<RestoreEntityResponse>(new Error("MaterialNotFound", "Recycled material not found"));
+
+                material.Restore(now);
+                await _materialRepository.UpdateAsync(material, cancellationToken);
+                await _unitOfWork.SaveChangesAsync(cancellationToken);
+                return Result.Success(new RestoreEntityResponse(true, "Material restored successfully"));
 
             default:
                 return Result.Failure<RestoreEntityResponse>(new Error("InvalidEntityType", $"Unknown entity type: {request.EntityType}"));

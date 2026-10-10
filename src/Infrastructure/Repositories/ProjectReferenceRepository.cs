@@ -64,4 +64,14 @@ internal sealed class ProjectReferenceRepository : IProjectReferenceRepository
         _context.UpdateIfDetached(reference);
         return Task.CompletedTask;
     }
+
+    public Task DeleteLinksForLevelAsync(int projectId, int levelId, CancellationToken cancellationToken = default) =>
+        _context.ProjectReferenceLinks
+            .Where(link => link.ProjectId == projectId && link.ProjectLevelId == levelId)
+            .ExecuteDeleteAsync(cancellationToken);
+
+    public Task DeleteLinksForCharacterAsync(int projectId, int characterId, CancellationToken cancellationToken = default) =>
+        _context.ProjectReferenceLinks
+            .Where(link => link.ProjectId == projectId && link.ProjectCharacterId == characterId)
+            .ExecuteDeleteAsync(cancellationToken);
 }

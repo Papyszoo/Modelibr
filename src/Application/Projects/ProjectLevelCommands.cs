@@ -154,17 +154,20 @@ internal sealed class DeleteProjectLevelCommandHandler
 {
     private readonly IProjectLevelRepository _levels;
     private readonly ISceneRepository _scenes;
+    private readonly IProjectReferenceRepository _references;
     private readonly IDateTimeProvider _clock;
     private readonly IUnitOfWork _unitOfWork;
 
     public DeleteProjectLevelCommandHandler(
         IProjectLevelRepository levels,
         ISceneRepository scenes,
+        IProjectReferenceRepository references,
         IDateTimeProvider clock,
         IUnitOfWork unitOfWork)
     {
         _levels = levels;
         _scenes = scenes;
+        _references = references;
         _clock = clock;
         _unitOfWork = unitOfWork;
     }
@@ -195,6 +198,11 @@ internal sealed class DeleteProjectLevelCommandHandler
                 scene.SetLevel(null, false, now);
             }
             await _unitOfWork.SaveChangesAsync(ct);
+
+            // Reference images stay, their link to this level goes. The FK is SET NULL, so
+            // leaving the rows would leave a link with no target - which the
+            // CK_ProjectReferenceLinks_OneTarget check refuses, turning the delete into a 500.
+            await _references.DeleteLinksForLevelAsync(level.ProjectId, level.Id, ct);
 
             await _levels.DeleteAsync(level, ct);
             await _unitOfWork.SaveChangesAsync(ct);

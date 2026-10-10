@@ -412,10 +412,46 @@ public static class SceneValidator
             return;
         }
 
-        foreach (var (nodeId, box) in boxes)
+        // The union of everything but each node, computed once with prefix/suffix extremes
+        // rather than a fresh scan per node. The check is O(n) over the scene instead of
+        // O(n^2): a scene may hold thousands of nodes, and validation runs on every write.
+        var entries = boxes.ToList();
+        var count = entries.Count;
+        var prefixMin = new Vec3[count];
+        var prefixMax = new Vec3[count];
+        var suffixMin = new Vec3[count];
+        var suffixMax = new Vec3[count];
+
+        for (var i = 0; i < count; i++)
         {
-            var others = boxes.Where(b => !string.Equals(b.Key, nodeId, StringComparison.Ordinal)).Select(b => b.Value).ToList();
-            var rest = Union(others);
+            var box = entries[i].Value;
+            prefixMin[i] = i == 0 ? box.Min : MinVec(prefixMin[i - 1], box.Min);
+            prefixMax[i] = i == 0 ? box.Max : MaxVec(prefixMax[i - 1], box.Max);
+        }
+
+        for (var i = count - 1; i >= 0; i--)
+        {
+            var box = entries[i].Value;
+            suffixMin[i] = i == count - 1 ? box.Min : MinVec(suffixMin[i + 1], box.Min);
+            suffixMax[i] = i == count - 1 ? box.Max : MaxVec(suffixMax[i + 1], box.Max);
+        }
+
+        for (var i = 0; i < count; i++)
+        {
+            var (nodeId, box) = entries[i];
+
+            var othersMin = i == 0
+                ? suffixMin[1]
+                : i == count - 1
+                    ? prefixMin[count - 2]
+                    : MinVec(prefixMin[i - 1], suffixMin[i + 1]);
+            var othersMax = i == 0
+                ? suffixMax[1]
+                : i == count - 1
+                    ? prefixMax[count - 2]
+                    : MaxVec(prefixMax[i - 1], suffixMax[i + 1]);
+
+            var rest = new Aabb(othersMin, othersMax);
             var threshold = Math.Max(StrayNodeMinimumDistanceMetres, StrayNodeDistanceFactor * rest.LargestExtent);
             var distance = DistanceOutside(box.Center, rest);
 
@@ -954,14 +990,11 @@ public static class SceneValidator
 
     private static double Volume(Aabb box) => Math.Max(0, box.Size.X) * Math.Max(0, box.Size.Y) * Math.Max(0, box.Size.Z);
 
-    private static Aabb Union(IReadOnlyList<Aabb> boxes)
-    {
-        var min = new Vec3(
-            boxes.Min(b => b.Min.X), boxes.Min(b => b.Min.Y), boxes.Min(b => b.Min.Z));
-        var max = new Vec3(
-            boxes.Max(b => b.Max.X), boxes.Max(b => b.Max.Y), boxes.Max(b => b.Max.Z));
-        return new Aabb(min, max);
-    }
+    private static Vec3 MinVec(Vec3 a, Vec3 b) =>
+        new(Math.Min(a.X, b.X), Math.Min(a.Y, b.Y), Math.Min(a.Z, b.Z));
+
+    private static Vec3 MaxVec(Vec3 a, Vec3 b) =>
+        new(Math.Max(a.X, b.X), Math.Max(a.Y, b.Y), Math.Max(a.Z, b.Z));
 
     /// <summary>Distance from a point to a box; 0 when the point is inside it.</summary>
     private static double DistanceOutside(Vec3 point, Aabb box)

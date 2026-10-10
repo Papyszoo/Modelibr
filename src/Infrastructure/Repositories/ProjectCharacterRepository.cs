@@ -63,6 +63,20 @@ internal sealed class ProjectCharacterRepository : IProjectCharacterRepository
         return Task.CompletedTask;
     }
 
+    public Task<bool> NameExistsAsync(
+        int projectId,
+        string name,
+        int? excludingCharacterId = null,
+        CancellationToken cancellationToken = default)
+    {
+        var normalizedName = name.Trim();
+        return _context.ProjectCharacters.AnyAsync(
+            character => character.ProjectId == projectId
+                && character.Name == normalizedName
+                && (!excludingCharacterId.HasValue || character.Id != excludingCharacterId.Value),
+            cancellationToken);
+    }
+
     public Task DeleteAsync(ProjectCharacter character, CancellationToken cancellationToken = default)
     {
         _context.ProjectCharacters.Remove(character);

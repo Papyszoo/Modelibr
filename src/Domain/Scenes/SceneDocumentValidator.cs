@@ -226,9 +226,20 @@ public static class SceneDocumentValidator
                 for (var s = 0; s < slots.Count; s++)
                 {
                     var slotPath = $"{path}.materialSlots[{s}]";
-                    ValidateMaterialBinding(slots[s], slotPath, requireSlot: true, issues);
 
-                    var slotName = slots[s].Slot;
+                    // A null entry deserializes fine from `materialSlots:[null]`, and the
+                    // binding rules below dereference it. Reported like the other "entry is
+                    // null" cases rather than thrown, because this validator exists to say
+                    // what is wrong with a document, not to fail on it.
+                    if (slots[s] is not { } binding)
+                    {
+                        issues.Add(new SceneValidationIssue(slotPath, "MaterialSlotNull", "A materialSlots entry is null."));
+                        continue;
+                    }
+
+                    ValidateMaterialBinding(binding, slotPath, requireSlot: true, issues);
+
+                    var slotName = binding.Slot;
                     if (!string.IsNullOrWhiteSpace(slotName) && !seenSlots.Add(slotName.Trim()))
                     {
                         issues.Add(new SceneValidationIssue(

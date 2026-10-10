@@ -125,6 +125,21 @@ public class ProfileSearchBiasTests
     }
 
     [Fact]
+    public void ABudgetOnlyProject_IsNotInertInBiasMode()
+    {
+        // The cap rides out on every hit as facts.profileFit even in bias, so a profile that
+        // carries one is not "nothing in play". Treating it as inert made the response claim
+        // "no style and no triangle budget" while carrying a triangleCap in the same object.
+        var bias = ProfileSearchBiasBuilder.Build(
+            ProjectWith(Array.Empty<string>(), p => GiveBudget(p, 5000)),
+            AssetSearchProfileModes.Bias);
+
+        Assert.False(bias.IsInert);
+        Assert.Equal(5000, bias.TriangleCap);
+        Assert.False(bias.EnforcesBudget);
+    }
+
+    [Fact]
     public void EnforcingWithoutACap_IsNotEnforcement()
     {
         var bias = ProfileSearchBiasBuilder.Build(

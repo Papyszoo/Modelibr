@@ -98,7 +98,7 @@ public class AgentOperationReverserTests
     /// payload without one is not reversible at all.
     /// </summary>
     private const string DeletedSceneBefore =
-        """{"name":"Kitchen","description":null,"document":"{\"schemaVersion\":1,\"nodes\":[],\"lights\":[]}"}""";
+        """{"name":"Kitchen","description":null,"document":{"schemaVersion":1,"nodes":[],"lights":[]}}""";
 
     /// <summary>The scene the inverse creates - a new id, which is the point of the case.</summary>
     private static SceneView RecreatedScene() => new(
@@ -492,6 +492,32 @@ public class AgentOperationReverserTests
         }
 
         Assert.Equal(1, created);
+    }
+
+    /// <summary>
+    /// The happy path the object-shaped payload was breaking. The writer records the scene
+    /// document as an object, so reading it with a string reader returned null for every real
+    /// row and the undo always answered NoPriorState instead of recreating the scene.
+    /// </summary>
+    [Fact]
+    public async Task Undoing_A_Delete_Scene_Recreates_It_From_The_Recorded_Document()
+    {
+        var entry = Completed("key-27", "delete-scene", "Scene", 4, before: DeletedSceneBefore);
+        Records(entry);
+        CreateSceneCommand? recreated = null;
+        _createScene.Setup(h => h.Handle(It.IsAny<CreateSceneCommand>(), It.IsAny<CancellationToken>()))
+            .Callback<CreateSceneCommand, CancellationToken>((command, _) => recreated = command)
+            .ReturnsAsync(Result.Success(RecreatedScene()));
+
+        var plan = await _reverser.PlanAsync("key-27", null);
+        var result = await _reverser.ApplyAsync(plan.Value);
+
+        Assert.True(result.Value.Single().Reversed);
+        Assert.NotNull(recreated);
+        Assert.Equal("Kitchen", recreated!.Name);
+        Assert.NotNull(recreated.DocumentJson);
+        Assert.Contains("\"nodes\"", recreated.DocumentJson!);
+        Assert.Contains("Recreated deleted scene", result.Value.Single().Detail);
     }
 
     /// <summary>
@@ -940,6 +966,31 @@ public class AgentOperationReverserTests
         Assert.True(applied!.Exact);
         Assert.Null(applied.Target);
         Assert.Null(applied.Name);
+    }
+
+    [Fact]
+    public async Task Reversing_A_Slot_Write_Hands_The_Restore_What_The_Write_Produced()
+    {
+        // The restore refuses to overwrite a slot that is no longer the one the write left,
+        // so the recorded "produced" fingerprint has to survive the audit payload and reach
+        // the command. This pins that round trip, not just the handler's use of it.
+        Records(Completed("key-slot", "resolve-slot", "Scene", 3,
+            before: """
+            {"slotId":"streetlight","slot":{"Id":"streetlight","Candidates":[{"Id":"A"},{"Id":"B"}],"ChosenCandidateId":"B","ResolvedBy":"agent"},"node":{"NodeId":"lamp-1"},"produced":{"CandidateIds":["A","B"],"ChosenCandidateId":"B","ResolvedBy":"agent"}}
+            """));
+        RestoreSceneSlotCommand? applied = null;
+        _restoreSceneSlot.Setup(h => h.Handle(It.IsAny<RestoreSceneSlotCommand>(), It.IsAny<CancellationToken>()))
+            .Callback<RestoreSceneSlotCommand, CancellationToken>((c, _) => applied = c)
+            .ReturnsAsync(Result.Success(new SceneSummary(3, "Street", null, 1, 1, 0, 0, Now, Now)));
+
+        var plan = await _reverser.PlanAsync("key-slot", null);
+        var result = await _reverser.ApplyAsync(plan.Value);
+
+        Assert.True(result.Value.Single().Reversed);
+        Assert.NotNull(applied);
+        Assert.NotNull(applied!.Produced);
+        Assert.Equal(new[] { "A", "B" }, applied.Produced!.CandidateIds);
+        Assert.Equal("B", applied.Produced.ChosenCandidateId);
     }
 
     // ---- set-scene-project and set-asset-metadata -------------------------------------

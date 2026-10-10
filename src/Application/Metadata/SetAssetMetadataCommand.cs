@@ -406,7 +406,19 @@ internal sealed class SetAssetMetadataCommandHandler
             var text = item.GetString();
             if (string.IsNullOrWhiteSpace(text)) continue;
 
-            var normalized = NormalizeEnum(field, text.Trim());
+            var trimmed = text.Trim();
+
+            // A list entry is bounded like a scalar one. Without this a tag over the tag
+            // column's limit reached ModelTag.SanitizeName, which throws - so the REST path
+            // answered 500 and the MCP path burned its idempotency key as Interrupted.
+            if (field.MaxLength is { } limit && trimmed.Length > limit)
+            {
+                return Result.Failure<IReadOnlyList<string>?>(new Error(
+                    "MetadataValueTooLong",
+                    $"'{field.Key}' entries accept at most {limit} characters and one was given {trimmed.Length}. Nothing was written."));
+            }
+
+            var normalized = NormalizeEnum(field, trimmed);
             if (normalized.IsFailure) return Result.Failure<IReadOnlyList<string>?>(normalized.Error);
             if (normalized.Value is not null) result.Add(normalized.Value);
         }

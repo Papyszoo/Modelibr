@@ -1,6 +1,7 @@
 using Application.Abstractions;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
+using Application.Abstractions.Services;
 using Domain.Services;
 using SharedKernel;
 
@@ -31,18 +32,18 @@ internal sealed class SetSceneProjectCommandHandler
     private readonly ISceneRepository _scenes;
     private readonly IProjectRepository _projects;
     private readonly IDateTimeProvider _clock;
-    private readonly IUnitOfWork _unitOfWork;
+    private readonly ISceneDocumentCommit _commit;
 
     public SetSceneProjectCommandHandler(
         ISceneRepository scenes,
         IProjectRepository projects,
         IDateTimeProvider clock,
-        IUnitOfWork unitOfWork)
+        ISceneDocumentCommit commit)
     {
         _scenes = scenes;
         _projects = projects;
         _clock = clock;
-        _unitOfWork = unitOfWork;
+        _commit = commit;
     }
 
     public async Task<Result<SetSceneProjectResponse>> Handle(
@@ -86,7 +87,15 @@ internal sealed class SetSceneProjectCommandHandler
 
         scene.SetProject(command.ProjectId, _clock.UtcNow);
         await _scenes.UpdateAsync(scene, cancellationToken);
-        await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+        // Committed here rather than left to the trailing unit-of-work commit, so a write
+        // that races another one is reported as Scene.RevisionConflict instead of surfacing
+        // as an unhandled concurrency exception.
+        var saved = await _commit.SaveAsync(cancellationToken);
+        if (saved.IsFailure)
+        {
+            return Result.Failure<SetSceneProjectResponse>(saved.Error);
+        }
 
         return Result.Success(new SetSceneProjectResponse(
             scene.Id, scene.ProjectId, projectName, previous, scene.Revision));

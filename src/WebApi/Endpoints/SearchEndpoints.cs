@@ -38,9 +38,33 @@ public static class SearchEndpoints
             string? shapeClass,
             string? engine,
             string? assetType,
+            double? minSize,
+            double? maxSize,
+            bool? hasRig,
+            int? minBones,
+            int? maxBones,
+            int? minMaterials,
+            int? maxMaterials,
+            bool? hasUvs,
+            string? uvStatus,
+            int? minParts,
+            int? maxParts,
+            int? minVertices,
+            int? maxVertices,
+            string? category,
+            string[]? styles,
+            string[]? themes,
+            string? license,
+            int? projectId,
+            int? sceneId,
+            string? applyProfile,
             IQueryHandler<AssetSearchQuery, AssetSearchResponse> queryHandler,
             CancellationToken cancellationToken) =>
         {
+            // Every filter search_assets accepts is bound here. This endpoint bound nine of
+            // them, so a REST caller could not pass a style, a theme, a licence, a UV status,
+            // a size, a rig or a project - and response.profile was always null because no
+            // project could be named.
             var result = await queryHandler.Handle(
                 new AssetSearchQuery(
                     q ?? string.Empty,
@@ -51,7 +75,27 @@ public static class SearchEndpoints
                     hasAnimations,
                     shapeClass,
                     engine,
-                    assetType),
+                    assetType,
+                    minSize,
+                    maxSize,
+                    hasRig,
+                    minBones,
+                    maxBones,
+                    minMaterials,
+                    maxMaterials,
+                    hasUvs,
+                    uvStatus,
+                    minParts,
+                    maxParts,
+                    minVertices,
+                    maxVertices,
+                    category,
+                    styles,
+                    themes,
+                    license,
+                    projectId,
+                    sceneId,
+                    applyProfile),
                 cancellationToken);
 
             if (result.IsFailure)

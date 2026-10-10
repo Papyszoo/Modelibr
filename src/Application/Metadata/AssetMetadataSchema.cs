@@ -247,6 +247,9 @@ public static class AssetMetadataSchema
             Type: FieldTypes.Text,
             Repeats: true,
             Provenance: FieldProvenance.Authored,
+            // Matches ModelTag's own ceiling, so an over-long tag is refused with a clear
+            // MetadataValueTooLong instead of reaching SanitizeName and throwing.
+            MaxLength: 100,
             Storage: TagsOnEntity(family) ? AssetMetadataStorage.Entity : AssetMetadataStorage.Metadata,
             Description: "Free-text labels. The strongest search signal there is, because a person chose the words.",
             StoreManifestPath: "tags");

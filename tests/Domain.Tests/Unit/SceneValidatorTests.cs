@@ -232,6 +232,27 @@ public class SceneValidatorTests
     }
 
     [Fact]
+    public void The_FarFromScene_Check_Uses_Everything_But_The_Node_Even_When_It_Is_First()
+    {
+        // The O(n) rewrite computes "everything but this node" from prefix/suffix extremes,
+        // so the answer must not depend on where in the list the far node sits.
+        var document = Document(new[]
+        {
+            Node("lamp", new Vec3(-1000, 0, 0), assetId: 1, groundSnap: true),
+            Node("sofa", Vec3.Zero, assetId: 2, groundSnap: true),
+            Node("table", new Vec3(2, 0, 0), assetId: 3, groundSnap: true),
+        });
+
+        var report = SceneValidator.Validate(
+            document,
+            Facts((1, new Vec3(0.3, 1.5, 0.3)), (2, new Vec3(2.2, 0.85, 0.95)), (3, new Vec3(1, 0.7, 1))),
+            Profiles(Textured(1), Textured(2), Textured(3)));
+
+        var finding = Assert.Single(report.Findings, f => f.Code == "Containment.FarFromScene");
+        Assert.Equal(new[] { "lamp" }, finding.NodeIds);
+    }
+
+    [Fact]
     public void An_Asset_Carrying_Cameras_And_Lights_Is_Reported_As_A_Sample_Scene()
     {
         // PlaysetLightTest, placed as a rug because a search hit named one part of it.
