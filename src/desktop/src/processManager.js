@@ -761,6 +761,35 @@ export class ProcessManager {
     return this.runningConfig.internalApiPort + 100 + index
   }
 
+  buildWorkerEnvironment(index) {
+    const workerBaseDir = path.join(this.runtimeDir, 'asset-processor')
+    const healthPort = this.getWorkerHealthPort(index)
+
+    return {
+      ...process.env,
+      NODE_ENV: 'production',
+      WORKER_ID: `worker-${index + 1}`,
+      WORKER_PORT: String(healthPort),
+      // Target the WebApi the workers can actually reach right now (active
+      // port), not a just-saved one that won't be bound until a restart - so
+      // recycling workers is safe even while a port change is pending. The
+      // worker-pool settings below still come from the latest saved config.
+      API_BASE_URL: `http://127.0.0.1:${this.runningConfig.internalApiPort}`,
+      // Scene render-back and animated VFX/model thumbnails photograph the
+      // running app (?render=...), so the worker needs the UI's address as well
+      // as the API's - the same reason docker-compose passes FRONTEND_URL.
+      // Loopback and the active UI port: it follows a user-changed port, and the
+      // host's own edge server is reachable there even when network access is on.
+      FRONTEND_URL: `http://127.0.0.1:${this.runningConfig.appPort}`,
+      WORKER_API_KEY: this.workerApiKey,
+      MAX_CONCURRENT_JOBS: String(this.config.maxConcurrentJobsPerWorker),
+      THUMBNAIL_STORAGE_PATH: this.paths.thumbnails,
+      BLENDER_INSTALL_PATH: this.paths.blender,
+      ENABLE_GPU_RENDERING: this.config.enableHardwareAcceleration ? 'true' : 'false',
+      PUPPETEER_CACHE_DIR: path.join(workerBaseDir, '.cache', 'puppeteer'),
+    }
+  }
+
   async spawnWorker(index) {
     const nodeExecutable = path.join(this.runtimeDir, 'node', platformExecutable('node'))
     const workerScript = path.join(this.runtimeDir, 'asset-processor', 'index.js')
@@ -769,23 +798,7 @@ export class ProcessManager {
 
     const proc = spawn(nodeExecutable, [workerScript], {
       cwd: workerBaseDir,
-      env: {
-        ...process.env,
-        NODE_ENV: 'production',
-        WORKER_ID: `worker-${index + 1}`,
-        WORKER_PORT: String(healthPort),
-        // Target the WebApi the workers can actually reach right now (active
-        // port), not a just-saved one that won't be bound until a restart - so
-        // recycling workers is safe even while a port change is pending. The
-        // worker-pool settings below still come from the latest saved config.
-        API_BASE_URL: `http://127.0.0.1:${this.runningConfig.internalApiPort}`,
-        WORKER_API_KEY: this.workerApiKey,
-        MAX_CONCURRENT_JOBS: String(this.config.maxConcurrentJobsPerWorker),
-        THUMBNAIL_STORAGE_PATH: this.paths.thumbnails,
-        BLENDER_INSTALL_PATH: this.paths.blender,
-        ENABLE_GPU_RENDERING: this.config.enableHardwareAcceleration ? 'true' : 'false',
-        PUPPETEER_CACHE_DIR: path.join(workerBaseDir, '.cache', 'puppeteer'),
-      },
+      env: this.buildWorkerEnvironment(index),
       stdio: ['ignore', 'pipe', 'pipe'],
       windowsHide: true,
     })

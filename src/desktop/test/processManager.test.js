@@ -217,6 +217,33 @@ test('web api environment needs no PostgreSQL client tools and keeps backups on'
   assert.equal(env.MODELIBR_SKIP_PREMIGRATION_BACKUP, 'false')
 })
 
+test('worker environment points scene render-back at the active UI port', () => {
+  // Regression: the native host started workers without FRONTEND_URL, so
+  // ?render=scene and ?render=vfx could never load the app and every scene
+  // render and animated thumbnail failed - while docker-compose passed it. It
+  // must follow the bound UI port (active), like API_BASE_URL follows the bound
+  // API port.
+  const pm = makePM({ appPort: 3010, internalApiPort: 38080 })
+  pm.markRunning()
+
+  const env = pm.buildWorkerEnvironment(0)
+
+  assert.equal(env.FRONTEND_URL, 'http://127.0.0.1:3010')
+  assert.equal(env.API_BASE_URL, 'http://127.0.0.1:38080')
+  // Health port hangs off the bound API port (index 0 -> +100).
+  assert.equal(env.WORKER_PORT, '38180')
+})
+
+test('worker FRONTEND_URL follows a UI port resolved away from a taken one', () => {
+  const pm = makePM({ appPort: 3010 })
+  pm.markRunning({ appPort: 50515 }) // 3010 was busy, bound 50515 instead
+
+  assert.equal(
+    pm.buildWorkerEnvironment(0).FRONTEND_URL,
+    'http://127.0.0.1:50515'
+  )
+})
+
 test('a runtime with only the server binaries passes the asset check', async () => {
   // Regression guard for the 0.6.1 desktop break: pg_dump/psql were listed as
   // required assets, so every packaged build threw "Missing runtime asset" and

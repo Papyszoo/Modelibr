@@ -729,6 +729,10 @@ https://localhost:8443/mcp
 (`8443` is `HTTPS_PORT` from your root `.env` - use whatever port you publish the
 Web API on.)
 
+Native installers host the endpoint on the app's own local port, so it is
+`http://127.0.0.1:3010/api/mcp` by default; change that port in the host status
+window's **Configuration** panel and restart Modelibr.
+
 Point your agent at that URL. For Claude Code, add it as an SSE MCP server:
 
 ```bash
