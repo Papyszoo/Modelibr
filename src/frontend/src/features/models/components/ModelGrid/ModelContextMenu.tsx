@@ -25,6 +25,7 @@ import {
 import { restoreEntity } from '@/features/recycled-files/api/recycledApi'
 import { SelectPackDialog } from '@/shared/components/dialogs/SelectPackDialog'
 import { SelectProjectDialog } from '@/shared/components/dialogs/SelectProjectDialog'
+import { UNDO_TOAST_LIFE_MS } from '@/shared/components/feedback/RecycleToastContent'
 import { type Model } from '@/utils/fileUtils'
 import {
   copyPathToClipboard,
@@ -257,7 +258,7 @@ export const ModelContextMenu = forwardRef<
         toast.current?.show({
           severity: 'success',
           summary: 'Recycled',
-          life: 6000,
+          life: UNDO_TOAST_LIFE_MS,
           content: () => (
             <div className="model-recycle-toast">
               <i className="pi pi-trash" aria-hidden="true" />

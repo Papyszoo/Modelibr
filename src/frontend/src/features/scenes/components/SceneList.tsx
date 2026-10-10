@@ -1,10 +1,12 @@
 import './SceneList.css'
 
 import { Button } from 'primereact/button'
+import { ContextMenu } from 'primereact/contextmenu'
 import { Dropdown } from 'primereact/dropdown'
 import { InputText } from 'primereact/inputtext'
 import { InputTextarea } from 'primereact/inputtextarea'
-import { type JSX, useRef, useState } from 'react'
+import { type MenuItem } from 'primereact/menuitem'
+import { type JSX, useMemo, useRef, useState } from 'react'
 
 import { useProjectsQuery } from '@/features/project/api/queries'
 import { ApiClientError } from '@/lib/apiBase'
@@ -43,11 +45,14 @@ export function SceneList({ onOpenScene }: SceneListProps): JSX.Element {
 
   const [isCreating, setIsCreating] = useState(false)
   const [name, setName] = useState('')
+  const [nameTouched, setNameTouched] = useState(false)
   const [description, setDescription] = useState('')
   const [projectId, setProjectId] = useState<number | null>(null)
   const [pendingDelete, setPendingDelete] = useState<SceneSummary | null>(null)
+  const [contextScene, setContextScene] = useState<SceneSummary | null>(null)
   const [createError, setCreateError] = useState<string | null>(null)
   const [deleteError, setDeleteError] = useState<string | null>(null)
+  const contextMenu = useRef<ContextMenu>(null)
 
   /**
    * The scene that exists, and the project it still wants, after a link failed.
@@ -202,6 +207,7 @@ export function SceneList({ onOpenScene }: SceneListProps): JSX.Element {
     setName('')
     setDescription('')
     setProjectId(null)
+    setNameTouched(false)
     setCreateError(null)
     setLinkFailure(null)
     onOpenScene(sceneId, sceneName)
@@ -228,11 +234,58 @@ export function SceneList({ onOpenScene }: SceneListProps): JSX.Element {
   const closeCreate = () => {
     // Dismissing after a link failure still leaves a real scene behind, so the
     // form is reset rather than kept - reopening it must not offer to retry a
-    // link for a scene the user has walked away from.
+    // link for a scene the user has walked away from, and must not show the
+    // previous draft's name.
     setIsCreating(false)
+    setName('')
+    setDescription('')
+    setProjectId(null)
+    setNameTouched(false)
     setCreateError(null)
     setLinkFailure(null)
   }
+
+  // Inline error only after the name field is left empty, so a freshly opened
+  // dialog does not show an error before the user has typed.
+  const nameError = nameTouched && name.trim().length === 0
+
+  const openSceneMenu = (
+    event: React.MouseEvent,
+    scene: SceneSummary
+  ): void => {
+    event.preventDefault()
+    setContextScene(scene)
+    contextMenu.current?.show(event)
+  }
+
+  // Same shape as model/material cards: card actions live behind one right-click
+  // context menu, and right-click never goes straight into a destructive
+  // confirm. A scene is a hard delete (no recycle bin), so Delete still opens
+  // the existing confirm dialog.
+  const contextMenuItems = useMemo<MenuItem[]>(
+    () => [
+      {
+        label: 'Open',
+        icon: 'pi pi-external-link',
+        command: () => {
+          if (contextScene) {
+            onOpenScene(contextScene.id, contextScene.name)
+          }
+        },
+      },
+      { separator: true },
+      {
+        label: 'Delete',
+        icon: 'pi pi-trash',
+        command: () => {
+          if (!contextScene) return
+          setDeleteError(null)
+          setPendingDelete(contextScene)
+        },
+      },
+    ],
+    [contextScene, onOpenScene]
+  )
 
   if (isLoading) {
     return <LoadingState message="Loading scenes…" />
@@ -296,11 +349,7 @@ export function SceneList({ onOpenScene }: SceneListProps): JSX.Element {
                 'data-scene-id': scene.id,
               }}
               onClick={() => onOpenScene(scene.id, scene.name)}
-              onContextMenu={event => {
-                event.preventDefault()
-                setDeleteError(null)
-                setPendingDelete(scene)
-              }}
+              onContextMenu={event => openSceneMenu(event, scene)}
               media={
                 // Scenes have no preview render yet, so the tile shows the
                 // scene glyph rather than an empty frame. When the render-back
@@ -376,9 +425,12 @@ export function SceneList({ onOpenScene }: SceneListProps): JSX.Element {
             value={name}
             autoFocus
             placeholder="Rundown city street"
+            className={nameError ? 'p-invalid' : undefined}
+            aria-invalid={nameError}
             // The scene already exists once a link has failed; renaming it is a
             // different operation and not one this dialog offers.
             disabled={linkFailure !== null}
+            onBlur={() => setNameTouched(true)}
             onChange={event => setName(event.target.value)}
             onKeyDown={event => {
               // Enter goes through the SAME guarded handler as the button, and
@@ -394,6 +446,15 @@ export function SceneList({ onOpenScene }: SceneListProps): JSX.Element {
               void handleCreate()
             }}
           />
+          {nameError ? (
+            <small
+              className="scene-list-form-error"
+              role="alert"
+              data-testid="scene-name-error"
+            >
+              Name is required.
+            </small>
+          ) : null}
 
           {/*
             Optional, and worth setting: a scene's project is what biases the
@@ -497,6 +558,12 @@ export function SceneList({ onOpenScene }: SceneListProps): JSX.Element {
           </p>
         ) : null}
       </Dialog>
+
+      <ContextMenu
+        ref={contextMenu}
+        model={contextMenuItems}
+        onHide={() => setContextScene(null)}
+      />
     </div>
   )
 }

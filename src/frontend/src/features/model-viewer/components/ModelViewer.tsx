@@ -28,9 +28,14 @@ import {
 import { useExternalResources } from '@/features/model-viewer/hooks/useExternalResources'
 import { useFileUploadHandlers } from '@/features/model-viewer/hooks/useFileUploadHandlers'
 import { useVersionSelection } from '@/features/model-viewer/hooks/useVersionSelection'
+import { restoreEntity } from '@/features/recycled-files/api/recycledApi'
 import { useTextureSetByIdQuery } from '@/features/texture-set/api/queries'
 import { useTextureSetsByModelVersionQuery } from '@/features/texture-set/api/queries'
 import { useTabUiState } from '@/hooks/useTabUiState'
+import {
+  recycleToastContent,
+  UNDO_TOAST_LIFE_MS,
+} from '@/shared/components/feedback/RecycleToastContent'
 import {
   EMPTY_RENDERER_PERF_STATS,
   type RendererPerfStats,
@@ -552,6 +557,35 @@ export function ModelViewer({
     [model, modelId, propModel, versionsQuery, modelQuery]
   )
 
+  /** Restores a version just moved to the recycle bin, from the Undo toast. */
+  const handleUndoRecycleVersion = useCallback(
+    async (versionId: number) => {
+      try {
+        await restoreEntity('modelVersion', versionId)
+        if (modelId && !propModel) {
+          await modelQuery.refetch()
+        }
+        await versionsQuery.refetch()
+        await queryClient.invalidateQueries({ queryKey: ['recycledFiles'] })
+        toast.current?.show({
+          severity: 'success',
+          summary: 'Restored',
+          detail: 'Model version restored',
+          life: 3000,
+        })
+      } catch (error) {
+        console.error('Failed to restore model version:', error)
+        toast.current?.show({
+          severity: 'error',
+          summary: 'Error',
+          detail: 'Failed to restore model version',
+          life: 3000,
+        })
+      }
+    },
+    [modelId, propModel, versionsQuery, modelQuery, queryClient]
+  )
+
   const handleRecycleVersion = useCallback(
     async (versionId: number) => {
       if (!model) return
@@ -559,9 +593,13 @@ export function ModelViewer({
         await softDeleteModelVersion(parseInt(model.id), versionId)
         toast.current?.show({
           severity: 'success',
-          summary: 'Success',
-          detail: 'Model version recycled successfully',
-          life: 3000,
+          summary: 'Recycled',
+          life: UNDO_TOAST_LIFE_MS,
+          content: () =>
+            recycleToastContent(
+              'Model version moved to recycled files',
+              () => void handleUndoRecycleVersion(versionId)
+            ),
         })
         if (modelId && !propModel) {
           await modelQuery.refetch()
@@ -583,7 +621,15 @@ export function ModelViewer({
         })
       }
     },
-    [model, modelId, propModel, versionsQuery, modelQuery, queryClient]
+    [
+      model,
+      modelId,
+      propModel,
+      versionsQuery,
+      modelQuery,
+      queryClient,
+      handleUndoRecycleVersion,
+    ]
   )
 
   const showToast = useCallback(

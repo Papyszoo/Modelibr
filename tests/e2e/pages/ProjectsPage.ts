@@ -214,6 +214,13 @@ export class ProjectsPage {
         await actionsBtn.focus();
         await this.page.keyboard.press("Enter");
 
+        // The actions button opens the shared context menu; Delete is a menu
+        // item that then opens the confirmation.
+        await this.page
+            .locator(".p-contextmenu")
+            .getByText("Delete", { exact: true })
+            .click();
+
         const confirmation = this.page
             .locator(".p-confirm-dialog")
             .filter({ hasText: projectName });
@@ -242,6 +249,13 @@ export class ProjectsPage {
         await expect(actionsBtn).toBeVisible();
         await actionsBtn.focus();
         await this.page.keyboard.press("Enter");
+
+        // The actions button opens the shared context menu; Delete is a menu
+        // item that then opens the confirmation.
+        await this.page
+            .locator(".p-contextmenu")
+            .getByText("Delete", { exact: true })
+            .click();
 
         const confirmation = this.page
             .locator(".p-confirm-dialog")

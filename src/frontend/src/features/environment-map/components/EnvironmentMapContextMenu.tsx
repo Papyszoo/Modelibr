@@ -28,8 +28,13 @@ import {
   addEnvironmentMapToProject,
   removeEnvironmentMapFromProject,
 } from '@/features/project/api/projectApi'
+import { restoreEntity } from '@/features/recycled-files/api/recycledApi'
 import { SelectPackDialog } from '@/shared/components/dialogs/SelectPackDialog'
 import { SelectProjectDialog } from '@/shared/components/dialogs/SelectProjectDialog'
+import {
+  recycleToastContent,
+  UNDO_TOAST_LIFE_MS,
+} from '@/shared/components/feedback/RecycleToastContent'
 import {
   type EnvironmentMapCategoryDto,
   type EnvironmentMapDto,
@@ -251,14 +256,40 @@ export const EnvironmentMapContextMenu = forwardRef<
     }
   }
 
+  /** Restores maps just moved to the recycle bin, from the Undo toast. */
+  const handleUndoRecycle = async (ids: number[]) => {
+    try {
+      for (const id of ids) {
+        await restoreEntity('environmentMap', id)
+      }
+      await invalidateRelatedQueries()
+      await queryClient.invalidateQueries({ queryKey: ['recycledFiles'] })
+      toast.current?.show({
+        severity: 'success',
+        summary: 'Restored',
+        detail: `${ids.length} environment map${ids.length === 1 ? '' : 's'} restored`,
+        life: 3000,
+      })
+    } catch (error) {
+      console.error('Failed to restore environment map:', error)
+      toast.current?.show({
+        severity: 'error',
+        summary: 'Error',
+        detail: 'Failed to restore environment map',
+        life: 3000,
+      })
+    }
+  }
+
   const handleRecycle = async () => {
     if (selectedEnvironmentMaps.length === 0) {
       return
     }
 
+    const recycledIds = selectedEnvironmentMaps.map(map => map.id)
     try {
-      for (const environmentMap of selectedEnvironmentMaps) {
-        await softDeleteEnvironmentMap(environmentMap.id)
+      for (const id of recycledIds) {
+        await softDeleteEnvironmentMap(id)
       }
 
       await invalidateRelatedQueries()
@@ -266,8 +297,12 @@ export const EnvironmentMapContextMenu = forwardRef<
       toast.current?.show({
         severity: 'success',
         summary: 'Recycled',
-        detail: `${selectedCountLabel} moved to recycled files`,
-        life: 3000,
+        life: UNDO_TOAST_LIFE_MS,
+        content: () =>
+          recycleToastContent(
+            `${selectedCountLabel} moved to recycled files`,
+            () => void handleUndoRecycle(recycledIds)
+          ),
       })
     } catch (error) {
       console.error('Failed to recycle environment map:', error)

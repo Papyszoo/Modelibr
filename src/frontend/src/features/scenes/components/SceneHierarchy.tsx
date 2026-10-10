@@ -2,11 +2,18 @@ import './SceneHierarchy.css'
 
 import { Badge } from 'primereact/badge'
 import { Button } from 'primereact/button'
-import { type JSX } from 'react'
+import { ContextMenu } from 'primereact/contextmenu'
+import { type MenuItem } from 'primereact/menuitem'
+import { type JSX, useMemo, useRef, useState } from 'react'
 
 import { EmptyState } from '@/shared/components'
 
-import type { SceneDocument, SceneNodeView, SceneOverlap } from '../types'
+import type {
+  SceneDocument,
+  SceneNode,
+  SceneNodeView,
+  SceneOverlap,
+} from '../types'
 
 interface SceneHierarchyProps {
   document: SceneDocument
@@ -38,6 +45,45 @@ export function SceneHierarchy({
   onToggleVisible,
   onRemoveNode,
 }: SceneHierarchyProps): JSX.Element {
+  const [contextNode, setContextNode] = useState<SceneNode | null>(null)
+  const contextMenu = useRef<ContextMenu>(null)
+
+  const openNodeMenu = (event: React.MouseEvent, node: SceneNode): void => {
+    event.preventDefault()
+    setContextNode(node)
+    contextMenu.current?.show(event)
+  }
+
+  // The hierarchy rows get the same right-click menu every other card has:
+  // select, toggle visibility and remove, rather than only the inline buttons.
+  const contextMenuItems = useMemo<MenuItem[]>(
+    () => [
+      {
+        label: 'Select',
+        icon: 'pi pi-cursor',
+        command: () => {
+          if (contextNode) onSelectNode(contextNode.id)
+        },
+      },
+      {
+        label: contextNode?.visible ? 'Hide' : 'Show',
+        icon: contextNode?.visible ? 'pi pi-eye-slash' : 'pi pi-eye',
+        command: () => {
+          if (contextNode) onToggleVisible(contextNode.id, !contextNode.visible)
+        },
+      },
+      { separator: true },
+      {
+        label: 'Remove',
+        icon: 'pi pi-trash',
+        command: () => {
+          if (contextNode) onRemoveNode(contextNode.id)
+        },
+      },
+    ],
+    [contextNode, onSelectNode, onToggleVisible, onRemoveNode]
+  )
+
   const overlapping = new Set(
     overlaps.flatMap(overlap => [overlap.nodeIdA, overlap.nodeIdB])
   )
@@ -71,6 +117,7 @@ export function SceneHierarchy({
                 key={node.id}
                 data-testid="scene-node-row"
                 data-node-id={node.id}
+                onContextMenu={event => openNodeMenu(event, node)}
                 className={
                   node.id === selectedNodeId
                     ? 'scene-hierarchy-row scene-hierarchy-row--selected'
@@ -152,6 +199,12 @@ export function SceneHierarchy({
           })}
         </ul>
       )}
+
+      <ContextMenu
+        ref={contextMenu}
+        model={contextMenuItems}
+        onHide={() => setContextNode(null)}
+      />
     </section>
   )
 }

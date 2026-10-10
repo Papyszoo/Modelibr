@@ -19,6 +19,7 @@ import { type GridComponents, VirtuosoGrid } from 'react-virtuoso'
 import { getFilePreviewUrl } from '@/features/models/api/modelApi'
 import { addTextureSetToPack } from '@/features/pack/api/packApi'
 import { addTextureSetToProject } from '@/features/project/api/projectApi'
+import { restoreEntity } from '@/features/recycled-files/api/recycledApi'
 import {
   addTextureToSetEndpoint,
   hardDeleteTextureSet,
@@ -36,6 +37,10 @@ import { CategoryTreePanel } from '@/shared/components/categories/CategoryTreePa
 import { SelectPackDialog } from '@/shared/components/dialogs/SelectPackDialog'
 import { SelectProjectDialog } from '@/shared/components/dialogs/SelectProjectDialog'
 import { EmptyState } from '@/shared/components/feedback'
+import {
+  recycleToastContent,
+  UNDO_TOAST_LIFE_MS,
+} from '@/shared/components/feedback/RecycleToastContent'
 import { useTagVocabulary } from '@/shared/hooks/useTagVocabulary'
 import {
   ALL_CATEGORIES_ID,
@@ -744,17 +749,46 @@ export function TextureSetGrid({ kind, viewStateScope }: TextureSetGridProps) {
     }
   }
 
+  /** Restores texture sets just moved to the recycle bin, from the Undo toast. */
+  const handleUndoRecycle = async (ids: number[]) => {
+    try {
+      for (const id of ids) {
+        await restoreEntity('textureSet', id)
+      }
+      invalidateTextureSets()
+      await queryClient.invalidateQueries({ queryKey: ['recycledFiles'] })
+      toast.current?.show({
+        severity: 'success',
+        summary: 'Restored',
+        detail:
+          ids.length > 1
+            ? `${ids.length} texture sets restored`
+            : 'Texture set restored',
+        life: 3000,
+      })
+    } catch (error) {
+      console.error('Failed to restore texture set:', error)
+      toast.current?.show({
+        severity: 'error',
+        summary: 'Error',
+        detail: 'Failed to restore texture set',
+        life: 3000,
+      })
+    }
+  }
+
   const handleRecycle = async () => {
     const sets = targetSets()
-    let okCount = 0
+    const recycledIds: number[] = []
     for (const set of sets) {
       try {
         await softDeleteTextureSet(set.id)
-        okCount += 1
+        recycledIds.push(set.id)
       } catch (error) {
         console.error('Failed to recycle texture set:', error)
       }
     }
+    const okCount = recycledIds.length
     // Single-item: preserve the original message text - e2e tests assert on it.
     const detail =
       sets.length === 1
@@ -765,8 +799,18 @@ export function TextureSetGrid({ kind, viewStateScope }: TextureSetGridProps) {
     toast.current?.show({
       severity: okCount === sets.length ? 'success' : 'warn',
       summary: 'Recycled',
-      detail,
-      life: 3000,
+      // Anything recycled can be taken back from the Undo action; a total
+      // failure has nothing to undo, so it keeps the plain message.
+      ...(okCount > 0
+        ? {
+            life: UNDO_TOAST_LIFE_MS,
+            content: () =>
+              recycleToastContent(
+                detail,
+                () => void handleUndoRecycle(recycledIds)
+              ),
+          }
+        : { detail, life: 3000 }),
     })
     invalidateTextureSets()
     queryClient.invalidateQueries({ queryKey: ['recycledFiles'] })

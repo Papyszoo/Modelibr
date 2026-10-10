@@ -3,10 +3,11 @@ import './ProjectList.css'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Button } from 'primereact/button'
 import { confirmDialog } from 'primereact/confirmdialog'
+import { ContextMenu } from 'primereact/contextmenu'
 import { InputSwitch } from 'primereact/inputswitch'
+import { type MenuItem } from 'primereact/menuitem'
 import { Toast } from 'primereact/toast'
-import { useState } from 'react'
-import { useRef } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 
 import { deleteProject } from '@/features/project/api/projectApi'
 import { useProjectsQuery } from '@/features/project/api/queries'
@@ -43,7 +44,9 @@ export function ProjectList() {
   const [onlyWithConceptArt, setOnlyWithConceptArt] = useState(false)
   const [isSearchOpen, setIsSearchOpen] = useState(false)
   const [isFiltersOpen, setIsFiltersOpen] = useState(false)
+  const [contextProject, setContextProject] = useState<ProjectDto | null>(null)
   const toast = useRef<Toast>(null)
+  const contextMenu = useRef<ContextMenu>(null)
   const { openProjectDetailsTab } = useTabContext()
 
   const { settings, setCardWidth } = useCardWidthStore()
@@ -90,27 +93,68 @@ export function ProjectList() {
     },
   })
 
-  const confirmDeleteProject = (project: ProjectDto): void => {
-    confirmDialog({
-      message: (
-        <>
-          <p>
-            Delete <strong>{project.name}</strong>? The project container will
-            be removed.
-          </p>
-          <p>Assets in the project will remain in your library.</p>
-        </>
-      ),
-      header: `Delete ${project.name}`,
-      icon: 'pi pi-exclamation-triangle',
-      acceptLabel: 'Delete Project',
-      rejectLabel: 'Cancel',
-      acceptClassName: 'p-button-danger',
-      accept: () => {
-        deleteProjectMutation.mutate(project.id)
-      },
-    })
+  const confirmDeleteProject = useCallback(
+    (project: ProjectDto): void => {
+      confirmDialog({
+        message: (
+          <>
+            <p>
+              Delete <strong>{project.name}</strong>? The project container will
+              be removed.
+            </p>
+            <p>Assets in the project will remain in your library.</p>
+          </>
+        ),
+        header: `Delete ${project.name}`,
+        icon: 'pi pi-exclamation-triangle',
+        acceptLabel: 'Delete Project',
+        rejectLabel: 'Cancel',
+        acceptClassName: 'p-button-danger',
+        accept: () => {
+          deleteProjectMutation.mutate(project.id)
+        },
+      })
+    },
+    [deleteProjectMutation]
+  )
+
+  // Same shape as model/material cards: card actions live behind one right-click
+  // context menu, and right-click never goes straight into a destructive
+  // confirm. A project is a hard delete (no recycle bin), so Delete still opens
+  // the existing confirm dialog.
+  const openProjectMenu = (
+    event: React.MouseEvent,
+    project: ProjectDto
+  ): void => {
+    event.preventDefault()
+    setContextProject(project)
+    contextMenu.current?.show(event)
   }
+
+  const contextMenuItems = useMemo<MenuItem[]>(
+    () => [
+      {
+        label: 'Open',
+        icon: 'pi pi-external-link',
+        command: () => {
+          if (contextProject) {
+            openProjectDetailsTab(contextProject.id.toString())
+          }
+        },
+      },
+      { separator: true },
+      {
+        label: 'Delete',
+        icon: 'pi pi-trash',
+        command: () => {
+          if (contextProject) {
+            confirmDeleteProject(contextProject)
+          }
+        },
+      },
+    ],
+    [contextProject, openProjectDetailsTab, confirmDeleteProject]
+  )
 
   const filteredProjects = projects.filter(project => {
     const matchesSearch =
@@ -254,6 +298,7 @@ export function ProjectList() {
                 onClick={() => {
                   openProjectDetailsTab(project.id.toString())
                 }}
+                onContextMenu={event => openProjectMenu(event, project)}
               >
                 <div className="project-grid-card-image">
                   {thumbnail ? (
@@ -308,12 +353,12 @@ export function ProjectList() {
                     icon="pi pi-ellipsis-v"
                     className="p-button-text p-button-rounded p-button-sm"
                     aria-label={`Project actions for ${project.name}`}
-                    aria-haspopup="dialog"
+                    aria-haspopup="menu"
                     title="Project actions"
                     disabled={deleteProjectMutation.isPending}
                     onClick={e => {
                       e.stopPropagation()
-                      confirmDeleteProject(project)
+                      openProjectMenu(e, project)
                     }}
                   />
                 </div>
@@ -322,6 +367,12 @@ export function ProjectList() {
           })}
         </div>
       )}
+
+      <ContextMenu
+        ref={contextMenu}
+        model={contextMenuItems}
+        onHide={() => setContextProject(null)}
+      />
 
       <CreateProjectDialog
         visible={showCreateDialog}

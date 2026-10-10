@@ -1,5 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { type ReactNode } from 'react'
 
+import { restoreEntity } from '@/features/recycled-files/api/recycledApi'
 import {
   createSoundCategory,
   deleteSoundCategory,
@@ -7,6 +9,10 @@ import {
   updateSound,
   updateSoundCategory,
 } from '@/features/sounds/api/soundApi'
+import {
+  recycleToastContent,
+  UNDO_TOAST_LIFE_MS,
+} from '@/shared/components/feedback/RecycleToastContent'
 import { useCategoryMutations } from '@/shared/hooks/useCategoryMutations'
 import { type SoundCategoryDto } from '@/types'
 
@@ -14,8 +20,9 @@ interface ShowToast {
   (opts: {
     severity: string
     summary: string
-    detail: string
+    detail?: string
     life: number
+    content?: () => ReactNode
   }): void
 }
 
@@ -84,6 +91,34 @@ export function useSoundMutations({
     },
   })
 
+  /** Restores sounds just moved to the recycle bin, from the Undo toast. */
+  const handleUndoRecycle = async (soundIds: number[]) => {
+    try {
+      await Promise.all(soundIds.map(id => restoreEntity('sound', id)))
+      setSelectedSoundIds(new Set())
+      setContextMenuTarget(null)
+      await loadSounds()
+      await queryClient.invalidateQueries({ queryKey: ['recycledFiles'] })
+      showToast({
+        severity: 'success',
+        summary: 'Restored',
+        detail:
+          soundIds.length > 1
+            ? `${soundIds.length} sounds restored`
+            : 'Sound restored',
+        life: 3000,
+      })
+    } catch (error) {
+      console.error('Failed to restore sounds:', error)
+      showToast({
+        severity: 'error',
+        summary: 'Error',
+        detail: 'Failed to restore sounds',
+        life: 3000,
+      })
+    }
+  }
+
   const recycleSoundsMutation = useMutation({
     mutationFn: async (soundIds: number[]) => {
       await Promise.all(soundIds.map(id => softDeleteSound(id)))
@@ -92,11 +127,14 @@ export function useSoundMutations({
       showToast({
         severity: 'success',
         summary: 'Recycled',
-        detail:
-          soundIds.length > 1
-            ? `${soundIds.length} sounds moved to recycle bin`
-            : 'Sound moved to recycle bin',
-        life: 3000,
+        life: UNDO_TOAST_LIFE_MS,
+        content: () =>
+          recycleToastContent(
+            soundIds.length > 1
+              ? `${soundIds.length} sounds moved to recycle bin`
+              : 'Sound moved to recycle bin',
+            () => void handleUndoRecycle(soundIds)
+          ),
       })
       setSelectedSoundIds(new Set())
       setContextMenuTarget(null)

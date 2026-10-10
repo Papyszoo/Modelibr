@@ -154,6 +154,33 @@ describe('SceneList - creating a scene', () => {
     expect(scenes.createScene).not.toHaveBeenCalled()
   })
 
+  it('shows an inline reason when the name is left empty', async () => {
+    // Regression: the Create button was simply disabled with no explanation of
+    // why, so an empty name read as a broken button.
+    renderWithProviders(<SceneList onOpenScene={onOpenScene} />)
+    await userEvent.click(await screen.findByTestId('scene-list-new'))
+
+    await userEvent.click(screen.getByLabelText('Name'))
+    await userEvent.tab()
+
+    expect(await screen.findByTestId('scene-name-error')).toHaveTextContent(
+      'Name is required.'
+    )
+  })
+
+  it('clears the draft name when the dialog is cancelled', async () => {
+    // Regression: a cancelled "New scene" kept its text, so reopening showed
+    // the previous draft's name.
+    renderWithProviders(<SceneList onOpenScene={onOpenScene} />)
+    await userEvent.click(await screen.findByTestId('scene-list-new'))
+    await userEvent.type(screen.getByLabelText('Name'), 'Stale draft')
+
+    await userEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+    await userEvent.click(screen.getByTestId('scene-list-new'))
+
+    expect(screen.getByLabelText('Name')).toHaveValue('')
+  })
+
   it('does not create a second scene when Enter is pressed while the link is in flight', async () => {
     // The window this closes: the scene is created, the link is still running,
     // and the form still holds a name. Another Enter used to start again from
@@ -425,8 +452,25 @@ describe('SceneList - deleting a scene', () => {
     renderWithProviders(<SceneList onOpenScene={onOpenScene} />)
     const tile = await screen.findByTestId('scene-tile')
     fireEvent.contextMenu(tile)
+    // Right-click opens the shared context menu; Delete is a menu item that only
+    // then opens the confirmation dialog.
+    await userEvent.click(await screen.findByText('Delete'))
     return screen.findByRole('button', { name: 'Delete' })
   }
+
+  // Regression: right-click used to open the delete confirmation directly, so a
+  // right-click could delete a scene with one more click and no access to the
+  // other card actions.
+  it('right-click opens the shared menu instead of the delete dialog', async () => {
+    renderWithProviders(<SceneList onOpenScene={onOpenScene} />)
+    const tile = await screen.findByTestId('scene-tile')
+    fireEvent.contextMenu(tile)
+
+    expect(await screen.findByText('Open')).toBeInTheDocument()
+    expect(
+      screen.queryByText(/only the composition is removed/)
+    ).not.toBeInTheDocument()
+  })
 
   // Regression: the delete rejection was unhandled, so the dialog stayed with
   // no message and the failure was silent.

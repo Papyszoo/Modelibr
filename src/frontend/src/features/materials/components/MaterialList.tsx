@@ -16,6 +16,7 @@ import {
   LoadingState,
 } from '@/shared/components'
 import { AddTile, AssetGrid, AssetTile } from '@/shared/components/asset-tile'
+import { UNDO_TOAST_LIFE_MS } from '@/shared/components/feedback/RecycleToastContent'
 import {
   ListToolbar,
   ListToolbarRow,
@@ -100,7 +101,7 @@ export function MaterialList(): JSX.Element {
       toast.current?.show({
         severity: 'success',
         summary: 'Recycled',
-        life: 6000,
+        life: UNDO_TOAST_LIFE_MS,
         content: () => (
           <div className="material-recycle-toast">
             <i className="pi pi-trash" aria-hidden="true" />
@@ -174,6 +175,14 @@ export function MaterialList(): JSX.Element {
     }
 
     setEditing(undefined)
+    toast.current?.show({
+      severity: 'success',
+      summary: editing ? 'Material saved' : 'Material created',
+      detail: editing
+        ? `${value.name} was saved.`
+        : `${value.name} was created.`,
+      life: 2500,
+    })
   }
 
   const materials = data?.materials ?? []

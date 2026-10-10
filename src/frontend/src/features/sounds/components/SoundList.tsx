@@ -9,6 +9,7 @@ import { Toast } from 'primereact/toast'
 import {
   type DragEvent,
   type MouseEvent,
+  type ReactNode,
   useCallback,
   useMemo,
   useRef,
@@ -59,8 +60,9 @@ export function SoundList() {
     (opts: {
       severity: string
       summary: string
-      detail: string
+      detail?: string
       life: number
+      content?: () => ReactNode
     }) => {
       toast.current?.show(opts as Parameters<Toast['show']>[0])
     },

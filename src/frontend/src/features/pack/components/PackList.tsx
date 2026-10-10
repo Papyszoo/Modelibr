@@ -2,10 +2,12 @@ import './PackList.css'
 
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Button } from 'primereact/button'
+import { confirmDialog } from 'primereact/confirmdialog'
+import { ContextMenu } from 'primereact/contextmenu'
 import { Dropdown } from 'primereact/dropdown'
+import { type MenuItem } from 'primereact/menuitem'
 import { Toast } from 'primereact/toast'
-import { useState } from 'react'
-import { useRef } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 
 import { deletePack } from '@/features/pack/api/packApi'
 import { usePacksQuery } from '@/features/pack/api/queries'
@@ -37,7 +39,9 @@ export function PackList() {
   const [selectedLicense, setSelectedLicense] = useState<string | null>(null)
   const [isSearchOpen, setIsSearchOpen] = useState(false)
   const [isFiltersOpen, setIsFiltersOpen] = useState(false)
+  const [contextPack, setContextPack] = useState<PackDto | null>(null)
   const toast = useRef<Toast>(null)
+  const contextMenu = useRef<ContextMenu>(null)
   const { openPackDetailsTab } = useTabContext()
 
   const { settings, setCardWidth } = useCardWidthStore()
@@ -85,6 +89,67 @@ export function PackList() {
   const handleDeletePack = async (packId: number) => {
     await deletePackMutation.mutateAsync(packId)
   }
+
+  // A pack is a hard delete (no recycle bin), so it keeps a confirm dialog -
+  // opened from the card menu, never straight from a right-click.
+  const confirmDeletePack = useCallback(
+    (pack: PackDto): void => {
+      confirmDialog({
+        message: (
+          <>
+            <p>
+              Delete <strong>{pack.name}</strong>? The pack container will be
+              removed.
+            </p>
+            <p>Assets in the pack will remain in your library.</p>
+          </>
+        ),
+        header: `Delete ${pack.name}`,
+        icon: 'pi pi-exclamation-triangle',
+        acceptLabel: 'Delete Pack',
+        rejectLabel: 'Cancel',
+        acceptClassName: 'p-button-danger',
+        accept: () => {
+          void handleDeletePack(pack.id)
+        },
+      })
+    },
+    // `handleDeletePack` is recreated with the mutation; the dialog only reads it
+    // when its accept button is pressed.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [deletePackMutation]
+  )
+
+  const openPackMenu = (event: React.MouseEvent, pack: PackDto): void => {
+    event.preventDefault()
+    setContextPack(pack)
+    contextMenu.current?.show(event)
+  }
+
+  const contextMenuItems = useMemo<MenuItem[]>(
+    () => [
+      {
+        label: 'Open',
+        icon: 'pi pi-external-link',
+        command: () => {
+          if (contextPack) {
+            openPackDetailsTab(contextPack.id.toString())
+          }
+        },
+      },
+      { separator: true },
+      {
+        label: 'Delete',
+        icon: 'pi pi-trash',
+        command: () => {
+          if (contextPack) {
+            confirmDeletePack(contextPack)
+          }
+        },
+      },
+    ],
+    [contextPack, openPackDetailsTab, confirmDeletePack]
+  )
 
   const licenseOptions = Array.from(
     new Set(packs.map(pack => pack.licenseType).filter(Boolean))
@@ -220,6 +285,7 @@ export function PackList() {
                 onClick={() => {
                   openPackDetailsTab(pack.id.toString())
                 }}
+                onContextMenu={event => openPackMenu(event, pack)}
               >
                 <div className="pack-grid-card-image">
                   {thumbnail ? (
@@ -268,13 +334,15 @@ export function PackList() {
                 </div>
                 <div className="pack-grid-card-actions">
                   <Button
-                    icon="pi pi-trash"
-                    className="p-button-text p-button-rounded p-button-danger p-button-sm"
-                    tooltip="Delete Pack"
+                    icon="pi pi-ellipsis-v"
+                    className="p-button-text p-button-rounded p-button-sm"
+                    aria-label={`Pack actions for ${pack.name}`}
+                    aria-haspopup="menu"
+                    title="Pack actions"
                     disabled={deletePackMutation.isPending}
                     onClick={e => {
                       e.stopPropagation()
-                      handleDeletePack(pack.id)
+                      openPackMenu(e, pack)
                     }}
                   />
                 </div>
@@ -283,6 +351,12 @@ export function PackList() {
           })}
         </div>
       )}
+
+      <ContextMenu
+        ref={contextMenu}
+        model={contextMenuItems}
+        onHide={() => setContextPack(null)}
+      />
 
       <CreatePackDialog
         visible={showCreateDialog}

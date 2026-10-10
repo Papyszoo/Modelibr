@@ -155,6 +155,20 @@ describe('MaterialList', () => {
     expect(body.parameters).not.toHaveProperty('baseColorB')
   })
 
+  it('confirms a saved material with a success toast', async () => {
+    // Regression: the editor closed silently after a save, so a save could not
+    // be told apart from a cancel.
+    const user = userEvent.setup()
+    renderWithProviders(<MaterialList />)
+    await screen.findByText('Brushed Brass')
+
+    await user.click(screen.getByTestId('material-list-new'))
+    await user.type(screen.getByTestId('material-name-input'), 'Rubber')
+    await user.click(screen.getByTestId('material-editor-save'))
+
+    expect(await screen.findByText('Material created')).toBeInTheDocument()
+  })
+
   it('does not clear a material&apos;s effects when saving the editor', async () => {
     // Effects are edited elsewhere; the update request must omit them rather
     // than send effects: null, which the server would read as "remove".

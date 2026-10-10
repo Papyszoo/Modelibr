@@ -1,0 +1,6 @@
+/* Undo toast shown after Recycle: icon + message + Undo action. */
+.recycle-toast {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
