@@ -68,6 +68,13 @@ Rendering must be offline-safe: local Three.js/Blender, no CDN imports.
   concurrent render jobs worker-wide; `browserManager.acquireSlot()`/`releaseSlot()`
   enforce it. Renderer-backed processors still `acquire()` / `release()` in
   try/finally (and arm `_armRendererAbort`).
+- Idle close: when the LAST render slot is released, `browserManager` starts a
+  `BROWSER_IDLE_TIMEOUT_MS` timer (default 60000; 0 disables) and closes the
+  shared Chromium if no job starts meanwhile - an idle browser holds ~3.7 GB.
+  The next job relaunches it lazily. It never closes while a slot is held, and a
+  job arriving during an in-flight close waits (`getBrowser` awaits `_closing`)
+  for a fresh browser. `acquireSlot()` cancels the timer; running render jobs
+  therefore never see their browser pulled out.
 - Pages crash (frame detach, OOM on 4K textures). `PuppeteerRenderer` has
   `_isPageUsable()` + `reinitialize()` - check/recover instead of inventing recovery.
 - The odd launch flags (`--disable-crashpad`, `--crash-dumps-dir=/tmp`, …) are

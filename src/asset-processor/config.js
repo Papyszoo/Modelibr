@@ -23,6 +23,15 @@ export const config = {
     1,
     parseInt(process.env.MAX_CONCURRENT_RENDER_JOBS, 10) || 1
   ),
+  // How long the shared Chromium may sit with no render job before the worker
+  // closes it, freeing the ~3.7 GB an idle native app holds. The next job
+  // relaunches it lazily. Default 60000; 0 disables the idle close entirely.
+  browserIdleTimeoutMs: (() => {
+    const raw = process.env.BROWSER_IDLE_TIMEOUT_MS
+    if (raw === undefined || raw === '') return 60000
+    const parsed = parseInt(raw, 10)
+    return Number.isFinite(parsed) && parsed >= 0 ? parsed : 60000
+  })(),
   jobTimeout: parseInt(process.env.JOB_TIMEOUT_MS) || 300000, // 5 minutes default
   // Poll interval for the decoupled extraction queue (prompt 20 executor).
   extractionPollIntervalMs:

@@ -19,6 +19,14 @@ import logger from './logger.js'
  * replaced only when it has crashed or disconnected, and closed on shutdown.
  * A page belongs to the job that opened it and is closed when the job releases
  * its render slot.
+ *
+ * Idle close: an idle native app still holds ~3.7 GB because the browser stays
+ * open. When the last render job releases its slot, a timer
+ * (BROWSER_IDLE_TIMEOUT_MS, default 60000; 0 disables) starts; if no job starts
+ * before it fires, the browser is closed and the next job relaunches it lazily.
+ * It is never closed while a job holds a page (a held render slot). A job that
+ * arrives while an idle close is in flight waits for that close, then gets a
+ * fresh browser.
  */
 export class BrowserManager {
   constructor() {
@@ -26,6 +34,18 @@ export class BrowserManager {
     this._launching = null
     this._active = 0
     this._waiters = []
+    this._idleTimer = null
+    this._closing = null
+    this._disposed = false
+  }
+
+  /**
+   * How long the browser may sit with no render job before it is closed.
+   * 0 (or a missing/invalid value, e.g. in tests) disables the idle close.
+   */
+  get idleTimeoutMs() {
+    const value = config.browserIdleTimeoutMs
+    return Number.isFinite(value) && value > 0 ? value : 0
   }
 
   /**
@@ -54,6 +74,13 @@ export class BrowserManager {
    * @returns {Promise<import('puppeteer').Browser>}
    */
   async getBrowser() {
+    // A job can arrive while the idle browser is being closed. Wait for that
+    // close to finish so we never hand back a browser that is mid-shutdown,
+    // then fall through to launch a fresh one.
+    while (this._closing) {
+      await this._closing
+    }
+
     if (this._isUsable(this.browser)) return this.browser
 
     // Concurrent first-callers share one launch instead of racing two browsers.
@@ -92,6 +119,10 @@ export class BrowserManager {
     })
 
     this.browser = browser
+    // A launch with no job waiting (e.g. the renderer pool warming up) starts
+    // the idle countdown immediately; inside a job `_active` is non-zero and
+    // the timer is armed only when the last job releases.
+    if (this._active === 0) this._armIdleTimer()
     return browser
   }
 
@@ -109,6 +140,8 @@ export class BrowserManager {
    * Paired with {@link releaseSlot} in a finally.
    */
   async acquireSlot() {
+    // A job is starting: cancel any idle countdown.
+    this._clearIdleTimer()
     if (this._active < this.concurrencyLimit) {
       this._active++
       return
@@ -121,12 +154,89 @@ export class BrowserManager {
   releaseSlot() {
     if (this._active > 0) this._active--
     const next = this._waiters.shift()
-    if (next) next()
+    if (next) {
+      // Handed straight to the next job - still busy, so never idle here.
+      next()
+      return
+    }
+    // Only the last job letting go makes the browser idle.
+    if (this._active === 0) this._armIdleTimer()
+  }
+
+  /** Cancel a pending idle close, if any. */
+  _clearIdleTimer() {
+    if (this._idleTimer) {
+      clearTimeout(this._idleTimer)
+      this._idleTimer = null
+    }
+  }
+
+  /**
+   * Schedule the idle close. A no-op while disabled, disposed, a job is active
+   * (holds a page), or there is no browser to close.
+   */
+  _armIdleTimer() {
+    this._clearIdleTimer()
+    const timeoutMs = this.idleTimeoutMs
+    if (this._disposed || timeoutMs <= 0) return
+    if (this._active > 0 || !this.browser) return
+
+    this._idleTimer = setTimeout(() => {
+      this._idleTimer = null
+      this._closeIdleBrowser().catch(error => {
+        logger.debug('Error closing idle shared browser', {
+          error: error.message,
+        })
+      })
+    }, timeoutMs)
+    // Don't let an idle worker be kept alive by the idle timer itself.
+    this._idleTimer.unref?.()
+  }
+
+  /**
+   * Close the shared browser after an idle period. Re-checks that no job holds
+   * a page; any that arrived while the timer was pending will have moved
+   * `_active` past zero and a fresh browser is launched for them instead.
+   */
+  async _closeIdleBrowser() {
+    if (this._active > 0 || !this.browser) return
+
+    const browser = this.browser
+    this.browser = null
+    logger.info('Closing idle shared Chromium browser', {
+      idleTimeoutMs: this.idleTimeoutMs,
+    })
+
+    // Assign before yielding so a job arriving now sees the in-flight close
+    // and waits for it (getBrowser) rather than racing this browser's teardown.
+    const closing = Promise.resolve()
+      .then(() => browser.close())
+      .catch(error => {
+        logger.debug('Error closing idle shared browser', {
+          error: error.message,
+        })
+      })
+    this._closing = closing
+    try {
+      await closing
+    } finally {
+      if (this._closing === closing) this._closing = null
+    }
   }
 
   /** Close the shared browser (graceful shutdown). */
   async dispose() {
     logger.info('Disposing shared Chromium browser')
+    this._disposed = true
+    this._clearIdleTimer()
+    // Let any in-flight idle close finish before tearing the browser down.
+    if (this._closing) {
+      try {
+        await this._closing
+      } catch {
+        // Already logged by _closeIdleBrowser.
+      }
+    }
     const browser = this.browser
     this.browser = null
     this._waiters = []
