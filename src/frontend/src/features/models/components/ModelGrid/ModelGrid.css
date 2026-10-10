@@ -270,6 +270,20 @@
   color: var(--text-color-secondary);
 }
 
+/* Undo toast shown after Recycle: icon + message + Undo action. */
+.model-recycle-toast {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+/* Deduped-upload toast: icon + message + Open action. */
+.model-upload-toast {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
 .model-change-category-dialog {
   display: flex;
   flex-direction: column;

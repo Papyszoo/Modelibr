@@ -3,6 +3,7 @@ import './SceneEditor.css'
 import { Button } from 'primereact/button'
 import { Message } from 'primereact/message'
 import { SelectButton } from 'primereact/selectbutton'
+import { Toast } from 'primereact/toast'
 import { type JSX, useCallback, useEffect, useMemo, useRef } from 'react'
 
 import { ApiClientError } from '@/lib/apiBase'
@@ -224,6 +225,7 @@ export function SceneEditor({
   // in an effect: an effect would leave the ref a render behind, which is
   // exactly the window a placement finishes in.
   const editsBlockedRef = useRef(editsBlocked)
+  const toast = useRef<Toast>(null)
   editsBlockedRef.current = editsBlocked
 
   // One guard, applied where the draft actions enter this component, so every
@@ -658,6 +660,12 @@ export function SceneEditor({
       // The document that was actually sent, so edits made while the request
       // was in flight stay dirty instead of being marked saved unsent.
       markSaved(saved.scene.revision, document)
+      toast.current?.show({
+        severity: 'success',
+        summary: 'Scene saved',
+        detail: 'Your changes were saved.',
+        life: 2500,
+      })
     } catch (caught) {
       // The server rejects an invalid document in full and says why, per
       // problem. Surfacing that verbatim is the point: the alternative this
@@ -1143,6 +1151,7 @@ export function SceneEditor({
           />
         </aside>
       </div>
+      <Toast ref={toast} />
     </div>
   )
 }

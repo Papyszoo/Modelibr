@@ -97,7 +97,8 @@
 
 .project-grid-card-stats {
   display: flex;
-  gap: 1rem;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
   margin-top: auto;
   padding-top: 0.5rem;
   border-top: 1px solid var(--surface-border);

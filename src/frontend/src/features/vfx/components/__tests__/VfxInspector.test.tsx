@@ -1,4 +1,4 @@
-import { fireEvent, screen } from '@testing-library/react'
+import { fireEvent, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { useState } from 'react'
 
@@ -86,13 +86,13 @@ describe('VfxInspector particles emitter', () => {
     renderWithProviders(<Harness initial={particlesComponent()} />)
 
     await user.selectOptions(screen.getByLabelText('Emitter shape'), 'disc')
-    expect(screen.getByLabelText('Radius (m)')).toHaveValue(2)
+    expect(screen.getByLabelText('Radius (m)')).toHaveValue('2')
 
     fireEvent.change(screen.getByLabelText('Radius (m)'), {
       target: { value: '5' },
     })
 
-    expect(screen.getByLabelText('Radius (m)')).toHaveValue(5)
+    expect(screen.getByLabelText('Radius (m)')).toHaveValue('5')
   })
 
   it('shows both radii for a ring', async () => {
@@ -101,8 +101,8 @@ describe('VfxInspector particles emitter', () => {
 
     await user.selectOptions(screen.getByLabelText('Emitter shape'), 'ring')
 
-    expect(screen.getByLabelText('Inner radius (m)')).toHaveValue(1)
-    expect(screen.getByLabelText('Outer radius (m)')).toHaveValue(3)
+    expect(screen.getByLabelText('Inner radius (m)')).toHaveValue('1')
+    expect(screen.getByLabelText('Outer radius (m)')).toHaveValue('3')
   })
 
   it('exposes the radius track only for a disc or ring, and drops it for a point', async () => {
@@ -136,7 +136,7 @@ describe('VfxInspector particles emitter', () => {
     )
 
     expect(screen.getByLabelText('Emitter shape')).toHaveValue('disc')
-    expect(screen.getByLabelText('Radius (m)')).toHaveValue(1.5)
+    expect(screen.getByLabelText('Radius (m)')).toHaveValue('1.5')
     expect(screen.getByTestId('vfx-track-radius')).toBeInTheDocument()
   })
 })
@@ -156,13 +156,13 @@ describe('VfxInspector mesh primitives', () => {
     renderWithProviders(<Harness initial={meshComponent()} />)
 
     await user.selectOptions(screen.getByLabelText('Primitive'), 'disc')
-    expect(screen.getByLabelText('Radius (m)')).toHaveValue(3)
+    expect(screen.getByLabelText('Radius (m)')).toHaveValue('3')
     expect(screen.getByTestId('vfx-track-radius')).toBeInTheDocument()
 
     fireEvent.change(screen.getByLabelText('Radius (m)'), {
       target: { value: '6' },
     })
-    expect(screen.getByLabelText('Radius (m)')).toHaveValue(6)
+    expect(screen.getByLabelText('Radius (m)')).toHaveValue('6')
   })
 
   it('shows both radii for a ring primitive', () => {
@@ -174,8 +174,8 @@ describe('VfxInspector mesh primitives', () => {
       />
     )
 
-    expect(screen.getByLabelText('Inner radius (m)')).toHaveValue(2)
-    expect(screen.getByLabelText('Outer radius (m)')).toHaveValue(5)
+    expect(screen.getByLabelText('Inner radius (m)')).toHaveValue('2')
+    expect(screen.getByLabelText('Outer radius (m)')).toHaveValue('5')
   })
 
   it('drops the radius track when a primitive becomes a library mesh', async () => {
@@ -205,7 +205,7 @@ describe('VfxInspector mesh primitives', () => {
     )
 
     expect(screen.getByLabelText('Colour')).toHaveValue('#8a93a6')
-    expect(screen.getByLabelText('Emissive')).toHaveValue(0)
+    expect(screen.getByLabelText('Emissive')).toHaveValue('0')
 
     fireEvent.change(screen.getByLabelText('Colour'), {
       target: { value: '#5aa469' },
@@ -215,6 +215,49 @@ describe('VfxInspector mesh primitives', () => {
     })
 
     expect(screen.getByLabelText('Colour')).toHaveValue('#5aa469')
-    expect(screen.getByLabelText('Emissive')).toHaveValue(4)
+    expect(screen.getByLabelText('Emissive')).toHaveValue('4')
+  })
+})
+
+describe('VfxInspector numeric parsing', () => {
+  it('accepts both "." and "," as the decimal separator', () => {
+    renderWithProviders(
+      <Harness initial={meshComponent({ mesh: { kind: 'disc', radius: 1 } })} />
+    )
+
+    fireEvent.change(screen.getByLabelText('Radius (m)'), {
+      target: { value: '1.5' },
+    })
+    expect(screen.getByLabelText('Radius (m)')).toHaveValue('1.5')
+
+    fireEvent.change(screen.getByLabelText('Radius (m)'), {
+      target: { value: '2,5' },
+    })
+    expect(screen.getByLabelText('Radius (m)')).toHaveValue('2.5')
+  })
+
+  // Regression: "Key at playhead" sampled the existing track and inserted the
+  // previous value; it must store the value the radius field shows now.
+  it('keys the value currently shown, not the previous key', async () => {
+    const user = userEvent.setup()
+    renderWithProviders(
+      <Harness
+        initial={meshComponent({
+          mesh: { kind: 'disc', radius: 4 },
+          tracks: { radius: [[0, 4]] },
+        })}
+      />
+    )
+
+    fireEvent.change(screen.getByLabelText('Radius (m)'), {
+      target: { value: '6' },
+    })
+    await user.click(
+      within(screen.getByTestId('vfx-track-radius')).getByRole('button', {
+        name: /key at playhead/i,
+      })
+    )
+
+    expect(screen.getByLabelText('Keyframe value')).toHaveValue('6')
   })
 })

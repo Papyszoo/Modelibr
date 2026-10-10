@@ -193,17 +193,21 @@ export class VfxPage {
    * confirmation text so a scenario can assert the user was told what was
    * about to happen.
    *
-   * The menu is dispatched rather than right-clicked. `contextmenu` fires on
-   * mousedown, so a real right-click's matching pointerup can land on the
+   * The card menu is dispatched rather than right-clicked. `contextmenu` fires
+   * on mousedown, so a real right-click's matching pointerup can land on the
    * modal mask while the dialog is opening; dispatching the menu keeps the
    * open deterministic and matches how the component's own unit test opens it.
-   * What these steps assert - the confirmation, then the removal - is the
-   * delete behaviour either way.
+   * The delete itself still goes through the confirmation, so what these steps
+   * assert - the confirmation, then the removal - is unchanged; only the menu
+   * step to reach it is new.
    */
   async deleteEffect(id: number): Promise<string> {
     const tile = this.effectTile(id);
     await expect(tile).toBeVisible();
     await tile.dispatchEvent("contextmenu");
+
+    // Right-click opens the card menu; the confirmation follows Delete.
+    await this.page.getByRole("menuitem", { name: "Delete" }).click();
 
     const dialog = this.page.locator(".p-dialog:visible").first();
     await expect(dialog).toBeVisible();

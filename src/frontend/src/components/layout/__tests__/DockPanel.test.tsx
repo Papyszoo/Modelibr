@@ -81,13 +81,19 @@ jest.mock('../DraggableTab', () => ({
     tab,
     isActive,
     onClose,
+    tooltipPosition,
   }: {
     tab: { id: string; label?: string }
     isActive: boolean
     onClose: () => void
+    tooltipPosition?: string
   }) {
     return (
-      <div data-testid="draggable-tab" data-active={isActive}>
+      <div
+        data-testid="draggable-tab"
+        data-active={isActive}
+        data-tooltip-position={tooltipPosition}
+      >
         {tab.label}
         <button
           data-testid={`close-${tab.id}`}
@@ -154,6 +160,31 @@ describe('DockPanelContent', () => {
 
     expect(screen.getByTestId('tab-content')).toBeInTheDocument()
     expect(screen.getByText('Test Tab Content')).toBeInTheDocument()
+  })
+
+  // Regression: left-dock tooltips sat below the icon and dropped onto the page
+  // heading, and a click left them hanging over the content. They must open to
+  // the right of the bar instead.
+  it('opens left-dock tab tooltips to the right, clear of the heading', () => {
+    const tabs: Tab[] = [
+      {
+        id: 'test-tab',
+        type: 'modelList',
+        label: 'Test Tab',
+        params: {},
+        internalUiState: {},
+      },
+    ]
+
+    render(
+      <DockPanelContent {...mockProps} tabs={tabs} activeTab="test-tab" />,
+      { wrapper: TestWrapper }
+    )
+
+    expect(screen.getByTestId('draggable-tab')).toHaveAttribute(
+      'data-tooltip-position',
+      'right'
+    )
   })
 
   it('should have drag handlers on dock-bar but not on active tab content', () => {

@@ -1,7 +1,9 @@
 import './VfxList.css'
 
 import { Button } from 'primereact/button'
-import { type JSX, useState } from 'react'
+import { ContextMenu } from 'primereact/contextmenu'
+import { type MenuItem } from 'primereact/menuitem'
+import { type JSX, useMemo, useRef, useState } from 'react'
 
 import { useTabContext } from '@/hooks/useTabContext'
 import { ApiClientError } from '@/lib/apiBase'
@@ -51,8 +53,39 @@ export function VfxList(): JSX.Element {
   const deleteEffect = useDeleteVfxMutation()
 
   const [pendingDelete, setPendingDelete] = useState<VfxSummary | null>(null)
+  const [contextEffect, setContextEffect] = useState<VfxSummary | null>(null)
   const [createError, setCreateError] = useState<string | null>(null)
   const [deleteError, setDeleteError] = useState<string | null>(null)
+  const contextMenu = useRef<ContextMenu>(null)
+
+  // Card actions live behind the same right-click context menu as model cards -
+  // a right-click must never go straight into a destructive confirm. Effects
+  // have no recycle bin, so the destructive item is Delete, which opens the
+  // confirm below.
+  const contextMenuItems = useMemo<MenuItem[]>(
+    () => [
+      {
+        label: 'Open',
+        icon: 'pi pi-external-link',
+        command: () => {
+          if (contextEffect) {
+            openVfxEditorTab(String(contextEffect.id), contextEffect.name)
+          }
+        },
+      },
+      { separator: true },
+      {
+        label: 'Delete',
+        icon: 'pi pi-trash',
+        command: () => {
+          if (!contextEffect) return
+          setDeleteError(null)
+          setPendingDelete(contextEffect)
+        },
+      },
+    ],
+    [contextEffect, openVfxEditorTab]
+  )
 
   const handleCreate = async () => {
     if (createEffect.isPending) return
@@ -145,8 +178,8 @@ export function VfxList(): JSX.Element {
               onClick={() => openVfxEditorTab(String(effect.id), effect.name)}
               onContextMenu={event => {
                 event.preventDefault()
-                setDeleteError(null)
-                setPendingDelete(effect)
+                setContextEffect(effect)
+                contextMenu.current?.show(event)
               }}
               media={
                 <VfxTileMedia
@@ -173,9 +206,10 @@ export function VfxList(): JSX.Element {
         }}
         header="Delete effect"
         size="sm"
-        // The dialog opens on the right button's contextmenu (pointerdown on
-        // macOS/Linux), so the same click's pointerup lands on the new mask
-        // and would dismiss it at once. Cancel and Escape still close it.
+        // Delete is a permanent hard delete (an effect has no recycle bin) and
+        // is opened from the card menu, so keep the mask non-dismissable to
+        // avoid losing the pending delete on a stray outside click. Cancel and
+        // Escape still close it.
         dismissableMask={false}
         footer={
           <>
@@ -237,6 +271,12 @@ export function VfxList(): JSX.Element {
           </p>
         ) : null}
       </Dialog>
+
+      <ContextMenu
+        ref={contextMenu}
+        model={contextMenuItems}
+        onHide={() => setContextEffect(null)}
+      />
     </div>
   )
 }

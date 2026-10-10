@@ -52,6 +52,30 @@ export function useScenesQuery({
 }
 
 /**
+ * True when a scene request failed because the scene no longer exists.
+ *
+ * A scene deleted while its tab is open answers 404; retrying that (and
+ * refetching it on every window focus) only produced repeated 404s. Other
+ * failures still retry normally.
+ */
+function isSceneNotFound(error: unknown): boolean {
+  return error instanceof ApiClientError && error.status === 404
+}
+
+/**
+ * The retry/window-focus policy shared by every per-scene query. One definition
+ * so the detail and slots queries cannot drift apart.
+ */
+function sceneNotFoundQueryPolicy() {
+  return {
+    retry: (failureCount: number, error: unknown) =>
+      !isSceneNotFound(error) && failureCount < 3,
+    refetchOnWindowFocus: (query: { state: { error: unknown } }) =>
+      !isSceneNotFound(query.state.error),
+  }
+}
+
+/**
  * A scene is written from outside this browser, so it is never served stale.
  *
  * The global default holds a query fresh for five minutes, which is right for a
@@ -66,6 +90,7 @@ export function getSceneByIdQueryOptions(sceneId: number) {
     queryKey: ['scenes', 'detail', sceneId] as const,
     queryFn: () => getSceneById(sceneId),
     staleTime: 0,
+    ...sceneNotFoundQueryPolicy(),
   })
 }
 
@@ -158,6 +183,9 @@ export function getSceneSlotsQueryOptions(sceneId: number) {
     queryKey: ['scenes', 'slots', sceneId] as const,
     queryFn: () => getSceneSlots(sceneId),
     staleTime: 0,
+    // Same as the detail query: a scene that no longer exists is not retried
+    // or refetched on focus.
+    ...sceneNotFoundQueryPolicy(),
   })
 }
 

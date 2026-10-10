@@ -233,6 +233,7 @@ export function ModelGrid({
     textureSetId,
     persistedViewState,
     onPersistedViewStateChange: updatePersistedViewState,
+    onOpenModel: id => openModelDetailsTab(String(id)),
   })
 
   const selectedModels = useMemo(

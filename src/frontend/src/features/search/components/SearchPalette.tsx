@@ -142,6 +142,20 @@ export function SearchPalette({
           {isFetching ? (
             <i className="pi pi-spin pi-spinner search-palette-spinner" />
           ) : null}
+          {term ? (
+            <button
+              type="button"
+              className="search-palette-clear"
+              aria-label="Clear search"
+              data-testid="search-palette-clear"
+              onClick={() => {
+                setTerm('')
+                inputRef.current?.focus()
+              }}
+            >
+              <i className="pi pi-times" aria-hidden="true" />
+            </button>
+          ) : null}
         </div>
 
         <div

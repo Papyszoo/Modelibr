@@ -192,8 +192,29 @@ describe('AssetMetadataPanel', () => {
 
   it('will not save until something changes', async () => {
     render()
-
     expect(await screen.findByTestId('asset-metadata-save')).toBeDisabled()
+  })
+
+  // Regression: the model viewer hosted this panel without passing `showToast`,
+  // so a successful save was silent even though the mutation reports it. The
+  // panel must call the callback the host wires to its Toast.
+  it('reports a successful save through showToast', async () => {
+    const showToast = jest.fn()
+    renderWithProviders(
+      <AssetMetadataPanel assetType="Model" assetId={7} showToast={showToast} />
+    )
+
+    await userEvent.type(await screen.findByLabelText('Description'), 'A crate')
+    await userEvent.click(screen.getByTestId('asset-metadata-save'))
+
+    await waitFor(() =>
+      expect(showToast).toHaveBeenCalledWith(
+        expect.objectContaining({
+          severity: 'success',
+          summary: 'Metadata saved',
+        })
+      )
+    )
   })
 
   // Regression: `showToast` is optional and no caller passes one, so a rejected

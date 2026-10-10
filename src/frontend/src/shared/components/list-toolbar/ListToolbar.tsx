@@ -184,6 +184,20 @@ export function ListToolbarSearchInput({
         // selects this input that way across multiple list pages.
         className="list-filters-search-input search-input"
       />
+      {value ? (
+        <button
+          type="button"
+          className="list-filters-search-clear"
+          aria-label="Clear search"
+          data-testid="search-clear"
+          onClick={() => {
+            onChange('')
+            inputRef.current?.focus()
+          }}
+        >
+          <i className="pi pi-times" aria-hidden="true" />
+        </button>
+      ) : null}
     </div>
   )
 }

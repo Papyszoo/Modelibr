@@ -183,6 +183,10 @@ export function DraggableTab({
   }
 
   const handleClick = (): void => {
+    // Clicking a tab opens its content but leaves the pointer on the icon, so
+    // the tooltip would stay up over the page. Dismiss it the same way the
+    // close button does.
+    dismissTooltip()
     onSelect()
   }
 

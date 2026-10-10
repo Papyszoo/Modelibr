@@ -1,4 +1,11 @@
-import { act, renderHook } from '@testing-library/react'
+import {
+  act,
+  fireEvent,
+  render,
+  renderHook,
+  screen,
+} from '@testing-library/react'
+import { type ReactElement } from 'react'
 
 // Mock blenderEnabledStore - control blenderEnabled value
 let mockBlenderEnabled = false
@@ -21,14 +28,25 @@ jest.mock('@/features/project/api/projectApi', () => ({
 const mockUploadMultipleFiles = jest.fn()
 const mockUploadFolder = jest.fn()
 const mockUploadZip = jest.fn()
+let mockLastUploadOptions: {
+  onSuccess?: (
+    file: unknown,
+    results: {
+      succeeded: { file?: { name?: string }; result: unknown }[]
+    }
+  ) => Promise<void>
+}
 jest.mock('@/shared/hooks/useFileUpload', () => ({
-  useFileUpload: () => ({
-    uploading: false,
-    uploadProgress: 0,
-    uploadMultipleFiles: mockUploadMultipleFiles,
-    uploadFolder: mockUploadFolder,
-    uploadZip: mockUploadZip,
-  }),
+  useFileUpload: (options: unknown) => {
+    mockLastUploadOptions = options as typeof mockLastUploadOptions
+    return {
+      uploading: false,
+      uploadProgress: 0,
+      uploadMultipleFiles: mockUploadMultipleFiles,
+      uploadFolder: mockUploadFolder,
+      uploadZip: mockUploadZip,
+    }
+  },
   useDragAndDrop: (callback: (files: File[]) => void) => ({
     onDrop: (e: {
       preventDefault: () => void
@@ -208,6 +226,69 @@ describe('useModelUpload', () => {
       })
 
       expect(mockUploadMultipleFiles).toHaveBeenCalledWith([blend1, blend2])
+    })
+  })
+
+  // Regression: a re-upload the backend deduped to an existing asset reported a
+  // plain "completed" and gave no hint the file already existed.
+  describe('deduped uploads', () => {
+    it('reports an existing asset with an Open action, without auto-opening it', async () => {
+      const onOpenModel = jest.fn()
+      renderHook(() =>
+        useModelUpload({
+          toast: mockToast,
+          onUploadComplete: mockOnUploadComplete,
+          onOpenModel,
+        })
+      )
+
+      await act(async () => {
+        await mockLastUploadOptions.onSuccess?.(null, {
+          succeeded: [
+            {
+              file: { name: 'chair.glb' },
+              result: { id: 7, alreadyExists: true },
+            },
+          ],
+        })
+      })
+
+      const shown = mockToast.current.show.mock.calls.at(-1)?.[0] as {
+        summary: string
+        content?: () => ReactElement
+      }
+      expect(shown.summary).toBe('Already in your library')
+
+      // The user chooses whether to open it - the tab must not steal focus.
+      expect(onOpenModel).not.toHaveBeenCalled()
+      expect(mockOnUploadComplete).toHaveBeenCalled()
+
+      // The toast's Open action opens the existing asset.
+      render(shown.content?.() as ReactElement)
+      fireEvent.click(screen.getByTestId('duplicate-upload-open'))
+      expect(onOpenModel).toHaveBeenCalledWith(7)
+    })
+
+    it('stays quiet for a genuinely new upload', async () => {
+      renderHook(() =>
+        useModelUpload({
+          toast: mockToast,
+          onUploadComplete: mockOnUploadComplete,
+        })
+      )
+
+      await act(async () => {
+        await mockLastUploadOptions.onSuccess?.(null, {
+          succeeded: [
+            {
+              file: { name: 'new.glb' },
+              result: { id: 8, alreadyExists: false },
+            },
+          ],
+        })
+      })
+
+      expect(mockToast.current.show).not.toHaveBeenCalled()
     })
   })
 })

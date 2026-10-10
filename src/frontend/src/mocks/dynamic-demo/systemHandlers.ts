@@ -3,6 +3,7 @@ import { http, HttpResponse } from 'msw'
 import { type MaterialEffectsDocument } from '@/shared/three/materialEffects'
 
 import {
+  addRecycledItem,
   type DemoEnvironmentMap,
   type DemoModel,
   type DemoScript,
@@ -14,6 +15,7 @@ import {
   getAllRecycledItems,
   getAllUploadHistory,
   getById,
+  nextId,
   now,
   put,
   recomputePackCounts,
@@ -699,9 +701,24 @@ export const systemHandlers = [
     return HttpResponse.json(material)
   }),
 
+  // Recycle a material the same way the real API does: record it for the
+  // recycle bin (so Undo can restore it) and drop it from the live list.
   http.delete('*/materials/:id', async ({ params }) => {
-    const index = DEMO_MATERIALS.findIndex(m => m.id === Number(params.id))
-    if (index >= 0) DEMO_MATERIALS.splice(index, 1)
+    const id = Number(params.id)
+    const index = DEMO_MATERIALS.findIndex(m => m.id === id)
+    if (index >= 0) {
+      const material = DEMO_MATERIALS[index]
+      const recycledId = await nextId('recycledItems')
+      await addRecycledItem({
+        id: recycledId,
+        type: 'material',
+        entityId: id,
+        name: material.name,
+        deletedAt: now(),
+        entity: { ...material } as unknown as Record<string, unknown>,
+      })
+      DEMO_MATERIALS.splice(index, 1)
+    }
 
     return new HttpResponse(null, { status: 204 })
   }),
@@ -1504,6 +1521,11 @@ export const systemHandlers = [
               await recomputeProjectCounts(project)
               await put('projects', project)
             }
+          }
+        } else if (type === 'material') {
+          const material = item.entity as (typeof DEMO_MATERIALS)[number]
+          if (!DEMO_MATERIALS.some(existing => existing.id === material.id)) {
+            DEMO_MATERIALS.push(material)
           }
         }
       }

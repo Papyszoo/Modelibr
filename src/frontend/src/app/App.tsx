@@ -11,6 +11,7 @@ import { getWebDavUrls } from '@/features/settings/api/settingsApi'
 import { useGlobalDragPrevention } from '@/hooks/useGlobalDragPrevention'
 import { useTheme } from '@/hooks/useTheme'
 import { UploadProgressWindow } from '@/shared/components'
+import { useDismissTooltipsOnPress } from '@/shared/hooks/useDismissTooltipsOnPress'
 import { useThumbnailSignalR } from '@/shared/thumbnail/hooks/useThumbnailSignalR'
 import { useBlenderEnabledStore } from '@/stores/blenderEnabledStore'
 import { useWebDavStore } from '@/stores/webDavStore'
@@ -23,6 +24,9 @@ function App(): JSX.Element {
 
   // Initialize theme
   useTheme()
+
+  // Tooltips must not linger after a click/tap.
+  useDismissTooltipsOnPress()
 
   // Fetch blender-enabled flag from backend at startup
   const fetchBlenderEnabled = useBlenderEnabledStore(s => s.fetchBlenderEnabled)

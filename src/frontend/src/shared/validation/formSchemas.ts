@@ -1,5 +1,7 @@
 import { z } from 'zod'
 
+import { parseDecimalInput } from '@/shared/utils/number'
+
 export const textureSetNameSchema = z
   .string()
   .trim()
@@ -14,19 +16,7 @@ export const spriteRenameFormSchema = z.object({
   name: z.string().trim().max(200, 'Name cannot exceed 200 characters'),
 })
 
-const parseNumberInput = (value: unknown) => {
-  if (typeof value === 'number') {
-    return Number.isFinite(value) ? value : undefined
-  }
-
-  if (typeof value === 'string') {
-    if (!value.trim()) return undefined
-    const parsed = Number(value)
-    return Number.isFinite(parsed) ? parsed : undefined
-  }
-
-  return undefined
-}
+const parseNumberInput = (value: unknown) => parseDecimalInput(value)
 
 export const settingsFormSchema = z.object({
   maxFileSizeMB: z.preprocess(

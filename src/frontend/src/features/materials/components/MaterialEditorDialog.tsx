@@ -9,7 +9,7 @@ import { Slider } from 'primereact/slider'
 import { type JSX, useMemo, useState } from 'react'
 
 import { ApiClientError } from '@/lib/apiBase'
-import { Dialog } from '@/shared/components'
+import { Dialog, NumberInput } from '@/shared/components'
 import {
   DRIVER_INPUTS,
   EFFECT_TYPES,
@@ -103,6 +103,10 @@ export function MaterialEditorDialog({
   onSubmit,
 }: MaterialEditorDialogProps): JSX.Element {
   const [name, setName] = useState(material?.name ?? '')
+  // Inline error state: only after the user leaves the field empty, so opening
+  // a "new material" dialog does not show an error before they have typed.
+  const [nameTouched, setNameTouched] = useState(false)
+  const nameError = nameTouched && name.trim().length === 0
   const [description, setDescription] = useState(material?.description ?? '')
   const [parameters, setParameters] = useState<MaterialParametersDto>(
     material?.parameters ?? DEFAULT_PARAMETERS
@@ -320,8 +324,20 @@ export function MaterialEditorDialog({
             autoFocus
             placeholder="Weathered brass"
             data-testid="material-name-input"
+            className={nameError ? 'p-invalid' : undefined}
+            aria-invalid={nameError}
+            onBlur={() => setNameTouched(true)}
             onChange={event => setName(event.target.value)}
           />
+          {nameError ? (
+            <small
+              className="material-editor-error"
+              role="alert"
+              data-testid="material-name-error"
+            >
+              Name is required.
+            </small>
+          ) : null}
 
           <label htmlFor="material-description">Description</label>
           <InputTextarea
@@ -640,28 +656,21 @@ function EffectParamRow({
           {driver && (
             <>
               <label htmlFor={`${baseId}-scale`}>x scale</label>
-              <input
-                // Uncontrolled on purpose: a controlled number input rewrites
-                // its text on every keystroke and eats the decimal point. `key`
-                // remounts it when the driver's input changes.
+              <NumberInput
+                // `key` remounts it when the driver's input changes so the
+                // field follows the newly selected driver.
                 key={driver.input}
                 id={`${baseId}-scale`}
-                type="number"
                 className="material-editor-driver-scale"
                 aria-label={`${param.label} driver scale`}
                 min={-100}
                 max={100}
-                step="any"
-                defaultValue={driver.scale}
+                step={0.1}
+                value={driver.scale}
                 data-testid={`${baseId}-scale`}
-                onChange={event => {
-                  const parsed = Number(event.target.value)
-                  if (!Number.isFinite(parsed)) return
-                  onDriverChange({
-                    input: driver.input,
-                    scale: Math.max(-100, Math.min(100, parsed)),
-                  })
-                }}
+                onChange={scale =>
+                  onDriverChange({ input: driver.input, scale })
+                }
               />
             </>
           )}

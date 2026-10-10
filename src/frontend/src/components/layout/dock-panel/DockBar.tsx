@@ -27,7 +27,14 @@ const ORIENTATION_BY_PLACEMENT: Record<DockPlacement, DockOrientation> = {
   bottom: 'horizontal',
 }
 
-/** Tooltips appear on the side opposite the bar so they don't cover the icon. */
+/**
+ * Tooltips open outward, to the side of the bar away from the icon.
+ *
+ * The content area sits beside a vertical bar, so an outward tooltip opens
+ * past the dock instead of into the page heading; a `bottom` tooltip on the
+ * top tab dropped straight onto it. Horizontal bars keep their outward
+ * position.
+ */
 const TOOLTIP_BY_PLACEMENT: Record<
   DockPlacement,
   'left' | 'right' | 'top' | 'bottom'

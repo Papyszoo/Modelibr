@@ -1,5 +1,7 @@
 import './VfxEditor.css'
 
+import { confirmDialog } from 'primereact/confirmdialog'
+import { Toast } from 'primereact/toast'
 import {
   type JSX,
   useCallback,
@@ -10,9 +12,14 @@ import {
 } from 'react'
 
 import { getFileUrl } from '@/features/models/api/modelApi'
-import { ErrorState, LoadingState } from '@/shared/components'
+import { useTabContext } from '@/hooks/useTabContext'
+import { ErrorState, LoadingState, NumberInput } from '@/shared/components'
 
-import { useUpdateVfxMutation, useVfxQuery } from '../api/queries'
+import {
+  useDeleteVfxMutation,
+  useUpdateVfxMutation,
+  useVfxQuery,
+} from '../api/queries'
 import { getVfxGodotExportUrl, vfxProblems } from '../api/vfxApi'
 import { useVfxAssetFiles } from '../hooks/useVfxAssets'
 import { createComponent } from '../lib/vfxDefaults'
@@ -58,8 +65,12 @@ function problemsFor(problems: VfxProblem[], index: number): VfxProblem[] {
 export function VfxEditor({ vfxId }: { vfxId: number }): JSX.Element {
   const query = useVfxQuery(vfxId)
   const update = useUpdateVfxMutation(vfxId)
+  const deleteEffect = useDeleteVfxMutation()
+  const { closeTab, tabId } = useTabContext()
+  const toast = useRef<Toast>(null)
 
   const [name, setName] = useState('')
+  const [nameTouched, setNameTouched] = useState(false)
   const [definition, setDefinition] = useState<VfxDefinition | null>(null)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [time, setTime] = useState(0)
@@ -172,6 +183,10 @@ export function VfxEditor({ vfxId }: { vfxId: number }): JSX.Element {
   }
   if (!definition) return <LoadingState message="Loading effect..." />
 
+  // Inline error only after the field is left empty, so a freshly opened editor
+  // does not show an error before the user has touched the name.
+  const nameError = nameTouched && name.trim().length === 0
+
   const addComponent = (
     type: VfxComponentType,
     asset?: { id: number; versionId?: number | null }
@@ -190,6 +205,39 @@ export function VfxEditor({ vfxId }: { vfxId: number }): JSX.Element {
   const togglePlay = () => {
     if (!playing && time >= definition.duration) setTime(0)
     setPlaying(value => !value)
+  }
+
+  const confirmDeleteEffect = () => {
+    confirmDialog({
+      header: 'Delete effect',
+      message: `Delete "${name.trim() || 'Untitled effect'}"? The assets it references are not affected - only the effect is removed.`,
+      icon: 'pi pi-exclamation-triangle',
+      acceptClassName: 'p-button-danger',
+      acceptLabel: 'Delete',
+      rejectLabel: 'Cancel',
+      accept: async () => {
+        try {
+          await deleteEffect.mutateAsync(vfxId)
+          toast.current?.show({
+            severity: 'success',
+            summary: 'Deleted',
+            detail: 'Effect deleted.',
+            life: 2500,
+          })
+          closeTab(tabId)
+        } catch (error) {
+          toast.current?.show({
+            severity: 'error',
+            summary: 'Delete failed',
+            detail:
+              error instanceof Error
+                ? error.message
+                : 'The effect could not be deleted.',
+            life: 4000,
+          })
+        }
+      },
+    })
   }
 
   const saveFailed = update.isError
@@ -214,16 +262,29 @@ export function VfxEditor({ vfxId }: { vfxId: number }): JSX.Element {
   return (
     <div className="vfx-editor" data-testid="vfx-editor">
       <header className="vfx-toolbar">
-        <input
-          className="vfx-title"
-          aria-label="Effect name"
-          value={name}
-          maxLength={200}
-          onChange={event => {
-            setName(event.target.value)
-            setDirty(true)
-          }}
-        />
+        <div className="vfx-title-field">
+          <input
+            className={`vfx-title${nameError ? ' p-invalid' : ''}`}
+            aria-label="Effect name"
+            aria-invalid={nameError}
+            value={name}
+            maxLength={200}
+            onBlur={() => setNameTouched(true)}
+            onChange={event => {
+              setName(event.target.value)
+              setDirty(true)
+            }}
+          />
+          {nameError ? (
+            <small
+              className="vfx-name-error"
+              role="alert"
+              data-testid="vfx-name-error"
+            >
+              Name is required.
+            </small>
+          ) : null}
+        </div>
 
         <div className="vfx-toolbar-group vfx-transport">
           <button
@@ -265,16 +326,14 @@ export function VfxEditor({ vfxId }: { vfxId: number }): JSX.Element {
           </label>
           <label className="vfx-toolbar-field">
             Length
-            <input
+            <NumberInput
               className="vfx-length-input"
-              type="number"
               aria-label="Effect length in seconds"
               value={definition.duration}
               min={0.1}
               max={60}
               step={0.1}
-              onChange={event => {
-                const value = Number(event.target.value)
+              onChange={value => {
                 if (!Number.isFinite(value) || value < 0.1 || value > 60) return
                 edit({
                   ...definition,
@@ -339,9 +398,26 @@ export function VfxEditor({ vfxId }: { vfxId: number }): JSX.Element {
             href={getVfxGodotExportUrl(vfxId)}
             download
             data-testid="vfx-export-godot"
+            onClick={() =>
+              toast.current?.show({
+                severity: 'success',
+                summary: 'Export started',
+                detail: 'Downloading the Godot scene archive.',
+                life: 3000,
+              })
+            }
           >
             <i className="pi pi-download" aria-hidden="true" /> Godot
           </a>
+          <button
+            type="button"
+            className="vfx-icon-button vfx-danger"
+            aria-label="Delete effect"
+            data-testid="vfx-editor-delete"
+            onClick={confirmDeleteEffect}
+          >
+            <i className="pi pi-trash" aria-hidden="true" />
+          </button>
         </div>
       </header>
 
@@ -419,6 +495,8 @@ export function VfxEditor({ vfxId }: { vfxId: number }): JSX.Element {
           if (component) replaceComponent({ ...component, start, duration })
         }}
       />
+
+      <Toast ref={toast} />
     </div>
   )
 }

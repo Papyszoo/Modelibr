@@ -11,8 +11,9 @@
   padding-bottom: var(--mod-space-md);
 }
 
-.material-list-confirm {
-  margin: 0;
-  font-size: var(--mod-text-sm);
-  color: var(--text-color-secondary);
+/* Undo toast shown after Recycle: icon + message + Undo action. */
+.material-recycle-toast {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
 }

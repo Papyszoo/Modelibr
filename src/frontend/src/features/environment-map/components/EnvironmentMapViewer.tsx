@@ -33,7 +33,7 @@ import {
   getEnvironmentMapPreviewOptions,
   getEnvironmentMapPrimaryPreviewUrl,
 } from '@/features/environment-map/utils/environmentMapUtils'
-import { AssetMetadataPanel } from '@/features/metadata'
+import { AssetMetadataPanel, useAssetMetadataToast } from '@/features/metadata'
 import { PanelWrapper } from '@/features/model-viewer/components/PanelWrapper'
 import { uploadFile } from '@/features/models/api/modelApi'
 
@@ -45,6 +45,7 @@ export function EnvironmentMapViewer({
   environmentMapId,
 }: EnvironmentMapViewerProps) {
   const toast = useRef<Toast>(null)
+  const showToast = useAssetMetadataToast(toast)
   const parsedEnvironmentMapId = Number(environmentMapId)
   const stableTabId = `environment-map-${environmentMapId}`
 
@@ -323,6 +324,7 @@ export function EnvironmentMapViewer({
             <AssetMetadataPanel
               assetType="EnvironmentMap"
               assetId={parsedEnvironmentMapId}
+              showToast={showToast}
             />
           )}
         </PanelWrapper>

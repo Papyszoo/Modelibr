@@ -168,7 +168,7 @@ export function AssetMetadataPanel({
       </div>
 
       {/*
-        Inline, because `showToast` is optional and no caller passes one: a
+        Inline, because `showToast` is optional and a host may not mount one: a
         failed save used to show nothing at all while the draft quietly stayed
         on screen, which reads as "saved".
       */}

@@ -104,9 +104,16 @@
   color: var(--mod-color-text-muted);
 }
 
-.vfx-title {
+.vfx-title-field {
+  display: flex;
   flex: 1 1 10rem;
+  flex-direction: column;
+  gap: 0.125rem;
   min-width: 0;
+}
+
+.vfx-title {
+  width: 100%;
   padding: var(--mod-space-2xs) var(--mod-space-xs);
   font: inherit;
   font-size: var(--mod-text-md);
@@ -115,6 +122,11 @@
   background: transparent;
   border: 1px solid transparent;
   border-radius: var(--mod-radius-sm);
+}
+
+.vfx-name-error {
+  font-size: var(--mod-text-xs);
+  color: var(--mod-color-danger);
 }
 
 .vfx-title:hover,
@@ -265,6 +277,9 @@
   padding: 0 var(--mod-space-sm) var(--mod-space-2xl);
   overflow-y: auto;
   scrollbar-gutter: stable;
+  /* Keep scrolled-to content clear of the sticky inspector header instead of
+     hiding it under the header. */
+  scroll-padding-top: 3rem;
   background: var(--mod-color-surface);
   border-left: 1px solid var(--mod-color-border);
 }

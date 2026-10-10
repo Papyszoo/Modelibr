@@ -87,6 +87,32 @@ describe('MaterialList', () => {
     expect(screen.getByText(/dielectric · rough 0\.95/)).toBeInTheDocument()
   })
 
+  // Regression: right-click on a material card went straight to a delete
+  // confirm. Materials are recycled (soft-deleted), so the card menu must offer
+  // Recycle with an Undo restore - never a destructive confirm. This mirrors
+  // the model card menu.
+  it('recycles from the context menu without a confirm and offers Undo', async () => {
+    const user = userEvent.setup()
+    renderWithProviders(<MaterialList />)
+    await screen.findByText('Brushed Brass')
+
+    fireEvent.contextMenu(screen.getAllByTestId('material-tile')[0])
+
+    expect(
+      screen.queryByTestId('material-delete-confirm')
+    ).not.toBeInTheDocument()
+
+    await user.click(await screen.findByText('Recycle'))
+    await waitFor(() => expect(mockDelete).toHaveBeenCalledWith('/materials/1'))
+
+    // The success toast carries an Undo affordance; pressing it restores the
+    // material from the recycle bin instead of leaving the user to find it.
+    await user.click(await screen.findByTestId('material-recycle-undo'))
+    await waitFor(() =>
+      expect(mockPost).toHaveBeenCalledWith('/recycled/material/1/restore')
+    )
+  })
+
   it('sends the typed search to the server and renders the narrowed result', async () => {
     // The search must reach the query key. If it were held in local state
     // without feeding the query, the list would never change and this goes red.
@@ -283,7 +309,7 @@ describe('MaterialList effects editor', () => {
     fireEvent.click(within(dropdownPanel()).getByText('Speed'))
     expect(
       screen.getByTestId('effect-jelly_wobble-amplitude-scale')
-    ).toHaveValue(0.0125)
+    ).toHaveValue('0.0125')
 
     // Then set the per-unit scale by hand.
     fireEvent.change(

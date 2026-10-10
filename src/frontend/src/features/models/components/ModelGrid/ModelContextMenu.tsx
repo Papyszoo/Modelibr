@@ -22,6 +22,7 @@ import {
   addModelToProject,
   removeModelFromProject,
 } from '@/features/project/api/projectApi'
+import { restoreEntity } from '@/features/recycled-files/api/recycledApi'
 import { SelectPackDialog } from '@/shared/components/dialogs/SelectPackDialog'
 import { SelectProjectDialog } from '@/shared/components/dialogs/SelectProjectDialog'
 import { type Model } from '@/utils/fileUtils'
@@ -219,19 +220,58 @@ export const ModelContextMenu = forwardRef<
       }
     }
 
+    /** Restores models just moved to the recycle bin, from the Undo toast. */
+    const handleUndoRecycle = async (ids: number[]) => {
+      try {
+        for (const id of ids) {
+          await restoreEntity('model', id)
+        }
+        await invalidateRelatedQueries()
+        await queryClient.invalidateQueries({ queryKey: ['recycledFiles'] })
+        toast.current?.show({
+          severity: 'success',
+          summary: 'Restored',
+          detail: `${ids.length} model${ids.length === 1 ? '' : 's'} restored`,
+          life: 3000,
+        })
+      } catch (error) {
+        console.error('Failed to restore model:', error)
+        toast.current?.show({
+          severity: 'error',
+          summary: 'Error',
+          detail: 'Failed to restore model',
+          life: 3000,
+        })
+      }
+    }
+
     const handleSoftDelete = async () => {
       if (selectedModels.length === 0) return
+      const recycledIds = selectedModels.map(model => Number(model.id))
       try {
-        for (const model of selectedModels) {
-          await softDeleteModel(Number(model.id))
+        for (const id of recycledIds) {
+          await softDeleteModel(id)
         }
         await invalidateRelatedQueries()
         await queryClient.invalidateQueries({ queryKey: ['recycledFiles'] })
         toast.current?.show({
           severity: 'success',
           summary: 'Recycled',
-          detail: `${selectedCountLabel} moved to recycled files`,
-          life: 3000,
+          life: 6000,
+          content: () => (
+            <div className="model-recycle-toast">
+              <i className="pi pi-trash" aria-hidden="true" />
+              <span>{`${selectedCountLabel} moved to recycled files`}</span>
+              <button
+                type="button"
+                className="p-button p-button-text p-button-sm"
+                data-testid="recycle-undo"
+                onClick={() => void handleUndoRecycle(recycledIds)}
+              >
+                Undo
+              </button>
+            </div>
+          ),
         })
       } catch (error) {
         console.error('Failed to recycle model:', error)

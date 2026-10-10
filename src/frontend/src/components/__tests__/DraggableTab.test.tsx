@@ -82,6 +82,30 @@ describe('DraggableTab', () => {
     expect(defaultProps.onSelect).toHaveBeenCalledTimes(1)
   })
 
+  it('opens its tooltip to the right by default', () => {
+    render(<DraggableTab {...defaultProps} />)
+
+    expect(getByTooltip('Models List')).toHaveAttribute(
+      'data-pr-position',
+      'right'
+    )
+  })
+
+  // Regression: clicking a tab left the tooltip hanging over the page because
+  // the pointer never left the icon. The click must dismiss it.
+  it('dismisses the tooltip when the tab is clicked', () => {
+    render(<DraggableTab {...defaultProps} />)
+
+    const tabElement = getByTooltip('Models List')
+    const onMouseLeave = jest.fn()
+    tabElement.addEventListener('mouseleave', onMouseLeave)
+
+    fireEvent.click(tabElement)
+
+    expect(onMouseLeave).toHaveBeenCalledTimes(1)
+    expect(defaultProps.onSelect).toHaveBeenCalledTimes(1)
+  })
+
   it('should have close button that calls onClose when clicked', () => {
     render(<DraggableTab {...defaultProps} />)
 

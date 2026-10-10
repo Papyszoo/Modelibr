@@ -79,12 +79,19 @@ export function useModelFilters({
     : currentSelectedProjectIds
   const setIsSearchOpen = useCallback(
     (value: boolean) => {
+      // Collapsing the search bar without clearing its filter left an invisible
+      // active query (0 results, no visible cause). Closing it clears the query.
+      const patch: Partial<ModelListViewState> = value
+        ? { isSearchOpen: value }
+        : { isSearchOpen: value, searchQuery: '' }
+
       if (persistedViewState && onPersistedViewStateChange) {
-        onPersistedViewStateChange({ isSearchOpen: value })
+        onPersistedViewStateChange(patch)
         return
       }
 
       setLocalIsSearchOpen(value)
+      if (!value) setLocalSearchQuery('')
     },
     [onPersistedViewStateChange, persistedViewState]
   )

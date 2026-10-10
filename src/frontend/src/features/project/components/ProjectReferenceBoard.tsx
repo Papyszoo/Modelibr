@@ -94,6 +94,11 @@ export function ProjectReferenceBoard({
       queryClient.invalidateQueries({
         queryKey: ['projects', projectId, 'references'],
       }),
+      // A reference image linked to a character changes that character's
+      // server-computed imageCount, so its list must refresh too.
+      queryClient.invalidateQueries({
+        queryKey: ['projects', projectId, 'characters'],
+      }),
       onChanged?.(),
     ])
   }

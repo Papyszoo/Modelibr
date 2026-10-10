@@ -4,7 +4,8 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Button } from 'primereact/button'
 import { InputText } from 'primereact/inputtext'
 import { InputTextarea } from 'primereact/inputtextarea'
-import { type ReactNode, useState } from 'react'
+import { Toast } from 'primereact/toast'
+import { type ReactNode, useRef, useState } from 'react'
 
 import {
   createProjectComment,
@@ -114,6 +115,7 @@ export function ProjectCommentThread({
 }: ProjectCommentThreadProps) {
   const { query, create, update } = useProjectComments(projectId)
   const [composerOpen, setComposerOpen] = useState(false)
+  const toast = useRef<Toast>(null)
 
   const comments = ordered(
     (query.data ?? []).filter(
@@ -131,6 +133,7 @@ export function ProjectCommentThread({
       data-testid="project-comment-thread"
       aria-label={`${heading} on ${targetName}`}
     >
+      <Toast ref={toast} />
       <div className="project-comment-thread-header">
         <div className="project-comment-thread-title">
           <h5>{heading}</h5>
@@ -192,11 +195,29 @@ export function ProjectCommentThread({
             composer === 'toggle' ? () => setComposerOpen(false) : undefined
           }
           onSubmit={async values => {
-            await create.mutateAsync({
-              ...commentTargetFields(target),
-              ...values,
-            })
-            setComposerOpen(false)
+            try {
+              await create.mutateAsync({
+                ...commentTargetFields(target),
+                ...values,
+              })
+              setComposerOpen(false)
+              toast.current?.show({
+                severity: 'success',
+                summary: 'Comment added',
+                detail: 'The comment was added.',
+                life: 2500,
+              })
+            } catch (error) {
+              toast.current?.show({
+                severity: 'error',
+                summary: 'Could not add comment',
+                detail:
+                  error instanceof Error
+                    ? error.message
+                    : 'The comment could not be added.',
+                life: 4000,
+              })
+            }
           }}
         />
       ) : null}

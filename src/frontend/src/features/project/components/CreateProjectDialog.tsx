@@ -27,7 +27,7 @@ export function CreateProjectDialog({
   const queryClient = useQueryClient()
   const toast = useRef<Toast>(null)
 
-  const { register, handleSubmit, reset } = useForm<
+  const { register, handleSubmit, reset, formState } = useForm<
     ProjectCreateFormInput,
     unknown,
     ProjectCreateFormOutput
@@ -40,6 +40,7 @@ export function CreateProjectDialog({
       notes: '',
     },
   })
+  const nameError = formState.errors.name?.message
 
   const createProjectMutation = useMutation({
     mutationFn: (payload: {
@@ -119,9 +120,20 @@ export function CreateProjectDialog({
             <label htmlFor="project-name">Name *</label>
             <InputText
               id="project-name"
+              className={nameError ? 'p-invalid' : undefined}
+              aria-invalid={!!nameError}
               {...register('name')}
               placeholder="Enter project name"
             />
+            {nameError ? (
+              <small
+                className="p-error"
+                role="alert"
+                data-testid="project-name-error"
+              >
+                {nameError}
+              </small>
+            ) : null}
           </div>
           <div className="field">
             <label htmlFor="project-description">Description</label>

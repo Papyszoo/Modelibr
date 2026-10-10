@@ -1,7 +1,8 @@
 import { type JSX, type ReactNode, useState } from 'react'
 
+import { NumberInput } from '@/shared/components'
+
 import { useVfxAssetInfo } from '../hooks/useVfxAssets'
-import { sampleTrack } from '../lib/vfxRuntime'
 import {
   DEFAULT_PRIMITIVE_COLOR,
   isPrimitiveMesh,
@@ -391,12 +392,10 @@ function ParticlesFields({
         <label className="vfx-field">
           <span>Seed</span>
           <span className="vfx-field-inline">
-            <input
-              type="number"
+            <NumberInput
               value={particles.seed}
-              onChange={event =>
-                set({ seed: Math.round(Number(event.target.value) || 0) })
-              }
+              step={1}
+              onChange={value => set({ seed: Math.round(value) })}
             />
             <button
               type="button"
@@ -632,9 +631,13 @@ function TrackEditor({
 
   const addAtPlayhead = () => {
     const t = Number(localTime.toFixed(2))
-    const value = sampleTrack(keys, t, defaultValue)
+    // Store what the field shows now (`defaultValue` is the component's current
+    // authored value), not the previously keyed value sampled from the track.
     onChange(
-      sorted([...keys.filter(([k]) => k !== t), [t, Number(value.toFixed(3))]])
+      sorted([
+        ...keys.filter(([k]) => k !== t),
+        [t, Number(defaultValue.toFixed(3))],
+      ])
     )
   }
 
@@ -646,22 +649,18 @@ function TrackEditor({
         ) : (
           keys.map(([t, value], index) => (
             <div key={index} className="vfx-key-row">
-              <input
-                type="number"
+              <NumberInput
                 aria-label="Keyframe time (s)"
                 value={t}
                 min={0}
                 max={componentDuration}
                 step={0.05}
-                onChange={event => {
+                onChange={value => {
                   const next = keys.map(
                     (key, i): VfxKeyframe =>
                       i === index
                         ? [
-                            Math.min(
-                              componentDuration,
-                              Math.max(0, Number(event.target.value) || 0)
-                            ),
+                            Math.min(componentDuration, Math.max(0, value)),
                             key[1],
                           ]
                         : key
@@ -669,19 +668,16 @@ function TrackEditor({
                   onChange(sorted(next))
                 }}
               />
-              <input
-                type="number"
+              <NumberInput
                 aria-label="Keyframe value"
                 value={value}
                 step={track === 'rotationY' ? 15 : 0.1}
-                onChange={event => {
-                  const next = keys.map(
+                onChange={next => {
+                  const updated = keys.map(
                     (key, i): VfxKeyframe =>
-                      i === index
-                        ? [key[0], Number(event.target.value) || 0]
-                        : key
+                      i === index ? [key[0], next] : key
                   )
-                  onChange(next)
+                  onChange(updated)
                 }}
               />
               <button
@@ -802,18 +798,12 @@ function NumberField({
   return (
     <label className="vfx-field">
       <span>{label}</span>
-      <input
-        type="number"
-        value={Number(value.toFixed(4))}
+      <NumberInput
+        value={value}
         min={min}
         max={max}
         step={step}
-        onChange={event => {
-          const next = Number(event.target.value)
-          if (event.target.value === '' || Number.isNaN(next)) return
-          const clamped = Math.min(max ?? next, Math.max(min ?? next, next))
-          onChange(clamped)
-        }}
+        onChange={onChange}
       />
     </label>
   )

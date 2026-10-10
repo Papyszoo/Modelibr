@@ -1,11 +1,15 @@
 import './MaterialList.css'
 
+import { useQueryClient } from '@tanstack/react-query'
 import { Button } from 'primereact/button'
-import { type JSX, useState } from 'react'
+import { ContextMenu } from 'primereact/contextmenu'
+import { type MenuItem } from 'primereact/menuitem'
+import { Toast } from 'primereact/toast'
+import { type JSX, useCallback, useMemo, useRef, useState } from 'react'
 
+import { restoreEntity } from '@/features/recycled-files/api/recycledApi'
 import { ApiClientError } from '@/lib/apiBase'
 import {
-  Dialog,
   EmptyState,
   ErrorState,
   ListHeader,
@@ -44,7 +48,12 @@ export function MaterialList(): JSX.Element {
   const [editing, setEditing] = useState<MaterialDto | null | undefined>(
     undefined
   )
-  const [pendingDelete, setPendingDelete] = useState<MaterialDto | null>(null)
+  const [contextMaterial, setContextMaterial] = useState<MaterialDto | null>(
+    null
+  )
+  const contextMenu = useRef<ContextMenu>(null)
+  const toast = useRef<Toast>(null)
+  const queryClient = useQueryClient()
 
   const { data, isLoading, error, refetch } = useMaterialsQuery({
     options: search.trim() ? { search: search.trim() } : {},
@@ -55,6 +64,68 @@ export function MaterialList(): JSX.Element {
 
   const isEditorOpen = editing !== undefined
   const isSaving = createMaterial.isPending || updateMaterial.isPending
+
+  /** Restores a material just moved to the recycle bin, from the Undo toast. */
+  const handleUndoRecycle = useCallback(
+    async (materialId: number) => {
+      try {
+        await restoreEntity('material', materialId)
+        await queryClient.invalidateQueries({ queryKey: ['materials'] })
+        await queryClient.invalidateQueries({ queryKey: ['recycledFiles'] })
+        toast.current?.show({
+          severity: 'success',
+          summary: 'Restored',
+          detail: 'Material restored',
+          life: 3000,
+        })
+      } catch (caught) {
+        console.error('Failed to restore material:', caught)
+        toast.current?.show({
+          severity: 'error',
+          summary: 'Error',
+          detail: 'Failed to restore material',
+          life: 3000,
+        })
+      }
+    },
+    [queryClient]
+  )
+
+  const handleRecycle = useCallback(async () => {
+    if (!contextMaterial) return
+    const { id, name } = contextMaterial
+    try {
+      await deleteMaterial.mutateAsync(id)
+      await queryClient.invalidateQueries({ queryKey: ['recycledFiles'] })
+      toast.current?.show({
+        severity: 'success',
+        summary: 'Recycled',
+        life: 6000,
+        content: () => (
+          <div className="material-recycle-toast">
+            <i className="pi pi-trash" aria-hidden="true" />
+            <span>{`${name} moved to recycled files`}</span>
+            <button
+              type="button"
+              className="p-button p-button-text p-button-sm"
+              data-testid="material-recycle-undo"
+              onClick={() => void handleUndoRecycle(id)}
+            >
+              Undo
+            </button>
+          </div>
+        ),
+      })
+    } catch (caught) {
+      console.error('Failed to recycle material:', caught)
+      toast.current?.show({
+        severity: 'error',
+        summary: 'Error',
+        detail: 'Failed to recycle material',
+        life: 3000,
+      })
+    }
+  }, [contextMaterial, deleteMaterial, handleUndoRecycle, queryClient])
 
   const handleSubmit = async (value: MaterialEditorSubmit): Promise<void> => {
     // Only the hex goes up for the colour - never the float components too.
@@ -106,6 +177,28 @@ export function MaterialList(): JSX.Element {
   }
 
   const materials = data?.materials ?? []
+
+  // Same shape as the model card menu: card actions live behind a context
+  // menu, never a right-click straight into a destructive confirm. A PBR
+  // material is soft-deleted to the recycle bin (the backend maps DELETE to the
+  // recycle command and the bin restores materials), so the destructive item is
+  // Recycle, and the success toast offers Undo - exactly like model cards.
+  const contextMenuItems = useMemo<MenuItem[]>(
+    () => [
+      {
+        label: 'Edit',
+        icon: 'pi pi-pencil',
+        command: () => setEditing(contextMaterial),
+      },
+      { separator: true },
+      {
+        label: 'Recycle',
+        icon: 'pi pi-trash',
+        command: () => void handleRecycle(),
+      },
+    ],
+    [contextMaterial, handleRecycle]
+  )
 
   return (
     <div className="material-list" data-testid="material-list">
@@ -187,7 +280,8 @@ export function MaterialList(): JSX.Element {
               onClick={() => setEditing(material)}
               onContextMenu={event => {
                 event.preventDefault()
-                setPendingDelete(material)
+                setContextMaterial(material)
+                contextMenu.current?.show(event)
               }}
               media={
                 <MaterialSwatch
@@ -214,41 +308,13 @@ export function MaterialList(): JSX.Element {
         />
       )}
 
-      <Dialog
-        open={pendingDelete !== null}
-        onClose={() => setPendingDelete(null)}
-        header="Delete material"
-        size="sm"
-        footer={
-          <>
-            <Button
-              label="Cancel"
-              text
-              size="small"
-              onClick={() => setPendingDelete(null)}
-            />
-            <Button
-              label="Delete"
-              icon="pi pi-trash"
-              severity="danger"
-              size="small"
-              data-testid="material-delete-confirm"
-              loading={deleteMaterial.isPending}
-              onClick={async () => {
-                if (pendingDelete) {
-                  await deleteMaterial.mutateAsync(pendingDelete.id)
-                }
-                setPendingDelete(null)
-              }}
-            />
-          </>
-        }
-      >
-        <p className="material-list-confirm">
-          Delete <strong>{pendingDelete?.name}</strong>? Any scene node dressed
-          with it falls back to the model&apos;s own material.
-        </p>
-      </Dialog>
+      <Toast ref={toast} />
+
+      <ContextMenu
+        ref={contextMenu}
+        model={contextMenuItems}
+        onHide={() => setContextMaterial(null)}
+      />
     </div>
   )
 }

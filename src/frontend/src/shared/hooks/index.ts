@@ -4,6 +4,7 @@ export {
   type UseCategoryMutationsConfig,
 } from './useCategoryMutations'
 export { useDebouncedValue } from './useDebouncedValue'
+export { useDismissTooltipsOnPress } from './useDismissTooltipsOnPress'
 export { useDragAndDrop, useFileUpload } from './useFileUpload'
 export {
   useBreakpoint,

@@ -148,14 +148,21 @@ describe('VfxList', () => {
     expect(onOpenVfxEditorTab).toHaveBeenCalledWith('1', 'Effect 1')
   })
 
-  it('asks before deleting and only removes on confirm', async () => {
+  it('opens a card context menu on right-click, then confirms before deleting', async () => {
     renderList()
     await screen.findByTestId('vfx-list')
 
     fireEvent.contextMenu(screen.getAllByTestId('vfx-tile')[0])
-    // The dialog opens, but nothing is deleted until the user says so.
+    // Right-click opens the shared context menu, not the delete confirm.
+    expect(document.querySelector('.p-contextmenu')).toBeInTheDocument()
+    // Effects are hard-deleted (no recycle bin), so there is no Recycle item
+    // and no Undo - the destructive item is Delete behind a confirm.
+    expect(screen.queryByText('Recycle')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('vfx-delete')).not.toBeInTheDocument()
     expect(vfx.deleteVfx).not.toHaveBeenCalled()
 
+    await userEvent.click(await screen.findByText('Delete'))
+    // The confirm opens, but nothing is deleted until the user says so.
     await userEvent.click(await screen.findByTestId('vfx-delete'))
 
     await waitFor(() =>
@@ -179,6 +186,7 @@ describe('VfxList', () => {
     await screen.findByTestId('vfx-list')
 
     fireEvent.contextMenu(screen.getAllByTestId('vfx-tile')[0])
+    await userEvent.click(await screen.findByText('Delete'))
     await userEvent.click(await screen.findByTestId('vfx-delete'))
 
     expect(await screen.findByTestId('vfx-delete-error')).toHaveTextContent(

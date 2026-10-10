@@ -7,6 +7,7 @@ import { InputSwitch } from 'primereact/inputswitch'
 import { MultiSelect } from 'primereact/multiselect'
 import { type MouseEvent as ReactMouseEvent } from 'react'
 
+import { isTriangleRangeInverted } from '@/features/models/utils/triangleRange'
 import {
   ListToolbar,
   ListToolbarActions,
@@ -129,6 +130,10 @@ export function ModelsFilters({
   }))
   const hasActiveSearch = searchQuery.trim().length > 0
   const hasTriangleRange = minTriangleCount != null || maxTriangleCount != null
+  const triangleRangeInvalid = isTriangleRangeInverted(
+    minTriangleCount,
+    maxTriangleCount
+  )
   const hasActiveFilters =
     selectedPackIds.length > 0 ||
     selectedProjectIds.length > 0 ||
@@ -333,7 +338,7 @@ export function ModelsFilters({
               placeholder="Min"
               min={0}
               useGrouping
-              inputClassName="models-filter-triangle-input"
+              inputClassName={`models-filter-triangle-input${triangleRangeInvalid ? ' p-invalid' : ''}`}
               data-testid="min-triangle-filter"
             />
             <span>–</span>
@@ -343,9 +348,18 @@ export function ModelsFilters({
               placeholder="Max"
               min={0}
               useGrouping
-              inputClassName="models-filter-triangle-input"
+              inputClassName={`models-filter-triangle-input${triangleRangeInvalid ? ' p-invalid' : ''}`}
               data-testid="max-triangle-filter"
             />
+            {triangleRangeInvalid ? (
+              <small
+                className="models-filter-range-error"
+                role="alert"
+                data-testid="triangle-range-error"
+              >
+                Min must be ≤ Max
+              </small>
+            ) : null}
           </div>
           <Dropdown
             value={uvStatus}

@@ -81,12 +81,32 @@ describe('VfxEditor', () => {
   })
 
   it('loads the effect into the toolbar, preview and timeline', async () => {
-    renderWithProviders(<VfxEditor vfxId={1} />)
+    renderWithProviders(<VfxEditor vfxId={1} />, { tabId: 'vfxEditor-1' })
 
     expect(await screen.findByTestId('vfx-editor')).toBeInTheDocument()
     expect(screen.getByLabelText('Effect name')).toHaveValue('Spark fountain')
     expect(screen.getByTestId('vfx-preview')).toBeInTheDocument()
     expect(screen.getAllByTestId('vfx-timeline-track')).toHaveLength(2)
+  })
+
+  // Regression: clearing the effect name showed no inline message (the autosave
+  // silently substituted "Untitled effect"), unlike the project and material
+  // name fields. The field must flag the empty name after the user leaves it.
+  it('shows an inline error when the effect name is cleared', async () => {
+    renderWithProviders(<VfxEditor vfxId={1} />, { tabId: 'vfxEditor-1' })
+    await screen.findByTestId('vfx-editor')
+
+    const input = screen.getByLabelText('Effect name')
+    fireEvent.change(input, { target: { value: '' } })
+    // Not shown until the field is left, so opening the editor stays quiet.
+    expect(screen.queryByTestId('vfx-name-error')).not.toBeInTheDocument()
+
+    fireEvent.blur(input)
+
+    expect(await screen.findByTestId('vfx-name-error')).toHaveTextContent(
+      'Name is required.'
+    )
+    expect(input).toHaveAttribute('aria-invalid', 'true')
   })
 
   // Regression: the save-state text ignored `update.isError`, and for a
@@ -95,7 +115,7 @@ describe('VfxEditor', () => {
   it('reports a failed autosave instead of Saved', async () => {
     vfx.updateVfx.mockRejectedValue(new Error('Network down'))
 
-    renderWithProviders(<VfxEditor vfxId={1} />)
+    renderWithProviders(<VfxEditor vfxId={1} />, { tabId: 'vfxEditor-1' })
     await screen.findByTestId('vfx-editor')
 
     fireEvent.change(screen.getByLabelText('Effect name'), {
@@ -117,7 +137,9 @@ describe('VfxEditor', () => {
   it('stays dirty after a failed autosave so the edit flushes on unmount', async () => {
     vfx.updateVfx.mockRejectedValue(new Error('Network down'))
 
-    const { unmount } = renderWithProviders(<VfxEditor vfxId={1} />)
+    const { unmount } = renderWithProviders(<VfxEditor vfxId={1} />, {
+      tabId: 'vfxEditor-1',
+    })
     await screen.findByTestId('vfx-editor')
 
     fireEvent.change(screen.getByLabelText('Effect name'), {
@@ -145,7 +167,9 @@ describe('VfxEditor', () => {
   // Regression: unmounting the editor (a tab switch) inside the 600 ms
   // debounce cleared the timer without flushing it, and the edit was lost.
   it('flushes a pending autosave on unmount', async () => {
-    const { unmount } = renderWithProviders(<VfxEditor vfxId={1} />)
+    const { unmount } = renderWithProviders(<VfxEditor vfxId={1} />, {
+      tabId: 'vfxEditor-1',
+    })
     await screen.findByTestId('vfx-editor')
 
     fireEvent.change(screen.getByLabelText('Effect name'), {

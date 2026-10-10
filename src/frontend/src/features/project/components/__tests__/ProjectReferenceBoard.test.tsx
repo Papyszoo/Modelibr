@@ -144,7 +144,8 @@ describe('ProjectReferenceBoard', () => {
   })
 
   it('links an image to a character from a plus action and unlinks it again', async () => {
-    renderBoard()
+    const { queryClient } = renderBoard()
+    const invalidate = jest.spyOn(queryClient, 'invalidateQueries')
 
     await userEvent.click(
       screen.getByRole('button', { name: 'Link character' })
@@ -157,6 +158,15 @@ describe('ProjectReferenceBoard', () => {
       projectLevelId: null,
       projectCharacterId: 4,
     })
+
+    // Linking a reference to a character changes that character's server-side
+    // imageCount, so the characters query must be refreshed too - otherwise the
+    // count stays stale until a reload.
+    await waitFor(() =>
+      expect(invalidate).toHaveBeenCalledWith({
+        queryKey: ['projects', 7, 'characters'],
+      })
+    )
 
     await userEvent.click(
       screen.getByRole('button', { name: 'Unlink Forest Crossing' })
