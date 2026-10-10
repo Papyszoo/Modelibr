@@ -163,9 +163,8 @@ export class ScenesPage {
   /**
    * How many scene EDITOR tabs are open.
    *
-   * Counted by tooltip rather than by icon: the list and the editor share
-   * `pi-box`, so an icon count cannot tell "one scene open in its own tab"
-   * from "the list plus an editor".
+   * Counted by the "Scene:" tooltip, which only an editor tab carries, so
+   * the Scenes list tab never counts as an open scene.
    */
   async sceneEditorTabCount(): Promise<number> {
     return this.page

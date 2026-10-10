@@ -5,9 +5,12 @@ import { useEffect, useMemo, useRef } from 'react'
 
 import { DraggableTab } from '@/components/layout/DraggableTab'
 import { useDockContext } from '@/contexts/DockContext'
-import { type Tab } from '@/types'
+import { useUIPreferencesStore } from '@/stores/uiPreferencesStore'
+import { type Tab, type TabType } from '@/types'
 
 import { useDockPanelActions } from './DockPanelActionsContext'
+import { DockPinnedEntry } from './DockPinnedEntry'
+import { PINNED_TAB_TYPES } from './pinnedTabs'
 
 export type DockPlacement = 'left' | 'right' | 'top' | 'bottom'
 export type DockOrientation = 'vertical' | 'horizontal'
@@ -18,6 +21,14 @@ interface DockBarProps {
   tabs: Tab[]
   activeTab: string
   onTabSelect: (tabId: string) => void
+  /** Shows the pinned entries; called with the kind of a closed one clicked. */
+  onPinnedSelect?: (type: TabType) => void
+  /**
+   * Tab types already open in another panel. A pinned page open elsewhere is
+   * visible there, so this dock shows no entry for it and only one panel can
+   * address it at a time.
+   */
+  pinnedTypesOpenElsewhere?: readonly TabType[]
 }
 
 const ORIENTATION_BY_PLACEMENT: Record<DockPlacement, DockOrientation> = {
@@ -50,6 +61,8 @@ export function DockBar({
   tabs,
   activeTab,
   onTabSelect,
+  onPinnedSelect,
+  pinnedTypesOpenElsewhere = [],
 }: DockBarProps) {
   const {
     closeTab,
@@ -120,6 +133,49 @@ export function DockBar({
     }
   }
 
+  const renderTab = (tab: Tab, closable = true) => (
+    <DraggableTab
+      key={tab.id}
+      tab={tab}
+      isActive={tab.id === activeTab}
+      onSelect={() => onTabSelect(tab.id)}
+      onClose={() => closeTab(tab.id)}
+      onDragStart={onTabDragStart}
+      onDragEnd={onTabDragEnd}
+      tooltipPosition={tooltipPosition}
+      closable={closable}
+    />
+  )
+
+  // Which catalogue entries are pinned right now (Settings, Appearance). The
+  // catalogue fixes the order so the dock stays stable as the user toggles.
+  const pinnedTabTypes = useUIPreferencesStore(s => s.pinnedTabTypes)
+  const pinnedEntries = PINNED_TAB_TYPES.filter(t => pinnedTabTypes.includes(t))
+
+  // Undefined `onPinnedSelect` marks a bar that is not the main dock (the
+  // right panel), which renders every tab as an ordinary closable one.
+  //
+  // A pinned page open in the other panel is already visible there, so it gets
+  // no entry here: otherwise the same page would be addressable from two bars
+  // and the entry's click would land in the other panel. An open one in this
+  // panel always keeps its pinned slot.
+  const pinnedSlots = onPinnedSelect
+    ? pinnedEntries
+        .map(type => ({ type, tab: tabs.find(t => t.type === type) }))
+        .filter(
+          slot =>
+            slot.tab !== undefined ||
+            !pinnedTypesOpenElsewhere.includes(slot.type)
+        )
+    : []
+
+  // Match the pinned slot by tab instance, not id: two tabs of one pinned type
+  // can share its singleton id, and each must keep a bar button.
+  const pinnedTabs = pinnedSlots
+    .map(slot => slot.tab)
+    .filter((tab): tab is Tab => tab !== undefined)
+  const unpinnedTabs = tabs.filter(tab => !pinnedTabs.includes(tab))
+
   return (
     <div
       className={`dock-bar dock-bar--${orientation} dock-bar--placement-${placement} dock-bar-${placement}`}
@@ -130,20 +186,25 @@ export function DockBar({
       onContextMenu={handleBarContextMenu}
       onMouseDown={handleBarMouseDown}
     >
-      {/* Tab icons */}
+      {/* Tab icons: pinned entries first, then the other open tabs */}
       <div className="dock-tabs">
-        {tabs.map(tab => (
-          <DraggableTab
-            key={tab.id}
-            tab={tab}
-            isActive={tab.id === activeTab}
-            onSelect={() => onTabSelect(tab.id)}
-            onClose={() => closeTab(tab.id)}
-            onDragStart={onTabDragStart}
-            onDragEnd={onTabDragEnd}
-            tooltipPosition={tooltipPosition}
-          />
-        ))}
+        {onPinnedSelect && pinnedSlots.length > 0 && (
+          <div className="dock-pinned">
+            {pinnedSlots.map(({ type, tab }) =>
+              tab ? (
+                renderTab(tab, false)
+              ) : (
+                <DockPinnedEntry
+                  key={type}
+                  type={type}
+                  onSelect={onPinnedSelect}
+                  tooltipPosition={tooltipPosition}
+                />
+              )
+            )}
+          </div>
+        )}
+        {unpinnedTabs.map(tab => renderTab(tab))}
       </div>
 
       {/* Add tab button - opens the New Tab page. Right-click on the bar

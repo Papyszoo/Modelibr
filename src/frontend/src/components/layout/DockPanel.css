@@ -82,6 +82,30 @@
   overflow-y: hidden;
 }
 
+.dock-pinned {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+
+/* Same divider as above the + button, between pinned entries and tabs. */
+.dock-pinned:not(:last-child) {
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--mod-color-border);
+}
+
+/* A horizontal bar (mobile top/bottom) lays the pinned group along the bar. */
+.dock-bar--horizontal .dock-pinned {
+  flex-direction: row;
+}
+
+.dock-bar--horizontal .dock-pinned:not(:last-child) {
+  padding-bottom: 0;
+  padding-right: 0.5rem;
+  border-bottom: none;
+  border-right: 1px solid var(--mod-color-border);
+}
+
 .dock-add {
   margin-top: auto;
 }

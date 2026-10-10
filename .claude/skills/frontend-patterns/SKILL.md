@@ -74,10 +74,12 @@ those endpoints in `dynamicDemoHandlers.ts` (prevents 405s).
 ## Tabs
 
 New tab type = six places: the `TabType` union in `src/shared/types/ui.ts`, a case
-in `TabContent.tsx`, a tile in `NewTabPage.tsx` (TILES + `RECENT_TAB_ICON`),
-icon+tooltip cases in `DraggableTab.tsx`, a label case in `navigationStore.ts`
+in `TabContent.tsx`, a tile in `NewTabPage.tsx` (TILES), a glyph of its own in
+`components/layout/tabIcons.ts` (shared by the dock and the New Tab page) plus a
+tooltip case in `DraggableTab.tsx`, a label case in `navigationStore.ts`
 `getTabLabel`, and BOTH allowlists in `tabSerialization.ts` (missing there = the
-tab type is rejected on session restore). Ripple: docs-audit checks the union
+tab type is rejected on session restore). The main pages pinned in the left dock
+are `PINNED_TAB_TYPES` in `dock-panel/pinnedTabs.ts`. Ripple: docs-audit checks the union
 against `user-interface.md` (`tabLabels` entry in `scripts/docs-audit/index.mjs`).
 
 Three.js / geometry / pixel-decode logic the worker render or demo mode must

@@ -1,8 +1,14 @@
 import type { Meta, StoryObj } from '@storybook/react'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 
 import { type Tab } from '@/types'
 
 import { DraggableTab } from './DraggableTab'
+
+// Asset tabs (a model, an effect) read their thumbnail through React Query.
+const queryClient = new QueryClient({
+  defaultOptions: { queries: { retry: false } },
+})
 
 const meta = {
   title: 'Components/DraggableTab',
@@ -11,6 +17,13 @@ const meta = {
     layout: 'centered',
   },
   tags: ['autodocs'],
+  decorators: [
+    Story => (
+      <QueryClientProvider client={queryClient}>
+        <Story />
+      </QueryClientProvider>
+    ),
+  ],
   argTypes: {
     isActive: {
       control: 'boolean',

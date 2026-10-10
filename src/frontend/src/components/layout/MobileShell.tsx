@@ -8,7 +8,7 @@ import { useDeepLinkHandler } from '@/hooks/useDeepLinkHandler'
 import { useWindowInit } from '@/hooks/useWindowInit'
 import { createTab, useNavigationStore } from '@/stores/navigationStore'
 import { useUIPreferencesStore } from '@/stores/uiPreferencesStore'
-import { type Tab } from '@/types'
+import { type Tab, type TabType } from '@/types'
 
 import { type DockPlacement } from './dock-panel/DockBar'
 import { DockPanelContent } from './DockPanelContent'
@@ -29,6 +29,7 @@ export function MobileShell() {
   const setTabsAction = useNavigationStore(s => s.setTabs)
   const setActiveTabAction = useNavigationStore(s => s.setActiveTab)
   const setActiveRightTabAction = useNavigationStore(s => s.setActiveRightTab)
+  const focusOrOpenTabAction = useNavigationStore(s => s.focusOrOpenTab)
 
   const mobileBarPosition = useUIPreferencesStore(s => s.mobileBarPosition)
 
@@ -67,6 +68,13 @@ export function MobileShell() {
   // No-op: there is only one panel on mobile.
   const moveTabBetweenPanels = useCallback(() => {}, [])
 
+  // The main dock is this single panel, so its pinned entries reuse the same
+  // DockBar logic as desktop: open (or focus) the page here.
+  const openPinnedTab = useCallback(
+    (type: TabType) => focusOrOpenTabAction(windowId, createTab(type)),
+    [windowId, focusOrOpenTabAction]
+  )
+
   const placement: DockPlacement = mobileBarPosition
 
   return (
@@ -83,6 +91,7 @@ export function MobileShell() {
           draggedTab={draggedTab}
           setDraggedTab={setDraggedTab}
           moveTabBetweenPanels={moveTabBetweenPanels}
+          onPinnedSelect={openPinnedTab}
         />
       </div>
     </DockProvider>

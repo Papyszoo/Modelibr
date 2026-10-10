@@ -560,6 +560,13 @@
   left: 19px;
 }
 
+/* One checkbox per pinnable main dock page (Settings, Appearance). */
+.pinned-tabs-options {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
 /* Legacy checkbox label (used inside BackupsSection's create-backup modal) */
 .settings-checkbox-label {
   display: flex;

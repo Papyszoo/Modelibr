@@ -1,4 +1,5 @@
-.draggable-tab {
+.draggable-tab,
+.dock-pin {
   position: relative;
   width: 40px;
   height: 40px;
@@ -13,7 +14,8 @@
   overflow: visible; /* Changed from hidden to show close button */
 }
 
-.draggable-tab:hover {
+.draggable-tab:hover,
+.dock-pin:hover {
   background: var(--mod-color-surface-hover);
   border-color: var(--mod-color-border);
 }
@@ -25,6 +27,12 @@
 
 .draggable-tab.active:hover {
   background: var(--mod-color-primary-hover);
+}
+
+/* A pinned entry is a button; drop the native button chrome. */
+.dock-pin {
+  padding: 0;
+  font: inherit;
 }
 
 /* Tab Icon */
@@ -75,14 +83,19 @@
 
 /* Tab Thumbnail */
 .tab-thumbnail {
+  display: block;
   width: 32px;
   height: 32px;
-  border-radius: 4px;
+  /* Same corner as the tile it sits in. */
+  border-radius: 6px;
   overflow: hidden;
-  background: var(--mod-color-bg);
+  /* Transparent, so the tile's own state (surface, hover, solid active blue)
+     shows around the model exactly as it does around an icon. */
+  background: transparent;
 }
 
 .tab-thumbnail-img {
+  display: block;
   width: 100%;
   height: 100%;
   object-fit: cover;
@@ -123,7 +136,8 @@
 
 /* Responsive design */
 @media (max-width: 768px) {
-  .draggable-tab {
+  .draggable-tab,
+  .dock-pin {
     width: 35px;
     height: 35px;
   }

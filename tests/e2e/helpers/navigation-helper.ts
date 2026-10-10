@@ -1,4 +1,4 @@
-import { Page, expect } from "@playwright/test";
+import { Locator, Page, expect } from "@playwright/test";
 
 /**
  * Navigation Helper for E2E tests
@@ -7,13 +7,13 @@ import { Page, expect } from "@playwright/test";
  * The app uses a Zustand store persisted to localStorage for tab state,
  * so there are no URL query params for tab management.
  *
- * Tab icons in the dock bar:
- *   Models List  → pi-list       | Texture Sets → pi-folder
- *   Sprites      → pi-image      | Sounds       → pi-volume-up
- *   Packs        → pi-inbox      | Projects     → pi-briefcase
- *   Stages       → pi-th-large   | History      → pi-history
- *   Recycled     → pi-trash      | Settings     → pi-cog
- *   ModelViewer  → pi-box        | PackViewer   → pi-folder-open
+ * Dock tabs carry `data-tab-type` (the TabType). Tests select tabs by it rather
+ * than by icon class: an asset tab (model, effect) shows its thumbnail in place
+ * of the icon. The pinned entries at the top of the left dock are `.dock-pin`
+ * buttons, not `.draggable-tab`, so they never count as open tabs.
+ *
+ * The window starts as ONE panel; the right panel only appears once it holds a
+ * tab, which a user gets by dragging a tab onto it (see `openTabViaMenu`).
  */
 
 /**
@@ -47,30 +47,42 @@ const TILE_LABELS: Record<string, string> = {
 
 const STATE_INJECTABLE_TYPES = new Set(["stageList"]);
 
-const TAB_ICONS: Record<string, string> = {
-  modelList: "pi-list",
-  modelViewer: "pi-box",
-  scenes: "pi-box",
-  globalMaterials: "pi-palette",
-  pbrMaterials: "pi-circle-fill",
-  modelTextures: "pi-images",
-  textureSetViewer: "pi-image",
-  environmentMaps: "pi-globe",
-  environmentMapViewer: "pi-globe",
-  sprites: "pi-image",
-  sounds: "pi-volume-up",
-  scripts: "pi-code",
-  packs: "pi-inbox",
-  packViewer: "pi-folder-open",
-  projects: "pi-briefcase",
-  projectViewer: "pi-briefcase",
-  assetStore: "pi-shopping-bag",
-  settings: "pi-cog",
-  history: "pi-history",
-  recycledFiles: "pi-trash",
-  stageList: "pi-th-large",
-  stageEditor: "pi-th-large",
-};
+const KNOWN_TAB_TYPES = new Set([
+  "modelList",
+  "modelViewer",
+  "globalMaterials",
+  "pbrMaterials",
+  "modelTextures",
+  "textureSetViewer",
+  "environmentMaps",
+  "environmentMapViewer",
+  "sprites",
+  "sounds",
+  "scripts",
+  "scriptViewer",
+  "packs",
+  "packViewer",
+  "projects",
+  "projectViewer",
+  "scenes",
+  "sceneEditor",
+  "vfxList",
+  "vfxEditor",
+  "assetStore",
+  "settings",
+  "history",
+  "recycledFiles",
+  "stageList",
+  "stageEditor",
+]);
+
+/** Selector for an open dock tab of the given type. */
+export function tabSelector(tabType: string): string {
+  if (!KNOWN_TAB_TYPES.has(tabType)) {
+    throw new Error(`Unknown tab type "${tabType}"`);
+  }
+  return `.draggable-tab[data-tab-type="${tabType}"]`;
+}
 
 /**
  * Navigate to the app with a clean slate (cleared localStorage/sessionStorage).
@@ -143,6 +155,14 @@ export async function openTabViaMenu(
     );
   }
 
+  // A single-panel window has no visible right dock: open the tab on the left
+  // and drag it onto the right panel, the way a user splits the view.
+  if (side === "right" && !(await page.locator(".dock-bar-right").isVisible())) {
+    await openTabViaMenu(page, tabType, "left");
+    await dragTabToRightPanel(page, tabType);
+    return;
+  }
+
   // Click the "+" button to open the New Tab page in the target panel.
   const dockBar = page.locator(`.dock-bar-${side}`);
   const addButton = dockBar.locator(".dock-add-button");
@@ -168,6 +188,42 @@ export async function openTabViaMenu(
   console.log(
     `[Nav] Opened "${tileLabel}" tab in ${side} panel via New Tab page ✓`,
   );
+}
+
+/**
+ * Drag an open left-panel tab onto the right panel. The right panel is hidden
+ * until a drag starts, so the drop target is looked up only after the pointer
+ * has begun dragging.
+ */
+export async function dragTabToRightPanel(
+  page: Page,
+  tabType: string,
+): Promise<void> {
+  const tab = page.locator(`.dock-bar-left ${tabSelector(tabType)}`).first();
+  const box = await tab.boundingBox();
+  if (!box) throw new Error(`No ${tabType} tab in the left dock to drag`);
+
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width / 2 + 10, box.y + box.height / 2, {
+    steps: 5,
+  });
+
+  const dropTarget = page.locator(".dock-bar-right");
+  await expect(dropTarget).toBeVisible({ timeout: 5000 });
+  const target = await dropTarget.boundingBox();
+  if (!target) throw new Error("Right panel did not appear during the drag");
+  await page.mouse.move(
+    target.x + target.width / 2,
+    target.y + target.height / 2,
+    { steps: 10 },
+  );
+  await page.mouse.up();
+
+  await expect(
+    page.locator(`.dock-bar-right ${tabSelector(tabType)}`).first(),
+  ).toBeVisible({ timeout: 5000 });
+  console.log(`[Nav] Dragged "${tabType}" tab into the right panel ✓`);
 }
 
 /**
@@ -283,27 +339,21 @@ export async function clickTab(
   tabType: string,
   side?: "left" | "right",
 ): Promise<void> {
-  const iconClass = TAB_ICONS[tabType];
-  if (!iconClass) {
-    throw new Error(`Unknown tab type "${tabType}"`);
-  }
+  const selector = tabSelector(tabType);
 
   let tabLocator;
   if (side) {
-    tabLocator = page
-      .locator(`.dock-bar-${side}`)
-      .locator(`.draggable-tab:has(.${iconClass})`)
-      .first();
+    tabLocator = page.locator(`.dock-bar-${side}`).locator(selector).first();
   } else {
-    tabLocator = page.locator(`.draggable-tab:has(.${iconClass})`).first();
+    tabLocator = page.locator(selector).first();
   }
 
   await tabLocator.click();
 
   // Wait for the tab to become active
   const activeSelector = side
-    ? `.dock-bar-${side} .draggable-tab.active:has(.${iconClass})`
-    : `.draggable-tab.active:has(.${iconClass})`;
+    ? `.dock-bar-${side} ${selector}.active`
+    : `${selector}.active`;
   await expect(page.locator(activeSelector).first()).toBeVisible({
     timeout: 5000,
   });
@@ -317,18 +367,12 @@ export async function countTabsByType(
   tabType: string,
   side?: "left" | "right",
 ): Promise<number> {
-  const iconClass = TAB_ICONS[tabType];
-  if (!iconClass) {
-    throw new Error(`Unknown tab type "${tabType}"`);
-  }
+  const selector = tabSelector(tabType);
 
   if (side) {
-    return page
-      .locator(`.dock-bar-${side}`)
-      .locator(`.draggable-tab:has(.${iconClass})`)
-      .count();
+    return page.locator(`.dock-bar-${side}`).locator(selector).count();
   }
-  return page.locator(`.draggable-tab:has(.${iconClass})`).count();
+  return page.locator(selector).count();
 }
 
 /**
@@ -376,6 +420,20 @@ export async function clickTabByTooltip(
 }
 
 /**
+ * Only a pinned page in the main (left) dock has no close button by design
+ * (Models and Projects by default; the set is configurable in Settings,
+ * Appearance). A close attempt on one is a test bug: fail with that, not a
+ * click timeout. Any other main page is an ordinary closable tab.
+ */
+async function expectClosable(tab: Locator, what: string): Promise<void> {
+  if ((await tab.locator(".tab-close-btn").count()) === 0) {
+    throw new Error(
+      `${what} is pinned in the main dock and cannot be closed - unpin it in Settings, drag it to the right panel, or don't close it`,
+    );
+  }
+}
+
+/**
  * Close a tab identified by its tooltip text.
  */
 export async function closeTabByTooltip(
@@ -389,6 +447,7 @@ export async function closeTabByTooltip(
   // The close button is `display: none` until the tab is hovered, so hovering
   // is not politeness here - without it the button has no box to click.
   await tab.hover();
+  await expectClosable(tab, `The "${tooltipSubstring}" tab`);
   const closeBtn = tab.locator(".tab-close-btn");
   await closeBtn.click();
 
@@ -410,14 +469,10 @@ export async function closeTabByType(
   page: Page,
   tabType: string,
 ): Promise<void> {
-  const iconClass = TAB_ICONS[tabType];
-  if (!iconClass) {
-    throw new Error(`Unknown tab type "${tabType}"`);
-  }
-
-  const tab = page.locator(`.draggable-tab:has(.${iconClass})`).first();
+  const tab = page.locator(tabSelector(tabType)).first();
   // Hidden until hover; see closeTabByTooltip.
   await tab.hover();
+  await expectClosable(tab, `The ${tabType} tab`);
   const closeBtn = tab.locator(".tab-close-btn");
   await closeBtn.click();
 
@@ -433,12 +488,7 @@ export async function isTabActive(
   tabType: string,
   side?: "left" | "right",
 ): Promise<boolean> {
-  const iconClass = TAB_ICONS[tabType];
-  if (!iconClass) {
-    throw new Error(`Unknown tab type "${tabType}"`);
-  }
-
-  const selector = `.draggable-tab.active:has(.${iconClass})`;
+  const selector = `${tabSelector(tabType)}.active`;
   if (side) {
     return page
       .locator(`.dock-bar-${side}`)
@@ -497,7 +547,7 @@ export async function openModelViewer(
 ): Promise<void> {
   // Ensure we're on the model list
   const modelListTab = page.locator(
-    ".dock-bar-left .draggable-tab:has(.pi-list)",
+    `.dock-bar-left ${tabSelector("modelList")}`,
   );
   if (
     await modelListTab

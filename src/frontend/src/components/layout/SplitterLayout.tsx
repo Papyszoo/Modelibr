@@ -1,7 +1,13 @@
 import './SplitterLayout.css'
 
 import { Splitter, SplitterPanel } from 'primereact/splitter'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from 'react'
 
 import { DockProvider } from '@/contexts/DockContext'
 import { GlobalSearchPalette } from '@/features/search'
@@ -9,7 +15,7 @@ import { useDeepLinkHandler } from '@/hooks/useDeepLinkHandler'
 import { useWindowInit } from '@/hooks/useWindowInit'
 import { createTab, useNavigationStore } from '@/stores/navigationStore'
 import { usePanelStore } from '@/stores/panelStore'
-import { type SplitterEvent, type Tab } from '@/types'
+import { type SplitterEvent, type Tab, type TabType } from '@/types'
 import {
   parseCompactTabFormatAsync,
   serializeToCompactFormat,
@@ -28,6 +34,10 @@ export function SplitterLayout() {
   const setActiveTabAction = useNavigationStore(s => s.setActiveTab)
   const setActiveRightTabAction = useNavigationStore(s => s.setActiveRightTab)
   const setSplitterSizeAction = useNavigationStore(s => s.setSplitterSize)
+  const focusOrOpenTabAction = useNavigationStore(s => s.focusOrOpenTab)
+  const collapseEmptyLeftPanelAction = useNavigationStore(
+    s => s.collapseEmptyLeftPanel
+  )
 
   const tabs = windowState?.tabs ?? [createTab('modelList')]
   const activeTabId = windowState?.activeTabId ?? 'modelList'
@@ -70,6 +80,10 @@ export function SplitterLayout() {
   const leftTabs = tabs.filter(t => t.params?.panel !== 'right')
   const rightTabs = tabs.filter(t => t.params?.panel === 'right')
 
+  // Pinned pages are a main-dock concept, so the left bar hides the entry for
+  // any pinned page already open in the right panel (it is visible there).
+  const rightTabTypes = rightTabs.map(t => t.type)
+
   // Active tabs per panel - left uses activeTabId, right uses activeRightTabId
   const activeLeftTab = leftTabs.find(t => t.id === activeTabId)
     ? activeTabId
@@ -81,6 +95,25 @@ export function SplitterLayout() {
   // Global drag state for cross-panel tab dragging
   const [draggedTab, setDraggedTab] = useState<Tab | null>(null)
 
+  // One full-width panel until the right panel holds a tab. Dragging a tab
+  // shows the right panel as a drop target, which is how a split starts.
+  const isSplit = rightTabs.length > 0 || draggedTab !== null
+  const effectiveLeftSize = isSplit ? splitterSize : 100
+
+  // A left panel whose last tab closed collapses: the right panel's tabs move
+  // over, so the remaining panel keeps the main dock with the pinned entries.
+  // Layout effect, so the empty left panel never paints.
+  const leftIsEmpty = leftTabs.length === 0
+  const rightHasTabs = rightTabs.length > 0
+  useLayoutEffect(() => {
+    if (leftIsEmpty && rightHasTabs) collapseEmptyLeftPanelAction(windowId)
+  }, [leftIsEmpty, rightHasTabs, windowId, collapseEmptyLeftPanelAction])
+
+  const openPinnedTab = useCallback(
+    (type: TabType) => focusOrOpenTabAction(windowId, createTab(type)),
+    [windowId, focusOrOpenTabAction]
+  )
+
   // Zustand store for panel sizes
   const { setLeftPanelWidth, setRightPanelWidth } = usePanelStore()
 
@@ -88,14 +121,14 @@ export function SplitterLayout() {
   useEffect(() => {
     const updatePanelSizes = () => {
       const totalWidth = window.innerWidth
-      setLeftPanelWidth((totalWidth * splitterSize) / 100)
-      setRightPanelWidth((totalWidth * (100 - splitterSize)) / 100)
+      setLeftPanelWidth((totalWidth * effectiveLeftSize) / 100)
+      setRightPanelWidth((totalWidth * (100 - effectiveLeftSize)) / 100)
     }
 
     updatePanelSizes()
     window.addEventListener('resize', updatePanelSizes)
     return () => window.removeEventListener('resize', updatePanelSizes)
-  }, [splitterSize, setLeftPanelWidth, setRightPanelWidth])
+  }, [effectiveLeftSize, setLeftPanelWidth, setRightPanelWidth])
 
   // Track label updates
   const leftLabelsUpdated = useRef<Set<string>>(new Set())
@@ -261,7 +294,11 @@ export function SplitterLayout() {
   return (
     <DockProvider>
       <GlobalSearchPalette windowId={windowId} side="left" />
-      <div className="splitter-layout">
+      {/* Both panels stay mounted while one is hidden, so collapsing or
+          splitting never remounts the visible panel's tab content. */}
+      <div
+        className={`splitter-layout${isSplit ? '' : ' splitter-layout--single'}`}
+      >
         <Splitter layout="horizontal" onResizeEnd={handleSplitterResizeEnd}>
           <SplitterPanel size={leftSize} minSize={20}>
             <DockPanelContent
@@ -273,6 +310,8 @@ export function SplitterLayout() {
               draggedTab={draggedTab}
               setDraggedTab={setDraggedTab}
               moveTabBetweenPanels={moveTabBetweenPanels}
+              onPinnedSelect={openPinnedTab}
+              pinnedTypesOpenElsewhere={rightTabTypes}
             />
           </SplitterPanel>
           <SplitterPanel size={rightSize} minSize={20}>

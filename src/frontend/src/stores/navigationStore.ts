@@ -101,6 +101,21 @@ export function migrateNavigationState(
   }
 }
 
+/**
+ * The left panel's next active tab after `closedId` leaves it: its left
+ * neighbour, else the next left tab, else none. Picked among left-panel tabs
+ * only - the flat list also holds the right panel's tabs.
+ */
+function nextActiveLeftTabId(tabs: Tab[], closedId: string): string | null {
+  const left = tabs.filter(t => t.params?.panel !== 'right')
+  const closedIndex = left.findIndex(t => t.id === closedId)
+  const remaining = left.filter(t => t.id !== closedId)
+  if (remaining.length === 0) return null
+  return remaining[
+    Math.min(closedIndex > 0 ? closedIndex - 1 : 0, remaining.length - 1)
+  ].id
+}
+
 /** Messages sent over BroadcastChannel */
 export type NavigationBroadcast =
   | { type: 'TAB_CLOSED'; windowId: string; tab: Tab }
@@ -134,6 +149,17 @@ export interface NavigationStore {
 
   // ── Actions: tab management ────────────────────────────────────────
   openTab: (windowId: string, side: 'left' | 'right', tab: Tab) => void
+  /**
+   * Activate `tab` in whichever panel already holds it, or open it in the left
+   * panel. Unlike `openTab`, an existing right-panel tab is focused on the
+   * right instead of being made the left panel's active id.
+   */
+  focusOrOpenTab: (windowId: string, tab: Tab) => void
+  /**
+   * Collapse an empty left panel: when only the right panel holds tabs, they
+   * move left so the window shows one full-width panel with the main dock.
+   */
+  collapseEmptyLeftPanel: (windowId: string) => void
   closeTab: (windowId: string, tabId: string) => void
   setActiveTab: (windowId: string, activeTabId: string) => void
   setActiveRightTab: (windowId: string, activeRightTabId: string) => void
@@ -547,27 +573,75 @@ export const useNavigationStore = create<NavigationStore>()(
         })
       },
 
+      focusOrOpenTab: (windowId, tab) => {
+        set(state => {
+          const ws = state.activeWindows[windowId]
+          if (!ws) return state
+
+          const existing = ws.tabs.find(t => t.id === tab.id)
+          const update = !existing
+            ? { tabs: [...ws.tabs, tab], activeTabId: tab.id }
+            : existing.params?.panel === 'right'
+              ? { activeRightTabId: existing.id }
+              : { activeTabId: existing.id }
+
+          return {
+            activeWindows: {
+              ...state.activeWindows,
+              [windowId]: {
+                ...ws,
+                ...update,
+                lastActiveAt: new Date().toISOString(),
+              },
+            },
+          }
+        })
+      },
+
+      collapseEmptyLeftPanel: windowId => {
+        set(state => {
+          const ws = state.activeWindows[windowId]
+          if (!ws) return state
+
+          const rightTabs = ws.tabs.filter(t => t.params?.panel === 'right')
+          if (rightTabs.length === 0 || rightTabs.length !== ws.tabs.length) {
+            return state
+          }
+
+          const tabs = ws.tabs.map(t => {
+            const { panel: _, ...params } = t.params
+            return { ...t, params }
+          })
+          const activeTabId = tabs.some(t => t.id === ws.activeRightTabId)
+            ? ws.activeRightTabId
+            : tabs[0].id
+
+          return {
+            activeWindows: {
+              ...state.activeWindows,
+              [windowId]: {
+                ...ws,
+                tabs,
+                activeTabId,
+                activeRightTabId: null,
+              },
+            },
+          }
+        })
+      },
+
       closeTab: (windowId, tabId) => {
         set(state => {
           const ws = state.activeWindows[windowId]
           if (!ws) return state
 
           const closedTab = ws.tabs.find(t => t.id === tabId)
-          const closedIndex = ws.tabs.findIndex(t => t.id === tabId)
           const newTabs = ws.tabs.filter(t => t.id !== tabId)
 
-          let newActiveTabId = ws.activeTabId
-          if (ws.activeTabId === tabId) {
-            if (newTabs.length > 0) {
-              const newIndex = Math.min(
-                closedIndex > 0 ? closedIndex - 1 : 0,
-                newTabs.length - 1
-              )
-              newActiveTabId = newTabs[newIndex].id
-            } else {
-              newActiveTabId = null
-            }
-          }
+          const newActiveTabId =
+            ws.activeTabId === tabId
+              ? nextActiveLeftTabId(ws.tabs, tabId)
+              : ws.activeTabId
 
           // Also handle right panel active tab
           let newActiveRightTabId = ws.activeRightTabId ?? null
@@ -665,20 +739,11 @@ export const useNavigationStore = create<NavigationStore>()(
           const ws = state.activeWindows[windowId]
           if (!ws) return state
 
-          const removedIndex = ws.tabs.findIndex(t => t.id === tabId)
           const newTabs = ws.tabs.filter(t => t.id !== tabId)
-          let newActiveTabId = ws.activeTabId
-          if (ws.activeTabId === tabId) {
-            if (newTabs.length > 0) {
-              const newIndex = Math.min(
-                removedIndex > 0 ? removedIndex - 1 : 0,
-                newTabs.length - 1
-              )
-              newActiveTabId = newTabs[newIndex].id
-            } else {
-              newActiveTabId = null
-            }
-          }
+          const newActiveTabId =
+            ws.activeTabId === tabId
+              ? nextActiveLeftTabId(ws.tabs, tabId)
+              : ws.activeTabId
 
           // Also handle right panel active tab
           let newActiveRightTabId = ws.activeRightTabId ?? null

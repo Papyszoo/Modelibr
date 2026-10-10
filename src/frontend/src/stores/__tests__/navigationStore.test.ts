@@ -97,6 +97,102 @@ describe('openTab', () => {
   })
 })
 
+describe('focusOrOpenTab (pinned dock entries)', () => {
+  beforeEach(() => store().initWindow('w1'))
+
+  const rightTab = (type: Tab['type']): Tab => {
+    const tab = createTab(type)
+    return { ...tab, params: { ...tab.params, panel: 'right' } }
+  }
+
+  it('opens a closed pinned page in the left panel and activates it', () => {
+    store().focusOrOpenTab('w1', createTab('vfxList'))
+    expect(win().tabs.map(t => t.id)).toEqual(['modelList', 'vfxList'])
+    expect(win().tabs[1].params.panel).toBeUndefined()
+    expect(win().activeTabId).toBe('vfxList')
+  })
+
+  // openTab('left') on a tab that lives on the right set the LEFT active id to
+  // it, so the left panel fell back to its first tab and the right one never
+  // changed: the click did nothing visible.
+  it('focuses a page open in the right panel there, not on the left', () => {
+    store().setTabs('w1', [createTab('modelList'), rightTab('scenes')])
+    store().setActiveRightTab('w1', 'other')
+
+    store().focusOrOpenTab('w1', createTab('scenes'))
+
+    expect(win().activeRightTabId).toBe('scenes')
+    expect(win().activeTabId).toBe('modelList')
+    expect(win().tabs).toHaveLength(2)
+  })
+})
+
+// The left panel's active tab was picked from the whole tab list, so closing
+// (or moving away) the active left tab could hand the left active id to a
+// right-panel tab, and the left panel fell back to its first tab.
+describe('closing the active left tab with right-panel tabs open', () => {
+  beforeEach(() => store().initWindow('w1'))
+
+  const layout = () => {
+    const sprites = createTab('sprites')
+    store().setTabs('w1', [
+      createTab('modelList'),
+      { ...sprites, params: { panel: 'right' } },
+      createTab('sounds'),
+    ])
+    store().setActiveTab('w1', 'sounds')
+  }
+
+  it('closeTab activates the neighbouring left tab', () => {
+    layout()
+    store().closeTab('w1', 'sounds')
+    expect(win().activeTabId).toBe('modelList')
+  })
+
+  it('removeTabFromWindow activates the neighbouring left tab', () => {
+    layout()
+    store().removeTabFromWindow('w1', 'sounds')
+    expect(win().activeTabId).toBe('modelList')
+  })
+})
+
+describe('collapseEmptyLeftPanel', () => {
+  beforeEach(() => store().initWindow('w1'))
+
+  // Closing the last left tab used to leave an empty half-screen pane next to
+  // the right one; the remaining tabs must become the single left panel.
+  it('moves right-panel tabs left when the left panel is empty', () => {
+    const scenes = createTab('scenes')
+    const sounds = createTab('sounds')
+    store().setTabs('w1', [
+      { ...scenes, params: { panel: 'right' } },
+      { ...sounds, params: { panel: 'right' } },
+    ])
+    store().setActiveRightTab('w1', 'sounds')
+
+    store().collapseEmptyLeftPanel('w1')
+
+    expect(win().tabs.map(t => [t.id, t.params.panel])).toEqual([
+      ['scenes', undefined],
+      ['sounds', undefined],
+    ])
+    expect(win().activeTabId).toBe('sounds')
+    expect(win().activeRightTabId).toBeNull()
+  })
+
+  it('leaves a real split alone', () => {
+    const before = [
+      createTab('modelList'),
+      { ...createTab('sounds'), params: { panel: 'right' } },
+    ]
+    store().setTabs('w1', before)
+
+    store().collapseEmptyLeftPanel('w1')
+
+    expect(win().tabs).toEqual(before)
+  })
+})
+
 describe('closeTab active-tab reselection', () => {
   beforeEach(() => {
     store().initWindow('w1')

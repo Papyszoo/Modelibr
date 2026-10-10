@@ -15,6 +15,7 @@ import {
 import { useForm } from 'react-hook-form'
 import { type z } from 'zod'
 
+import { PINNED_TAB_TYPES } from '@/components/layout/dock-panel/pinnedTabs'
 import { useModelsQuery } from '@/features/models/api/queries'
 import { ScriptTemplatesSection } from '@/features/scripts/components/ScriptTemplatesSection'
 import { useSettingsQuery } from '@/features/settings/api/queries'
@@ -40,6 +41,7 @@ import { useTabUiState } from '@/hooks/useTabUiState'
 import { useTheme } from '@/hooks/useTheme'
 import { settingsFormSchema } from '@/shared/validation/formSchemas'
 import { useBlenderEnabledStore } from '@/stores/blenderEnabledStore'
+import { getTabLabel } from '@/stores/navigationStore'
 import {
   type MobileBarPosition,
   useUIPreferencesStore,
@@ -81,7 +83,7 @@ const SECTIONS: SectionMeta[] = [
     label: 'Appearance',
     icon: 'pi-palette',
     desc: 'Theme and interface display options',
-    fields: ['Color theme', 'Mobile tab bar position'],
+    fields: ['Color theme', 'Mobile tab bar position', 'Pinned tabs'],
     hasFormSave: false,
     demoLocked: false,
   },
@@ -263,6 +265,8 @@ export function Settings({ tabId }: SettingsProps = {}): JSX.Element {
   const setMobileBarPosition = useUIPreferencesStore(
     s => s.setMobileBarPosition
   )
+  const pinnedTabTypes = useUIPreferencesStore(s => s.pinnedTabTypes)
+  const setPinnedTabType = useUIPreferencesStore(s => s.setPinnedTabType)
 
   // ── Settings form (file upload + thumbnails + texture proxy) ────────
   const [isSaving, setIsSaving] = useState(false)
@@ -1008,6 +1012,32 @@ export function Settings({ tabId }: SettingsProps = {}): JSX.Element {
                   <span className="settings-help">
                     Where the tab bar appears on narrow (mobile) screens. The
                     desktop layout is unaffected.
+                  </span>
+                </div>
+
+                <div className="settings-field">
+                  <label>Pinned tabs</label>
+                  <div className="pinned-tabs-options">
+                    {PINNED_TAB_TYPES.map(type => (
+                      <label key={type} className="settings-checkbox-label">
+                        <input
+                          type="checkbox"
+                          checked={pinnedTabTypes.includes(type)}
+                          onChange={e =>
+                            setPinnedTabType(type, e.target.checked)
+                          }
+                        />
+                        <span>{getTabLabel(type)}</span>
+                      </label>
+                    ))}
+                  </div>
+                  <span className="settings-help">
+                    Pinned pages are always present in the main dock and cannot
+                    be closed. The rest open from the New Tab page like any
+                    other tab.
+                  </span>
+                  <span className="settings-default">
+                    Default: Models and Projects
                   </span>
                 </div>
               </div>

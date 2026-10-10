@@ -27,6 +27,7 @@ const mockGetPackById = jest.fn()
 const mockGetProjectById = jest.fn()
 const mockGetStageById = jest.fn()
 const mockGetSceneById = jest.fn()
+const mockGetVfx = jest.fn()
 
 jest.mock('../../services/ApiClient', () => ({
   __esModule: true,
@@ -61,6 +62,9 @@ jest.mock('@/features/stage-editor/api/stageApi', () => ({
 }))
 jest.mock('@/features/scenes/api/scenesApi', () => ({
   getSceneById: (...args: unknown[]) => mockGetSceneById(...args),
+}))
+jest.mock('@/features/vfx/api/vfxApi', () => ({
+  getVfx: (...args: unknown[]) => mockGetVfx(...args),
 }))
 
 describe('Tab Serialization (Browser Refresh Compatibility)', () => {
@@ -506,6 +510,19 @@ describe('Tab Serialization (Browser Refresh Compatibility)', () => {
       expect(result[0].label).toBe('Rooftop chase')
       expect(result[0].sceneId).toBe('12')
       expect(mockGetSceneById).toHaveBeenCalledWith(12)
+    })
+
+    // The label refresh rebuilt effect tabs without a name, so every open
+    // effect read "Effect: Effect" in the dock instead of its own name.
+    it('should fetch effect name from API', async () => {
+      mockGetVfx.mockResolvedValue({ id: 10, name: 'Alien spores' })
+
+      const result = await parseCompactTabFormatAsync('vfx-10')
+      expect(result).toHaveLength(1)
+      expect(result[0].type).toBe('vfxEditor')
+      expect(result[0].label).toBe('Alien spores')
+      expect(result[0].params.vfxId).toBe('10')
+      expect(mockGetVfx).toHaveBeenCalledWith(10)
     })
 
     it('should fall back to ID-based label when API fails', async () => {

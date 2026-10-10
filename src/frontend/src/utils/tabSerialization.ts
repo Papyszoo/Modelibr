@@ -6,6 +6,7 @@ import { getSceneById } from '@/features/scenes/api/scenesApi'
 import { getScriptById } from '@/features/scripts/api/scriptApi'
 import { getStageById } from '@/features/stage-editor/api/stageApi'
 import { getTextureSetById } from '@/features/texture-set/api/textureSetApi'
+import { getVfx } from '@/features/vfx/api/vfxApi'
 import { createTab } from '@/stores/navigationStore'
 import { type Tab } from '@/types'
 
@@ -270,7 +271,15 @@ export async function parseCompactTabFormatAsync(
       }
 
       if (tabId.startsWith('vfx-')) {
-        tabs.push(createTab('vfxEditor', tabId.substring(4)))
+        const vfxId = tabId.substring(4)
+        let vfxName: string | undefined
+        try {
+          const vfx = await getVfx(Number(vfxId))
+          vfxName = vfx.name
+        } catch {
+          /* fall back to ID-based label */
+        }
+        tabs.push(createTab('vfxEditor', vfxId, vfxName))
         continue
       }
 

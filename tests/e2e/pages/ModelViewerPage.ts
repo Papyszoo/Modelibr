@@ -826,7 +826,7 @@ export class ModelViewerPage {
         // Opening the texture set switches focus to its new tab - return to the
         // model viewer tab so the inline preview is visible for assertions.
         const modelViewerTab = this.page
-            .locator(".draggable-tab:has(.pi-box)")
+            .locator('.draggable-tab[data-tab-type="modelViewer"]')
             .first();
         if ((await modelViewerTab.count()) > 0) {
             await modelViewerTab.click();
