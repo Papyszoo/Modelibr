@@ -1,7 +1,9 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
+import { X509Certificate } from 'crypto'
 import fs from 'fs/promises'
 import http from 'http'
+import https from 'https'
 import net from 'net'
 import os from 'os'
 import path from 'path'
@@ -29,13 +31,18 @@ function freePort() {
 function request(method, url, payload) {
   return new Promise((resolve, reject) => {
     const u = new URL(url)
+    const transport = u.protocol === 'https:' ? https : http
     const body = payload ? Buffer.from(JSON.stringify(payload)) : null
-    const req = http.request(
+    const req = transport.request(
       {
         hostname: u.hostname,
         port: u.port,
         path: u.pathname,
         method,
+        // The edge server presents a self-signed certificate; a test client must
+        // accept it, exactly like a browser after the one-time warning.
+        rejectUnauthorized: false,
+        agent: false,
         headers: body
           ? { 'content-type': 'application/json', 'content-length': body.length }
           : {},
@@ -191,6 +198,54 @@ test('a real LAN client is refused over HTTP', { skip: !findLanIPv4Address() }, 
       appPort: 4010,
     })
     assert.equal(allowed.status, 200)
+  } finally {
+    await edge.close()
+    await fs.rm(userData, { recursive: true, force: true })
+  }
+})
+
+// With network access on, the same port must answer both a TLS handshake (a LAN
+// browser forcing HTTPS, which used to die with SSL_ERROR_RX_RECORD_TOO_LONG)
+// and plain HTTP (the Electron window and MCP clients on loopback).
+test('network access serves TLS and plain HTTP on the same port', async () => {
+  const userData = await fs.mkdtemp(path.join(os.tmpdir(), 'modelibr-tls-'))
+  const runtimeDir = path.join(userData, 'runtime')
+  await fs.mkdir(path.join(runtimeDir, 'frontend'), { recursive: true })
+  await fs.writeFile(
+    path.join(runtimeDir, 'frontend', 'index.html'),
+    '<!doctype html><title>modelibr-ok</title>'
+  )
+
+  const appPort = await freePort()
+  const internalApiPort = await freePort()
+
+  const { config, configPath } = await loadRuntimeConfig(userData)
+  const runtimeManager = new ProcessManager({
+    runtimeDir,
+    userDataDir: userData,
+    config: { ...config, appPort, internalApiPort, allowNetworkAccess: true },
+    log: () => {},
+  })
+  runtimeManager.markRunning()
+
+  const edge = await startEdgeServer({ runtimeDir, configPath, runtimeManager, log: () => {} })
+  try {
+    const plain = await request('GET', `http://127.0.0.1:${appPort}/`)
+    assert.equal(plain.status, 200)
+    assert.match(plain.body, /modelibr-ok/)
+
+    const tls = await request('GET', `https://127.0.0.1:${appPort}/`)
+    assert.equal(tls.status, 200)
+    assert.match(tls.body, /modelibr-ok/)
+
+    // The certificate the edge server presents is written into the data root and
+    // covers the loopback address, so a browser reaching it over HTTPS accepts
+    // the host (after the one-time warning).
+    const cert = new X509Certificate(
+      await fs.readFile(path.join(runtimeManager.paths.data, 'modelibr-edge.crt'), 'utf8')
+    )
+    assert.match(cert.subjectAltName, /IP Address:127\.0\.0\.1/)
+    assert.match(cert.subjectAltName, /DNS:localhost/)
   } finally {
     await edge.close()
     await fs.rm(userData, { recursive: true, force: true })

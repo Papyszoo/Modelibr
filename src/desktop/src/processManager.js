@@ -45,7 +45,10 @@ export function findLanIPv4Address(interfaces = os.networkInterfaces()) {
 
 export function buildLanUrl(port, interfaces = os.networkInterfaces()) {
   const host = findLanIPv4Address(interfaces)
-  return host ? `http://${host}:${port}` : null
+  // The edge server serves the LAN over HTTPS (self-signed), so the address a
+  // device on another machine opens is https - that is what makes it a secure
+  // context for the browser.
+  return host ? `https://${host}:${port}` : null
 }
 
 async function exists(targetPath) {

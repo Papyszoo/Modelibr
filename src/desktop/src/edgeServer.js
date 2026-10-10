@@ -2,9 +2,12 @@ import express from 'express'
 import rateLimit from 'express-rate-limit'
 import { createProxyMiddleware } from 'http-proxy-middleware'
 import http from 'http'
+import https from 'https'
+import net from 'net'
 import path from 'path'
 
 import { sanitizeRuntimeConfig, saveRuntimeConfig } from './runtimeConfig.js'
+import { ensureTlsCertificate } from './tlsCertificate.js'
 
 // Loopback clients only. Accepts the IPv4 loopback range (127.0.0.0/8) and the
 // IPv6 loopback, including the IPv4-mapped form Node hands back when a socket is
@@ -131,16 +134,20 @@ export async function startEdgeServer({ runtimeDir, configPath, runtimeManager, 
     response.sendFile(path.join(frontendDir, 'index.html'))
   })
 
-  const server = http.createServer(app)
-
-  server.on('upgrade', (request, socket, head) => {
+  // One request handler and one websocket upgrade route shared by the HTTP and
+  // HTTPS listeners, so a client gets identical behaviour whichever protocol it
+  // speaks on the port.
+  const onUpgrade = (request, socket, head) => {
     if (request.url?.startsWith('/api/')) {
       apiProxy.upgrade(request, socket, head)
       return
     }
 
     socket.destroy()
-  })
+  }
+
+  const httpServer = http.createServer(app)
+  httpServer.on('upgrade', onUpgrade)
 
   // The app port was already resolved to a free one at start (runningConfig),
   // so a clash here is rare - surface a clear message if it somehow still hits.
@@ -148,11 +155,54 @@ export async function startEdgeServer({ runtimeDir, configPath, runtimeManager, 
   // Loopback by default (this machine only). Bind all interfaces when the user
   // opts into network access, so a desktop client on another LAN machine can
   // reach the host. The app has no auth, so this is off by default.
-  const bindHost = runtimeManager.runningConfig.allowNetworkAccess
-    ? '0.0.0.0'
-    : '127.0.0.1'
+  const allowNetworkAccess = runtimeManager.runningConfig.allowNetworkAccess
+  const bindHost = allowNetworkAccess ? '0.0.0.0' : '127.0.0.1'
+
+  let listener = null
+  let httpsServer = null
+  // The dispatcher's own connections, so close() can drop idle keep-alive
+  // sockets instead of waiting for them to time out.
+  const sockets = new Set()
+
+  if (allowNetworkAccess) {
+    // A browser that forces HTTPS (Firefox HTTPS-only, a secure-context
+    // redirect, a plain `https://host:3010` typed by hand) opens a TLS
+    // handshake on the plain-HTTP port. Without handling it the server answered
+    // in HTTP and the browser surfaced SSL_ERROR_RX_RECORD_TOO_LONG. The
+    // certificate is self-signed like the Docker stack's, so the LAN URL is a
+    // secure context after the browser's one-time warning is accepted.
+    const { key, cert } = await ensureTlsCertificate({
+      dataDir: runtimeManager.paths.data,
+      log,
+    })
+
+    httpsServer = https.createServer({ key, cert }, app)
+    httpsServer.on('upgrade', onUpgrade)
+
+    // Peek at the first byte of every connection and hand the socket to TLS
+    // (0x16 is the TLS handshake record) or plain HTTP, so the same port serves
+    // both and loopback http://127.0.0.1:3010 keeps working unchanged.
+    listener = net.createServer(socket => {
+      sockets.add(socket)
+      socket.on('close', () => sockets.delete(socket))
+      socket.on('error', () => socket.destroy())
+
+      socket.once('data', chunk => {
+        socket.pause()
+        const target = chunk[0] === 0x16 ? httpsServer : httpServer
+        target.emit('connection', socket)
+        // Return the peeked byte so the chosen server parses the connection
+        // from its first byte.
+        socket.unshift(chunk)
+        process.nextTick(() => socket.resume())
+      })
+    })
+  } else {
+    listener = httpServer
+  }
+
   await new Promise((resolve, reject) => {
-    server.once('error', err => {
+    listener.once('error', err => {
       if (err.code === 'EADDRINUSE') {
         reject(new Error(
           `Port ${appPort} is already in use.\n\nChange it in Settings and restart Modelibr.`
@@ -161,14 +211,30 @@ export async function startEdgeServer({ runtimeDir, configPath, runtimeManager, 
         reject(err)
       }
     })
-    server.listen(appPort, bindHost, resolve)
+    listener.listen(appPort, bindHost, resolve)
   })
 
-  log(`[ModelibrDesktop][edge] Listening on http://${bindHost}:${appPort}`)
+  if (allowNetworkAccess) {
+    log(
+      `[ModelibrDesktop][edge] Listening on https://${bindHost}:${appPort} (self-signed) and http://127.0.0.1:${appPort}`
+    )
+  } else {
+    log(`[ModelibrDesktop][edge] Listening on http://${bindHost}:${appPort}`)
+  }
 
   return {
     async close() {
-      await new Promise(resolve => server.close(resolve))
+      for (const socket of [...sockets]) {
+        socket.destroy()
+      }
+      sockets.clear()
+
+      await new Promise(resolve => {
+        listener.close(() => resolve())
+        // Drop idle keep-alive sockets so close() does not wait them out.
+        httpServer.closeAllConnections?.()
+        httpsServer?.closeAllConnections?.()
+      })
     },
   }
 }

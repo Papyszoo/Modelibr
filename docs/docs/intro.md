@@ -27,6 +27,7 @@ If you want the simplest local setup, download the **Modelibr** (host) installer
 - Windows, macOS, and Linux installers bundle the frontend, WebApi, asset processor, and PostgreSQL.
 - The host runs from a tray / menu-bar icon. Use its **Show Status** window for live service health (backend, database, asset processor) and the frontend URL.
 - The application and WebDAV are exposed on the same local configurable port.
+- Turning on **Allow access from my network** in the **Configuration** panel serves the app over HTTPS with a self-signed certificate, so a device on your network opens `https://<host-address>:<port>`. The browser shows a one-time certificate warning the first time; accept it to continue.
 - Worker process count, jobs per worker, GPU acceleration, and the app port are configured in the host status window's **Configuration** panel.
 - The host checks GitHub Releases for newer versions and shows an update prompt in the tray and status window.
 - An optional **Modelibr Client** installer opens a running host in its own desktop window instead of a browser tab.

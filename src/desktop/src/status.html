@@ -244,12 +244,16 @@
     </div>
 
     <!-- Only shown when "Allow access from my network" is on. The address a
-         device on the same network opens; the local address and Copy button
-         above stay pointed at this machine. -->
+         device on the same network opens (HTTPS with a self-signed
+         certificate); the local address and Copy button above stay pointed at
+         this machine. -->
     <div id="lan-block" style="display:none">
       <div class="config-subnote">Reachable on your network at:</div>
       <div class="address-line">
         <code id="lan-url">-</code>
+      </div>
+      <div class="config-subnote">
+        Your browser warns once about the self-signed certificate: accept it to continue.
       </div>
     </div>
 

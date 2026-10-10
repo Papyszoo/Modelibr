@@ -330,7 +330,7 @@ test('buildLanUrl builds the address a LAN device uses, or null when there is no
     buildLanUrl(3010, {
       en0: [{ family: 'IPv4', address: '192.168.1.63', internal: false }],
     }),
-    'http://192.168.1.63:3010'
+    'https://192.168.1.63:3010'
   )
   assert.equal(
     buildLanUrl(3010, {
