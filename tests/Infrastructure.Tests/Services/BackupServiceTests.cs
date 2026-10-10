@@ -161,6 +161,28 @@ public sealed class BackupServiceTests
     }
 
     [Fact]
+    public void ToUploadRelative_StripsWhateverTheUploadsRootIs()
+    {
+        var root = "/var/lib/modelibr/uploads";
+
+        Assert.Equal("ab/cd/hash", BackupService.ToUploadRelative($"{root}/ab/cd/hash", root));
+        // A different root - e.g. a native install - normalises the same way.
+        Assert.Equal("ab/cd/hash", BackupService.ToUploadRelative("/home/me/modelibr/data/uploads/ab/cd/hash", "/home/me/modelibr/data/uploads"));
+        // Already relative stays as it is.
+        Assert.Equal("ab/cd/hash", BackupService.ToUploadRelative("ab/cd/hash", root));
+        // Windows separators normalise to the sweep's forward slashes.
+        Assert.Equal("ab/cd/hash", BackupService.ToUploadRelative("ab\\cd\\hash", root));
+    }
+
+    [Fact]
+    public void ToUploadRelative_PathOutsideTheRoot_IsReturnedNormalisedUnchanged()
+    {
+        var root = "/var/lib/modelibr/uploads";
+
+        Assert.Equal("/somewhere/else/file.png", BackupService.ToUploadRelative("/somewhere/else/file.png", root));
+    }
+
+    [Fact]
     public async Task CreateSnapshotAsync_UnreachableDatabase_LeavesNoPublishedArchive()
     {
         // A backup that cannot reach the database must fail without publishing a

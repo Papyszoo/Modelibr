@@ -34,11 +34,17 @@ namespace WebApi.Infrastructure;
 /// </summary>
 public static class RestoreOnBootProcessor
 {
+    /// <summary>
+    /// Written into the restore root after a successful restore. Its presence tells
+    /// the post-startup re-queue service that thumbnail rows restored from an archive
+    /// without their files need generation again. The file is removed once handled.
+    /// </summary>
+    public const string ThumbnailRequeueMarkerFileName = ".requeue-missing-thumbnails";
+
     public static async Task RunAsync(IConfiguration configuration, ILogger logger)
     {
         var restoreRoot = configuration["RESTORE_STORAGE_PATH"] ?? "/var/lib/modelibr/restore";
         var uploadRoot = configuration["UPLOAD_STORAGE_PATH"] ?? "/var/lib/modelibr/uploads";
-        var thumbnailRoot = configuration["THUMBNAIL_STORAGE_PATH"] ?? "/var/lib/modelibr/thumbnails";
         var processedDir = Path.Combine(restoreRoot, "processed");
         var failedDir = Path.Combine(restoreRoot, "failed");
 
@@ -50,7 +56,6 @@ public static class RestoreOnBootProcessor
         // restore). We do NOT delete them automatically - they are the only
         // recovery copy of the operator's live data and must be removed manually.
         WarnAboutStalePreRestoreDirs(uploadRoot, logger);
-        WarnAboutStalePreRestoreDirs(thumbnailRoot, logger);
 
         var archive = Directory.EnumerateFiles(restoreRoot, "*.tar")
             .OrderBy(f => f, StringComparer.Ordinal)
@@ -60,7 +65,7 @@ public static class RestoreOnBootProcessor
         // Refuse to run a second restore on top of an unrecovered pre-restore dir.
         // If those still exist, an operator hasn't finished cleaning up the previous
         // failure - running another restore now would shadow the recovery copy.
-        if (HasStalePreRestoreDirs(uploadRoot) || HasStalePreRestoreDirs(thumbnailRoot))
+        if (HasStalePreRestoreDirs(uploadRoot))
         {
             await MoveToFailedAsync(archive, failedDir,
                 "Refusing to restore: .pre-restore-* directories from a previous run still exist. " +
@@ -167,17 +172,14 @@ public static class RestoreOnBootProcessor
                 return;
             }
 
-            // ── Phase 4: stage existing trees and extract uploads/thumbnails ──
+            // ── Phase 4: stage the uploads tree and extract uploads/thumbnails ──
             // Past this point we ARE touching live data. Any failure leaves
-            // pre-restore copies behind for manual recovery.
-
+            // pre-restore copies behind for manual recovery. Thumbnails live under
+            // the uploads root, so staging that one tree covers both.
             var uploadsPreRestore = StageExistingTreeStrict(uploadRoot, $".pre-restore-{stamp}", logger);
-            var thumbnailsPreRestore = manifest.Scope.Thumbnails
-                ? StageExistingTreeStrict(thumbnailRoot, $".pre-restore-{stamp}", logger)
-                : null;
 
             var (extractedUploads, extractedThumbnails) =
-                ExtractDataEntries(archive, uploadRoot, thumbnailRoot, manifest);
+                ExtractDataEntries(archive, uploadRoot, manifest);
 
             if (extractedUploads != manifest.Stats.UploadsCount)
             {
@@ -189,7 +191,7 @@ public static class RestoreOnBootProcessor
             {
                 throw new InvalidOperationException(
                     $"Extracted {extractedThumbnails} thumbnail files but manifest expected " +
-                    $"{manifest.Stats.ThumbnailsCount}. Pre-restore copy preserved at {thumbnailsPreRestore}.");
+                    $"{manifest.Stats.ThumbnailsCount}. Pre-restore copy preserved at {uploadsPreRestore}.");
             }
 
             // ── Phase 5: load the database ─────────────────────────────────────
@@ -206,9 +208,15 @@ public static class RestoreOnBootProcessor
                 await RunPgRestoreAsync(dumpPath, host, port, user, password, db, logger);
             }
 
-            // Success - drop the pre-restore copies and move the archive aside.
+            // Success - drop the pre-restore copy and move the archive aside.
             DeleteDirectoryQuiet(uploadsPreRestore, logger);
-            if (thumbnailsPreRestore != null) DeleteDirectoryQuiet(thumbnailsPreRestore, logger);
+
+            // Tell the post-startup re-queue service a restore just landed. It re-queues
+            // only the thumbnails whose files are actually missing, so an archive that
+            // carried them needs no work.
+            var marker = Path.Combine(restoreRoot, ThumbnailRequeueMarkerFileName);
+            try { await File.WriteAllTextAsync(marker, DateTime.UtcNow.ToString("O")); }
+            catch (IOException ex) { logger.LogWarning(ex, "Could not write the thumbnail re-queue marker {Marker}", marker); }
 
             var processedPath = Path.Combine(processedDir, $"{stamp}-{Path.GetFileName(archive)}");
             File.Move(archive, processedPath);
@@ -285,7 +293,6 @@ public static class RestoreOnBootProcessor
     private static (int uploads, int thumbnails) ExtractDataEntries(
         string tarPath,
         string uploadRoot,
-        string thumbnailRoot,
         BackupManifest manifest)
     {
         var uploads = 0;
@@ -310,8 +317,11 @@ public static class RestoreOnBootProcessor
             else if (entry.Name.StartsWith(BackupServiceConstants.ThumbnailsPrefix, StringComparison.Ordinal)
                      && manifest.Scope.Thumbnails)
             {
+                // Thumbnails are stored under the uploads root (their stored path is
+                // relative to it), so they are restored there - not into the worker's
+                // transient THUMBNAIL_STORAGE_PATH.
                 var rel = entry.Name[BackupServiceConstants.ThumbnailsPrefix.Length..];
-                targetPath = SafeCombine(thumbnailRoot, rel);
+                targetPath = SafeCombine(uploadRoot, rel);
                 thumbnails++;
             }
 

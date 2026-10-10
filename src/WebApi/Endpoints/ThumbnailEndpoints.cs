@@ -1,4 +1,5 @@
 using Application.Abstractions.Messaging;
+using Application.Abstractions.Storage;
 using Application.Models;
 using Application.Thumbnails;
 using Domain.ValueObjects;
@@ -218,6 +219,7 @@ public static class ThumbnailEndpoints
         app.MapGet("/models/{id}/thumbnail/file", async (
             int id,
             IQueryHandler<GetThumbnailStatusQuery, GetThumbnailStatusQueryResponse> queryHandler,
+            IUploadPathProvider pathProvider,
             CancellationToken cancellationToken) =>
         {
             var result = await queryHandler.Handle(new GetThumbnailStatusQuery(id), cancellationToken);
@@ -234,20 +236,21 @@ public static class ThumbnailEndpoints
                 return Results.NotFound("Thumbnail not ready or not found");
             }
 
-            // Ensure the directory exists before checking file existence
-            var directory = Path.GetDirectoryName(response.ThumbnailPath);
+            // Stored relative to the uploads root; rebase against the current root.
+            var thumbnailPath = pathProvider.Resolve(response.ThumbnailPath);
+            var directory = Path.GetDirectoryName(thumbnailPath);
             if (!string.IsNullOrEmpty(directory))
             {
                 Directory.CreateDirectory(directory);
             }
             
-            if (!System.IO.File.Exists(response.ThumbnailPath))
+            if (!System.IO.File.Exists(thumbnailPath))
             {
                 return Results.NotFound("Thumbnail file not found on disk");
             }
 
-            var fileStream = System.IO.File.OpenRead(response.ThumbnailPath);
-            var contentType = ContentTypeProvider.GetContentType(response.ThumbnailPath);
+            var fileStream = System.IO.File.OpenRead(thumbnailPath);
+            var contentType = ContentTypeProvider.GetContentType(thumbnailPath);
             
             // Add cache headers for thumbnail files - include version ID for proper cache invalidation
             var httpContext = ((IEndpointRouteBuilder)app).ServiceProvider.GetRequiredService<IHttpContextAccessor>().HttpContext;
@@ -266,6 +269,7 @@ public static class ThumbnailEndpoints
         app.MapGet("/models/{id}/thumbnail/png-file", async (
             int id,
             IQueryHandler<GetThumbnailStatusQuery, GetThumbnailStatusQueryResponse> queryHandler,
+            IUploadPathProvider pathProvider,
             CancellationToken cancellationToken) =>
         {
             var result = await queryHandler.Handle(new GetThumbnailStatusQuery(id), cancellationToken);
@@ -282,19 +286,20 @@ public static class ThumbnailEndpoints
                 return Results.NotFound("PNG thumbnail not ready or not found");
             }
 
-            // Ensure the directory exists before checking file existence
-            var directory = Path.GetDirectoryName(response.PngThumbnailPath);
+            // Stored relative to the uploads root; rebase against the current root.
+            var pngThumbnailPath = pathProvider.Resolve(response.PngThumbnailPath);
+            var directory = Path.GetDirectoryName(pngThumbnailPath);
             if (!string.IsNullOrEmpty(directory))
             {
                 Directory.CreateDirectory(directory);
             }
             
-            if (!System.IO.File.Exists(response.PngThumbnailPath))
+            if (!System.IO.File.Exists(pngThumbnailPath))
             {
                 return Results.NotFound("PNG thumbnail file not found on disk");
             }
 
-            var fileStream = System.IO.File.OpenRead(response.PngThumbnailPath);
+            var fileStream = System.IO.File.OpenRead(pngThumbnailPath);
             
             // Add cache headers for thumbnail files - include version ID for proper cache invalidation
             var httpContext = ((IEndpointRouteBuilder)app).ServiceProvider.GetRequiredService<IHttpContextAccessor>().HttpContext;
@@ -359,6 +364,7 @@ public static class ThumbnailEndpoints
         app.MapGet("/model-versions/{versionId}/thumbnail/file", async (
             int versionId,
             IQueryHandler<GetVersionThumbnailQuery, GetVersionThumbnailQueryResponse> queryHandler,
+            IUploadPathProvider pathProvider,
             CancellationToken cancellationToken) =>
         {
             var result = await queryHandler.Handle(new GetVersionThumbnailQuery(versionId), cancellationToken);
@@ -375,20 +381,21 @@ public static class ThumbnailEndpoints
                 return Results.NotFound("Thumbnail not ready or not found");
             }
 
-            // Ensure the directory exists before checking file existence
-            var directory = Path.GetDirectoryName(response.ThumbnailPath);
+            // Stored relative to the uploads root; rebase against the current root.
+            var thumbnailPath = pathProvider.Resolve(response.ThumbnailPath);
+            var directory = Path.GetDirectoryName(thumbnailPath);
             if (!string.IsNullOrEmpty(directory))
             {
                 Directory.CreateDirectory(directory);
             }
             
-            if (!System.IO.File.Exists(response.ThumbnailPath))
+            if (!System.IO.File.Exists(thumbnailPath))
             {
                 return Results.NotFound("Thumbnail file not found on disk");
             }
 
-            var fileStream = System.IO.File.OpenRead(response.ThumbnailPath);
-            var contentType = ContentTypeProvider.GetContentType(response.ThumbnailPath);
+            var fileStream = System.IO.File.OpenRead(thumbnailPath);
+            var contentType = ContentTypeProvider.GetContentType(thumbnailPath);
             
             // Add cache headers for thumbnail files
             var httpContext = ((IEndpointRouteBuilder)app).ServiceProvider.GetRequiredService<IHttpContextAccessor>().HttpContext;
@@ -406,6 +413,7 @@ public static class ThumbnailEndpoints
         app.MapGet("/model-versions/{versionId}/thumbnail/png-file", async (
             int versionId,
             IQueryHandler<GetVersionThumbnailQuery, GetVersionThumbnailQueryResponse> queryHandler,
+            IUploadPathProvider pathProvider,
             CancellationToken cancellationToken) =>
         {
             var result = await queryHandler.Handle(new GetVersionThumbnailQuery(versionId), cancellationToken);
@@ -422,19 +430,20 @@ public static class ThumbnailEndpoints
                 return Results.NotFound("PNG thumbnail not ready or not found");
             }
 
-            // Ensure the directory exists before checking file existence
-            var directory = Path.GetDirectoryName(response.PngThumbnailPath);
+            // Stored relative to the uploads root; rebase against the current root.
+            var pngThumbnailPath = pathProvider.Resolve(response.PngThumbnailPath);
+            var directory = Path.GetDirectoryName(pngThumbnailPath);
             if (!string.IsNullOrEmpty(directory))
             {
                 Directory.CreateDirectory(directory);
             }
             
-            if (!System.IO.File.Exists(response.PngThumbnailPath))
+            if (!System.IO.File.Exists(pngThumbnailPath))
             {
                 return Results.NotFound("PNG thumbnail file not found on disk");
             }
 
-            var fileStream = System.IO.File.OpenRead(response.PngThumbnailPath);
+            var fileStream = System.IO.File.OpenRead(pngThumbnailPath);
             
             // Add cache headers for thumbnail files
             var httpContext = ((IEndpointRouteBuilder)app).ServiceProvider.GetRequiredService<IHttpContextAccessor>().HttpContext;

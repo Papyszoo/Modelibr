@@ -102,8 +102,10 @@ function CreateBackupModal({
             </span>
           </label>
           <span className="settings-help backups-modal-help">
-            Auto-generated thumbnails can be regenerated, but custom-uploaded
-            thumbnails cannot - include this if you've uploaded custom ones.
+            Leave this off to keep the archive smaller: thumbnails are
+            regenerated automatically after a restore. Include it to keep the
+            current thumbnails in the archive and skip that regeneration -
+            useful if you have uploaded custom ones.
           </span>
 
           {projected != null && (

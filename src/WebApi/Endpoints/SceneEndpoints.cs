@@ -1,5 +1,6 @@
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
+using Application.Abstractions.Storage;
 using Application.Scenes;
 using Domain.Scenes;
 using Microsoft.AspNetCore.Mvc;
@@ -421,15 +422,23 @@ public static class SceneEndpoints
             int renderId,
             IQueryHandler<GetSceneRenderQuery, SceneRenderView> handler,
             ISceneRenderRepository renderRepository,
+            IUploadPathProvider pathProvider,
             CancellationToken cancellationToken) =>
         {
             var render = await renderRepository.GetByJobIdAsync(renderId, cancellationToken);
-            if (render is null || !System.IO.File.Exists(render.FilePath))
+            if (render is null)
             {
                 return Results.NotFound();
             }
 
-            return Results.File(render.FilePath, "image/png");
+            // Stored relative to the uploads root; rebase against the current root.
+            var renderPath = pathProvider.Resolve(render.FilePath);
+            if (!System.IO.File.Exists(renderPath))
+            {
+                return Results.NotFound();
+            }
+
+            return Results.File(renderPath, "image/png");
         })
         .WithName("Serve Scene Render")
         .WithSummary("The rendered image itself");

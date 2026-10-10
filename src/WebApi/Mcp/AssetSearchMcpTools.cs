@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using System.Text.Json;
 using Application.Abstractions.Messaging;
+using Application.Abstractions.Storage;
 using Application.Extraction;
 using Application.Extraction.Compute;
 using Application.Search;
@@ -82,6 +83,7 @@ public sealed class AssetSearchMcpTools
                      "left to right, top to bottom (tile 1 = hits[0]); use it to choose between candidates by how they look.")]
         bool withImage = false,
         IQueryHandler<GetVersionThumbnailQuery, GetVersionThumbnailQueryResponse>? thumbnailHandler = null,
+        IUploadPathProvider? pathProvider = null,
         McpCallerContext? caller = null,
         CancellationToken cancellationToken = default)
     {
@@ -127,7 +129,7 @@ public sealed class AssetSearchMcpTools
         var thumbnails = new List<byte[]?>(result.Value.Hits.Count);
         foreach (var hit in result.Value.Hits)
         {
-            thumbnails.Add(await ThumbnailBytesAsync(thumbnailHandler, hit, cancellationToken));
+            thumbnails.Add(await ThumbnailBytesAsync(thumbnailHandler, pathProvider, hit, cancellationToken));
         }
 
         return result.Value.Hits.Count == 0
@@ -169,6 +171,7 @@ public sealed class AssetSearchMcpTools
                      "left to right, top to bottom (tile 1 = hits[0]); use it to choose between candidates by how they look.")]
         bool withImage = false,
         IQueryHandler<GetVersionThumbnailQuery, GetVersionThumbnailQueryResponse>? thumbnailHandler = null,
+        IUploadPathProvider? pathProvider = null,
         McpCallerContext? caller = null,
         CancellationToken cancellationToken = default)
     {
@@ -249,7 +252,7 @@ public sealed class AssetSearchMcpTools
             var thumbnails = new List<byte[]?>(result.Value.Hits.Count);
             foreach (var hit in result.Value.Hits)
             {
-                thumbnails.Add(await ThumbnailBytesAsync(thumbnailHandler, hit, cancellationToken));
+                thumbnails.Add(await ThumbnailBytesAsync(thumbnailHandler, pathProvider, hit, cancellationToken));
             }
 
             images.Add(ThumbnailSheet.Build(thumbnails));
@@ -269,10 +272,12 @@ public sealed class AssetSearchMcpTools
     /// </summary>
     private static async Task<byte[]?> ThumbnailBytesAsync(
         IQueryHandler<GetVersionThumbnailQuery, GetVersionThumbnailQueryResponse>? handler,
+        IUploadPathProvider? pathProvider,
         AssetSearchHit hit,
         CancellationToken cancellationToken)
     {
         if (handler is null
+            || pathProvider is null
             || !string.Equals(hit.AssetType, ExtractionAssetTypes.Model, StringComparison.OrdinalIgnoreCase)
             || hit.VersionId is not { } versionId)
         {
@@ -282,13 +287,19 @@ public sealed class AssetSearchMcpTools
         var result = await handler.Handle(new GetVersionThumbnailQuery(versionId), cancellationToken);
         if (result.IsFailure
             || result.Value.Status != ThumbnailStatus.Ready
-            || string.IsNullOrEmpty(result.Value.ThumbnailPath)
-            || !File.Exists(result.Value.ThumbnailPath))
+            || string.IsNullOrEmpty(result.Value.ThumbnailPath))
         {
             return null;
         }
 
-        return await File.ReadAllBytesAsync(result.Value.ThumbnailPath, cancellationToken);
+        // The stored path is relative to the uploads root; rebase it to open it.
+        var thumbnailPath = pathProvider.Resolve(result.Value.ThumbnailPath);
+        if (!File.Exists(thumbnailPath))
+        {
+            return null;
+        }
+
+        return await File.ReadAllBytesAsync(thumbnailPath, cancellationToken);
     }
 
     /// <summary>

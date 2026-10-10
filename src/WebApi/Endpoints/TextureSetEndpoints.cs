@@ -1,4 +1,5 @@
 using Application.Abstractions.Messaging;
+using Application.Abstractions.Storage;
 using Application.TextureSets;
 using Application.Thumbnails;
 using Domain.ValueObjects;
@@ -653,14 +654,20 @@ public static class TextureSetEndpoints
     private static async Task<IResult> ServeTextureSetThumbnail(
         int id,
         IQueryHandler<GetTextureSetByIdQuery, GetTextureSetByIdResponse> queryHandler,
+        IUploadPathProvider pathProvider,
         CancellationToken cancellationToken)
     {
         var result = await queryHandler.Handle(new GetTextureSetByIdQuery(id), cancellationToken);
         if (result.IsFailure)
             return Results.NotFound();
 
-        var thumbnailPath = result.Value.TextureSet.ThumbnailPath;
-        if (string.IsNullOrEmpty(thumbnailPath) || !System.IO.File.Exists(thumbnailPath))
+        // Stored relative to the uploads root; rebase against the current root.
+        var stored = result.Value.TextureSet.ThumbnailPath;
+        if (string.IsNullOrEmpty(stored))
+            return Results.NotFound();
+
+        var thumbnailPath = pathProvider.Resolve(stored);
+        if (!System.IO.File.Exists(thumbnailPath))
             return Results.NotFound();
 
         var contentType = ContentTypeProvider.GetContentType(thumbnailPath);
@@ -670,14 +677,20 @@ public static class TextureSetEndpoints
     private static async Task<IResult> ServeTextureSetPngThumbnail(
         int id,
         IQueryHandler<GetTextureSetByIdQuery, GetTextureSetByIdResponse> queryHandler,
+        IUploadPathProvider pathProvider,
         CancellationToken cancellationToken)
     {
         var result = await queryHandler.Handle(new GetTextureSetByIdQuery(id), cancellationToken);
         if (result.IsFailure)
             return Results.NotFound();
 
-        var pngPath = result.Value.TextureSet.PngThumbnailPath;
-        if (string.IsNullOrEmpty(pngPath) || !System.IO.File.Exists(pngPath))
+        // Stored relative to the uploads root; rebase against the current root.
+        var stored = result.Value.TextureSet.PngThumbnailPath;
+        if (string.IsNullOrEmpty(stored))
+            return Results.NotFound();
+
+        var pngPath = pathProvider.Resolve(stored);
+        if (!System.IO.File.Exists(pngPath))
             return Results.NotFound();
 
         return Results.File(pngPath, "image/png");

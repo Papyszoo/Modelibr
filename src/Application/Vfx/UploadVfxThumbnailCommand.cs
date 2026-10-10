@@ -25,20 +25,17 @@ internal sealed class UploadVfxThumbnailCommandHandler
 {
     private readonly IVfxRepository _vfxRepository;
     private readonly IFileStorage _fileStorage;
-    private readonly IUploadPathProvider _pathProvider;
     private readonly IDateTimeProvider _dateTimeProvider;
     private readonly IUnitOfWork _unitOfWork;
 
     public UploadVfxThumbnailCommandHandler(
         IVfxRepository vfxRepository,
         IFileStorage fileStorage,
-        IUploadPathProvider pathProvider,
         IDateTimeProvider dateTimeProvider,
         IUnitOfWork unitOfWork)
     {
         _vfxRepository = vfxRepository;
         _fileStorage = fileStorage;
-        _pathProvider = pathProvider;
         _dateTimeProvider = dateTimeProvider;
         _unitOfWork = unitOfWork;
     }
@@ -63,13 +60,14 @@ internal sealed class UploadVfxThumbnailCommandHandler
         try
         {
             var stored = await _fileStorage.SaveAsync(command.ThumbnailFile, FileType.Texture, cancellationToken);
-            var fullPath = Path.Combine(_pathProvider.UploadRootPath, stored.RelativePath);
+            // Uploads-relative, like every other stored file; the serving endpoint rebases it.
+            var relativePath = stored.RelativePath;
 
-            vfx.SetThumbnailPath(fullPath, _dateTimeProvider.UtcNow);
+            vfx.SetThumbnailPath(relativePath, _dateTimeProvider.UtcNow);
             await _vfxRepository.UpdateAsync(vfx, cancellationToken);
             await _unitOfWork.SaveChangesAsync(cancellationToken);
 
-            return Result.Success(new UploadVfxThumbnailResponse(vfx.Id, fullPath, stored.SizeBytes));
+            return Result.Success(new UploadVfxThumbnailResponse(vfx.Id, relativePath, stored.SizeBytes));
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {

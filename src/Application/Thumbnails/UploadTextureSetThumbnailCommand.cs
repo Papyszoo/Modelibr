@@ -13,20 +13,17 @@ internal class UploadTextureSetThumbnailCommandHandler : ICommandHandler<UploadT
 {
     private readonly ITextureSetRepository _textureSetRepository;
     private readonly IFileStorage _fileStorage;
-    private readonly IUploadPathProvider _pathProvider;
     private readonly IDateTimeProvider _dateTimeProvider;
     private readonly IUnitOfWork _unitOfWork;
 
     public UploadTextureSetThumbnailCommandHandler(
         ITextureSetRepository textureSetRepository,
         IFileStorage fileStorage,
-        IUploadPathProvider pathProvider,
         IDateTimeProvider dateTimeProvider,
         IUnitOfWork unitOfWork)
     {
         _textureSetRepository = textureSetRepository;
         _fileStorage = fileStorage;
-        _pathProvider = pathProvider;
         _dateTimeProvider = dateTimeProvider;
         _unitOfWork = unitOfWork;
     }
@@ -43,17 +40,18 @@ internal class UploadTextureSetThumbnailCommandHandler : ICommandHandler<UploadT
         try
         {
             var storedFileResult = await _fileStorage.SaveAsync(command.ThumbnailFile, FileType.Texture, cancellationToken);
-            var fullPath = Path.Combine(_pathProvider.UploadRootPath, storedFileResult.RelativePath);
+            // Uploads-relative, like every other stored file; readers rebase at serve time.
+            var relativePath = storedFileResult.RelativePath;
 
             var now = _dateTimeProvider.UtcNow;
 
             if (command.IsPng)
             {
-                textureSet.SetPngThumbnailPath(fullPath, now);
+                textureSet.SetPngThumbnailPath(relativePath, now);
             }
             else
             {
-                textureSet.SetThumbnailPath(fullPath, now);
+                textureSet.SetThumbnailPath(relativePath, now);
             }
 
             await _textureSetRepository.UpdateAsync(textureSet, cancellationToken);
@@ -61,7 +59,7 @@ internal class UploadTextureSetThumbnailCommandHandler : ICommandHandler<UploadT
 
             return Result.Success(new UploadTextureSetThumbnailCommandResponse(
                 command.TextureSetId,
-                fullPath,
+                relativePath,
                 storedFileResult.SizeBytes));
         }
         catch (Exception ex)

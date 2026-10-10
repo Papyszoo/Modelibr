@@ -171,8 +171,13 @@ public sealed class BackupService : IBackupService
     public async Task<BackupSizeEstimate> EstimateSizeAsync(CancellationToken cancellationToken)
     {
         var dbBytes = await GetDatabaseSizeBytesAsync(cancellationToken);
-        var uploadBytes = DirectorySize(_paths.UploadRoot);
-        var thumbBytes = DirectorySize(_paths.ThumbnailRoot);
+
+        // Thumbnails physically live under the uploads root, so the raw uploads size
+        // already contains them. Report them separately (they are what includeThumbnails
+        // adds) so the UI does not count them twice.
+        var thumbBytes = await GetThumbnailStorageSizeAsync();
+        var uploadBytes = Math.Max(0, DirectorySize(_paths.UploadRoot) - thumbBytes);
+
         return new BackupSizeEstimate(dbBytes, uploadBytes, thumbBytes);
     }
 
@@ -346,6 +351,15 @@ public sealed class BackupService : IBackupService
             var dumpInfo = new FileInfo(dumpPath);
             var dumpSha = await ComputeSha256Async(dumpPath);
 
+            // Thumbnails and previews live under the uploads root (content-addressed,
+            // like every other file), so the plain uploads sweep below would carry them.
+            // Resolve the referenced set once and either keep it out of that sweep - the
+            // default, and what makes includeThumbnails meaningful - or write it as its
+            // own section so the manifest's thumbnail count is real.
+            var thumbnailRelativePaths = (await GetThumbnailUploadPathsAsync())
+                .Select(path => ToUploadRelative(path, _paths.UploadRoot))
+                .ToHashSet(StringComparer.Ordinal);
+
             await using (var outStream = File.Create(tmpPath))
             await using (var tar = new TarWriter(outStream, TarEntryFormat.Pax, leaveOpen: false))
             {
@@ -364,13 +378,17 @@ public sealed class BackupService : IBackupService
                     // user bytes that survived a failed save - real user data that a
                     // restore must bring back (prompt 30, item 5).
                     (uploadsCount, uploadsBytes) = await WriteDirectoryEntriesAsync(
-                        tar, _paths.UploadRoot, UploadsPrefix, skipDirNames: UploadSkipDirNames);
+                        tar,
+                        _paths.UploadRoot,
+                        UploadsPrefix,
+                        skipDirNames: UploadSkipDirNames,
+                        excludeRelativePaths: thumbnailRelativePaths);
                 }
 
-                if (scope.IncludeThumbnails && Directory.Exists(_paths.ThumbnailRoot))
+                if (scope.IncludeThumbnails && thumbnailRelativePaths.Count > 0)
                 {
-                    (thumbsCount, thumbsBytes) = await WriteDirectoryEntriesAsync(
-                        tar, _paths.ThumbnailRoot, ThumbnailsPrefix);
+                    (thumbsCount, thumbsBytes) = await WriteThumbnailEntriesAsync(
+                        tar, _paths.UploadRoot, thumbnailRelativePaths);
                 }
 
                 // Validate after enumeration as well as before the dump. The
@@ -434,6 +452,123 @@ public sealed class BackupService : IBackupService
             .Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
             .Where(path => path.Length > 0)
             .ToList();
+    }
+
+    /// <summary>
+    /// Every thumbnail / preview path the database knows about, across every asset
+    /// family that stores one. These files live under the uploads root, so they have
+    /// to be identified to be left out of the uploads sweep (or included deliberately).
+    /// </summary>
+    /// <remarks>
+    /// Each table is probed before it is queried because the first-boot pre-migration
+    /// backup runs before any schema exists, and later tables arrive with later
+    /// migrations - one absent table must not fail the whole backup.
+    /// </remarks>
+    private async Task<IReadOnlyCollection<string>> GetThumbnailUploadPathsAsync()
+    {
+        var columnsByTable = new (string Table, string[] Columns)[]
+        {
+            ("Thumbnails", ["ThumbnailPath", "PngThumbnailPath"]),
+            ("TextureSets", ["ThumbnailPath", "PngThumbnailPath"]),
+            ("EnvironmentMapVariants", ["ThumbnailPath"]),
+            ("Materials", ["ThumbnailPath", "PngThumbnailPath"]),
+            ("Vfx", ["ThumbnailPath"]),
+            ("SceneRenders", ["FilePath"]),
+        };
+
+        var paths = new List<string>();
+        await using var connection = await OpenConnectionAsync();
+
+        foreach (var (table, columns) in columnsByTable)
+        {
+            if (!await TableExistsAsync(connection, table)) continue;
+
+            foreach (var column in columns)
+            {
+                await using var command = new NpgsqlCommand(
+                    $"SELECT DISTINCT \"{column}\" FROM \"{table}\" " +
+                    $"WHERE \"{column}\" IS NOT NULL AND \"{column}\" <> '';",
+                    connection);
+                await using var reader = await command.ExecuteReaderAsync();
+                while (await reader.ReadAsync())
+                {
+                    paths.Add(reader.GetString(0));
+                }
+            }
+        }
+
+        return paths.Distinct(StringComparer.Ordinal).ToList();
+    }
+
+    private async Task<long> GetThumbnailStorageSizeAsync()
+    {
+        // A size probe must never stand between a user and their backup, so any
+        // failure degrades to zero rather than throwing.
+        try
+        {
+            long total = 0;
+            foreach (var path in await GetThumbnailUploadPathsAsync())
+            {
+                try
+                {
+                    var full = Path.Combine(_paths.UploadRoot, ToUploadRelative(path, _paths.UploadRoot));
+                    var info = new FileInfo(full);
+                    if (info.Exists) total += info.Length;
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                {
+                    // Unreadable single file - skip it.
+                }
+            }
+
+            return total;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Could not estimate thumbnail storage; the estimate omits it.");
+            return 0;
+        }
+    }
+
+    private static async Task<bool> TableExistsAsync(NpgsqlConnection connection, string table)
+    {
+        await using var command = new NpgsqlCommand("SELECT to_regclass(@name) IS NOT NULL;", connection);
+        command.Parameters.AddWithValue("name", $"public.\"{table}\"");
+        return await command.ExecuteScalarAsync() is true;
+    }
+
+    /// <summary>
+    /// Expresses a stored path the way the uploads sweep sees it: relative to the
+    /// uploads root, with forward slashes. A path already relative is returned as is;
+    /// an absolute one (a row written before the relative-path migration, or a
+    /// pre-migration snapshot) has the current root stripped when it sits under it.
+    /// </summary>
+    internal static string ToUploadRelative(string storedPath, string uploadRoot)
+    {
+        var normalized = storedPath.Replace('\\', '/');
+        if (!Path.IsPathRooted(storedPath)) return normalized;
+
+        var rootFull = Path.GetFullPath(uploadRoot);
+        var rootPrefix = rootFull.EndsWith(Path.DirectorySeparatorChar)
+            ? rootFull
+            : rootFull + Path.DirectorySeparatorChar;
+        var comparison = OperatingSystem.IsWindows()
+            ? StringComparison.OrdinalIgnoreCase
+            : StringComparison.Ordinal;
+
+        string full;
+        try
+        {
+            full = Path.GetFullPath(storedPath);
+        }
+        catch (Exception ex) when (ex is ArgumentException or IOException or NotSupportedException)
+        {
+            return normalized;
+        }
+
+        return full.StartsWith(rootPrefix, comparison)
+            ? Path.GetRelativePath(rootFull, full).Replace('\\', '/')
+            : normalized;
     }
 
     /// <summary>
@@ -592,7 +727,8 @@ public sealed class BackupService : IBackupService
         TarWriter tar,
         string rootDir,
         string entryPrefix,
-        IReadOnlyCollection<string>? skipDirNames = null)
+        IReadOnlyCollection<string>? skipDirNames = null,
+        IReadOnlySet<string>? excludeRelativePaths = null)
     {
         var count = 0;
         long bytes = 0;
@@ -600,17 +736,50 @@ public sealed class BackupService : IBackupService
 
         foreach (var path in Directory.EnumerateFiles(rootDir, "*", SearchOption.AllDirectories))
         {
-            if (skipDirNames is { Count: > 0 })
-            {
-                var rel = Path.GetRelativePath(rootFull, path).Replace('\\', '/');
-                if (skipDirNames.Any(skip => rel.StartsWith(skip + "/", StringComparison.Ordinal))) continue;
-            }
             var relative = Path.GetRelativePath(rootFull, path).Replace('\\', '/');
+            if (skipDirNames is { Count: > 0 }
+                && skipDirNames.Any(skip => relative.StartsWith(skip + "/", StringComparison.Ordinal)))
+            {
+                continue;
+            }
+            if (excludeRelativePaths is not null && excludeRelativePaths.Contains(relative)) continue;
+
             var entryName = entryPrefix + relative;
             var entry = new PaxTarEntry(TarEntryType.RegularFile, entryName);
             await using var fs = File.OpenRead(path);
             // fs.Length is valid here regardless of stream position - it returns the
             // file's size, not bytes-read-since-open.
+            var size = fs.Length;
+            entry.DataStream = fs;
+            await tar.WriteEntryAsync(entry);
+            count++;
+            bytes += size;
+        }
+
+        return (count, bytes);
+    }
+
+    /// <summary>
+    /// Writes the referenced thumbnail files as their own <c>thumbnails/</c> section.
+    /// They physically live under the uploads root, but naming them separately is what
+    /// lets a restore count what it got and lets a backup without them omit them
+    /// cleanly. A path whose file is gone is skipped - the count reflects the archive.
+    /// </summary>
+    private static async Task<(int count, long bytes)> WriteThumbnailEntriesAsync(
+        TarWriter tar,
+        string uploadRoot,
+        IEnumerable<string> relativePaths)
+    {
+        var count = 0;
+        long bytes = 0;
+
+        foreach (var relative in relativePaths)
+        {
+            var fullPath = Path.Combine(uploadRoot, relative);
+            if (!File.Exists(fullPath)) continue;
+
+            var entry = new PaxTarEntry(TarEntryType.RegularFile, ThumbnailsPrefix + relative);
+            await using var fs = File.OpenRead(fullPath);
             var size = fs.Length;
             entry.DataStream = fs;
             await tar.WriteEntryAsync(entry);

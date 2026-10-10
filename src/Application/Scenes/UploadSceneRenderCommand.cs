@@ -23,7 +23,6 @@ internal class UploadSceneRenderCommandHandler : ICommandHandler<UploadSceneRend
     private readonly ISceneRenderRepository _renderRepository;
     private readonly ISceneRepository _sceneRepository;
     private readonly IFileStorage _fileStorage;
-    private readonly IUploadPathProvider _pathProvider;
     private readonly IDateTimeProvider _dateTimeProvider;
     private readonly IUnitOfWork _unitOfWork;
 
@@ -32,7 +31,6 @@ internal class UploadSceneRenderCommandHandler : ICommandHandler<UploadSceneRend
         ISceneRenderRepository renderRepository,
         ISceneRepository sceneRepository,
         IFileStorage fileStorage,
-        IUploadPathProvider pathProvider,
         IDateTimeProvider dateTimeProvider,
         IUnitOfWork unitOfWork)
     {
@@ -40,7 +38,6 @@ internal class UploadSceneRenderCommandHandler : ICommandHandler<UploadSceneRend
         _renderRepository = renderRepository;
         _sceneRepository = sceneRepository;
         _fileStorage = fileStorage;
-        _pathProvider = pathProvider;
         _dateTimeProvider = dateTimeProvider;
         _unitOfWork = unitOfWork;
     }
@@ -87,7 +84,8 @@ internal class UploadSceneRenderCommandHandler : ICommandHandler<UploadSceneRend
             // classifies what the bytes are for storage layout, and there is no image
             // bucket beyond it. This is not the render being a texture.
             var storedFileResult = await _fileStorage.SaveAsync(command.RenderFile, FileType.Texture, cancellationToken);
-            var fullPath = Path.Combine(_pathProvider.UploadRootPath, storedFileResult.RelativePath);
+            // Uploads-relative, like every other stored file; the file endpoint rebases it.
+            var relativePath = storedFileResult.RelativePath;
 
             // The scene as it stands now that the picture is in. Together with the revision
             // the job recorded when it was queued this answers "is this a picture of the
@@ -98,7 +96,7 @@ internal class UploadSceneRenderCommandHandler : ICommandHandler<UploadSceneRend
                 job.SceneId.Value,
                 job.Id,
                 job.SceneViewpoint ?? "iso",
-                fullPath,
+                relativePath,
                 storedFileResult.SizeBytes,
                 command.Width,
                 command.Height,
@@ -115,7 +113,7 @@ internal class UploadSceneRenderCommandHandler : ICommandHandler<UploadSceneRend
             return Result.Success(new UploadSceneRenderCommandResponse(
                 render.Id,
                 job.SceneId.Value,
-                fullPath,
+                relativePath,
                 storedFileResult.SizeBytes));
         }
         catch (Exception ex)

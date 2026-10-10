@@ -15,7 +15,6 @@ internal class UploadPngThumbnailCommandHandler : ICommandHandler<UploadPngThumb
     private readonly IModelRepository _modelRepository;
     private readonly IThumbnailRepository _thumbnailRepository;
     private readonly IFileStorage _fileStorage;
-    private readonly IUploadPathProvider _pathProvider;
     private readonly IDateTimeProvider _dateTimeProvider;
     private readonly IUnitOfWork _unitOfWork;
 
@@ -23,14 +22,12 @@ internal class UploadPngThumbnailCommandHandler : ICommandHandler<UploadPngThumb
         IModelRepository modelRepository,
         IThumbnailRepository thumbnailRepository,
         IFileStorage fileStorage,
-        IUploadPathProvider pathProvider,
         IDateTimeProvider dateTimeProvider,
         IUnitOfWork unitOfWork)
     {
         _modelRepository = modelRepository;
         _thumbnailRepository = thumbnailRepository;
         _fileStorage = fileStorage;
-        _pathProvider = pathProvider;
         _dateTimeProvider = dateTimeProvider;
         _unitOfWork = unitOfWork;
     }
@@ -65,8 +62,9 @@ internal class UploadPngThumbnailCommandHandler : ICommandHandler<UploadPngThumb
             // Store the PNG file using existing storage infrastructure
             var storedFileResult = await _fileStorage.SaveAsync(command.PngFile, FileType.Texture, cancellationToken);
             
-            // Build the full path for the PNG thumbnail
-            var fullPath = Path.Combine(_pathProvider.UploadRootPath, storedFileResult.RelativePath);
+            // Persist the uploads-relative path (like every other file); readers rebase
+            // it against the uploads root so the library is portable across roots.
+            var pngRelativePath = storedFileResult.RelativePath;
 
             // Get image dimensions if possible (optional, can default to command values)
             var width = command.Width ?? 256; // Default width if not provided
@@ -103,7 +101,7 @@ internal class UploadPngThumbnailCommandHandler : ICommandHandler<UploadPngThumb
             {
                 // No WebP yet, set PNG as primary
                 thumbnailToUpdate.MarkAsReady(
-                    fullPath,
+                    pngRelativePath,
                     storedFileResult.SizeBytes,
                     width,
                     height,
@@ -114,7 +112,7 @@ internal class UploadPngThumbnailCommandHandler : ICommandHandler<UploadPngThumb
                 // WebP exists, set PNG separately using overloaded method
                 thumbnailToUpdate.MarkAsReady(
                     thumbnailToUpdate.ThumbnailPath!, // thumbnailPath
-                    fullPath, // pngThumbnailPath
+                    pngRelativePath, // pngThumbnailPath
                     thumbnailToUpdate.SizeBytes!.Value, // sizeBytes
                     thumbnailToUpdate.Width!.Value, // width
                     thumbnailToUpdate.Height!.Value, // height
@@ -126,7 +124,7 @@ internal class UploadPngThumbnailCommandHandler : ICommandHandler<UploadPngThumb
 
             return Result.Success(new UploadPngThumbnailCommandResponse(
                 model.Id,
-                fullPath,
+                pngRelativePath,
                 storedFileResult.SizeBytes,
                 width,
                 height));

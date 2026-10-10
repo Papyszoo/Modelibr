@@ -34,7 +34,7 @@ public class VfxThumbnailTests
     }
 
     private UploadVfxThumbnailCommandHandler UploadHandler() =>
-        new(_vfx.Object, _storage.Object, _paths.Object, _clock.Object, _unitOfWork.Object);
+        new(_vfx.Object, _storage.Object, _clock.Object, _unitOfWork.Object);
 
     private static IFileUpload Upload(string contentType)
     {
@@ -79,7 +79,7 @@ public class VfxThumbnailTests
             new UploadVfxThumbnailCommand(7, Upload("image/webp")), CancellationToken.None);
 
         Assert.True(result.IsSuccess);
-        Assert.Equal(Path.Combine("/uploads", "ab/cd/abcdef"), vfx.ThumbnailPath);
+        Assert.Equal("ab/cd/abcdef", vfx.ThumbnailPath);
         _vfx.Verify(r => r.UpdateAsync(vfx, It.IsAny<CancellationToken>()), Times.Once);
         _unitOfWork.Verify(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
     }

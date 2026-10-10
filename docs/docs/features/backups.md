@@ -15,16 +15,21 @@ migration is applied.
 Open the **Settings** page and go to **Backup & Restore**.
 
 1. Click **Create backup**.
-2. Choose whether to include thumbnails. Thumbnails regenerate automatically,
-   so leaving this off keeps the archive smaller - the database and uploaded
-   files are always included.
+2. Choose whether to include thumbnails. Thumbnails regenerate
+   automatically, so leaving this off keeps the archive smaller; after a
+   restore the missing thumbnails are queued for generation again. Include
+   them to keep the exact current pictures instead, which also keeps any
+   custom-uploaded thumbnails. The database and uploaded files are always
+   included.
 3. The new backup appears in the list as `in_progress`, then flips to
    `ready` once it finishes.
 
 Each backup is a single `.tar` archive containing a Postgres dump
 (`database.dump`), your uploaded files (`uploads/`), optionally thumbnails
 (`thumbnails/`), and a `manifest.json` describing the archive's contents and a
-SHA-256 checksum of the database dump.
+SHA-256 checksum of the database dump. Thumbnails are stored relative to the
+uploads root, so an archive and its database stay loadable even if the uploads
+root moves between machines or containers.
 
 ## Restoring a backup
 
@@ -39,6 +44,11 @@ triggered it or the app is recovering from an unclean shutdown).
    the archive is invalid or corrupted, it's moved to a `failed/` folder
    instead (with an error file explaining why) and your current data is left
    untouched.
+
+If the archive did not include thumbnails, every thumbnail whose file is now
+missing is queued for generation again once the app is running, through the
+same thumbnail job path as any other thumbnail. If it did include them, they are
+restored as they were and nothing is queued.
 
 ## Automatic pre-migration backups
 

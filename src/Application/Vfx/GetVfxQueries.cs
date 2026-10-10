@@ -1,5 +1,6 @@
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
+using Application.Abstractions.Storage;
 using SharedKernel;
 
 namespace Application.Vfx;
@@ -55,10 +56,12 @@ public sealed record GetVfxThumbnailQuery(int Id) : IQuery<string>;
 internal sealed class GetVfxThumbnailQueryHandler : IQueryHandler<GetVfxThumbnailQuery, string>
 {
     private readonly IVfxRepository _vfx;
+    private readonly IUploadPathProvider _paths;
 
-    public GetVfxThumbnailQueryHandler(IVfxRepository vfx)
+    public GetVfxThumbnailQueryHandler(IVfxRepository vfx, IUploadPathProvider paths)
     {
         _vfx = vfx;
+        _paths = paths;
     }
 
     public async Task<Result<string>> Handle(GetVfxThumbnailQuery query, CancellationToken cancellationToken)
@@ -67,6 +70,7 @@ internal sealed class GetVfxThumbnailQueryHandler : IQueryHandler<GetVfxThumbnai
 
         return string.IsNullOrEmpty(vfx?.ThumbnailPath)
             ? Result.Failure<string>(new Error("VfxThumbnailNotFound", $"Vfx {query.Id} has no thumbnail."))
-            : Result.Success(vfx.ThumbnailPath);
+            // Stored relative to the uploads root; the serving endpoint needs the real path.
+            : Result.Success(_paths.Resolve(vfx.ThumbnailPath));
     }
 }
