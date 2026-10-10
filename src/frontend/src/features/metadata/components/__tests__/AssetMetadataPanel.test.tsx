@@ -196,6 +196,23 @@ describe('AssetMetadataPanel', () => {
     expect(await screen.findByTestId('asset-metadata-save')).toBeDisabled()
   })
 
+  // Regression: `showToast` is optional and no caller passes one, so a rejected
+  // save showed nothing while the draft stayed on screen - which reads as saved.
+  it('shows the failure inline when a save is rejected', async () => {
+    api.setAssetMetadata.mockRejectedValue(
+      new Error('The server refused the change.')
+    )
+
+    render()
+
+    await userEvent.type(await screen.findByLabelText('Description'), 'A crate')
+    await userEvent.click(screen.getByTestId('asset-metadata-save'))
+
+    expect(await screen.findByTestId('asset-metadata-error')).toHaveTextContent(
+      'The server refused the change.'
+    )
+  })
+
   it('offers only the schema vocabulary for an enum list', async () => {
     // A value outside it is one no search filter will ever match.
     api.getAssetMetadataSchema.mockResolvedValue({

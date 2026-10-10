@@ -4,9 +4,9 @@ import { Environment, Grid, OrbitControls } from '@react-three/drei'
 import { Canvas, useLoader, useThree } from '@react-three/fiber'
 import { type JSX, useCallback, useEffect, useMemo, useState } from 'react'
 import * as THREE from 'three'
-import { EXRLoader } from 'three/examples/jsm/loaders/EXRLoader'
-import { RGBELoader } from 'three/examples/jsm/loaders/RGBELoader'
 
+import { CanvasErrorBoundary } from '@/features/model-viewer/components/CanvasErrorBoundary'
+import { environmentMapLoader } from '@/shared/three/environmentMapLoader'
 import { RendererPerfSampler } from '@/shared/three/RendererPerfSampler'
 
 import {
@@ -150,103 +150,122 @@ export function SceneCanvas({
   })
 
   // Resolved out here with everything else - the environment map is a library
-  // asset, so its URL comes from a query the canvas subtree cannot run.
+  // asset, so its URL comes from a query the canvas subtree cannot run. The
+  // extension comes with it: the file route carries no suffix, so the loader
+  // must be chosen from the asset's own name, not the URL.
   const environmentMap = document.environment?.environmentMap
-  const environmentMapUrl = environmentMap
-    ? (sources.get(sceneAssetSourceKey(environmentMap))?.url ?? null)
-    : null
+  const environmentMapSource = environmentMap
+    ? sources.get(sceneAssetSourceKey(environmentMap))
+    : undefined
+  const environmentMapUrl = environmentMapSource?.url ?? null
+  const environmentMapExtension = environmentMapSource?.extension ?? ''
 
   return (
     <div className="scene-canvas" data-testid="scene-canvas">
-      <Canvas
-        shadows={viewportQuality.shadowsEnabled}
-        camera={{
-          position: camera.position,
-          fov: camera.fov ?? DEFAULT_CAMERA.fov,
-        }}
-        gl={{ antialias: true, powerPreference: 'high-performance' }}
-        dpr={viewportQuality.dpr}
-        onPointerMissed={interactive ? () => onSelectNode(null) : undefined}
+      <CanvasErrorBoundary
+        resetKey={`${document.environment?.environmentMap?.assetId ?? ''}|${environmentMapUrl ?? ''}`}
+        fallback={
+          <p className="scene-canvas__error" role="alert">
+            The 3D view could not be drawn.
+          </p>
+        }
       >
-        <SceneCameraAim target={camera.target ?? [0, 0, 0]} />
-        {interactive && !blockout ? (
-          <>
-            <RendererPerfSampler
-              onSample={viewportMeasurements.onRendererSample}
-            />
-            <SceneResourcePriorityProbe
-              candidates={resourceCandidates}
-              qualityState={viewportQuality.state}
-              onRank={onRankResources}
-            />
-          </>
-        ) : null}
+        <Canvas
+          shadows={viewportQuality.shadowsEnabled}
+          camera={{
+            position: camera.position,
+            fov: camera.fov ?? DEFAULT_CAMERA.fov,
+          }}
+          gl={{ antialias: true, powerPreference: 'high-performance' }}
+          dpr={viewportQuality.dpr}
+          onPointerMissed={interactive ? () => onSelectNode(null) : undefined}
+        >
+          <SceneCameraAim target={camera.target ?? [0, 0, 0]} />
+          {interactive && !blockout ? (
+            <>
+              <RendererPerfSampler
+                onSample={viewportMeasurements.onRendererSample}
+              />
+              <SceneResourcePriorityProbe
+                candidates={resourceCandidates}
+                qualityState={viewportQuality.state}
+                onRank={onRankResources}
+              />
+            </>
+          ) : null}
 
-        {showGrid ? (
-          <Grid
-            args={[40, 40]}
-            cellSize={1}
-            cellThickness={0.5}
-            cellColor="#4b5563"
-            sectionSize={5}
-            sectionThickness={1}
-            sectionColor="#6b7280"
-            fadeDistance={80}
-            followCamera={false}
-            infiniteGrid
+          {showGrid ? (
+            <Grid
+              args={[40, 40]}
+              cellSize={1}
+              cellThickness={0.5}
+              cellColor="#4b5563"
+              sectionSize={5}
+              sectionThickness={1}
+              sectionColor="#6b7280"
+              fadeDistance={80}
+              followCamera={false}
+              infiniteGrid
+            />
+          ) : null}
+
+          <CanvasErrorBoundary
+            resetKey={`${document.environment?.environmentMap?.assetId ?? ''}|${environmentMapUrl ?? ''}`}
+            fallback={null}
+          >
+            <SceneEnvironmentRig
+              environment={document.environment ?? null}
+              mapUrl={environmentMapUrl}
+              mapExtension={environmentMapExtension}
+            />
+          </CanvasErrorBoundary>
+
+          <SceneDocumentLights
+            lights={document.lights}
+            shadowsEnabled={viewportQuality.shadowsEnabled}
           />
-        ) : null}
 
-        <SceneEnvironmentRig
-          environment={document.environment ?? null}
-          mapUrl={environmentMapUrl}
-        />
+          {document.nodes.map(node => {
+            const facts = nodeFacts.get(node.id)
+            return (
+              <SceneNodeObject
+                key={node.id}
+                node={node}
+                selected={node.id === selectedNodeId}
+                onSelect={onSelectNode}
+                source={
+                  node.asset && resourceAdmission.isAdmitted(node.asset)
+                    ? sources.get(sceneAssetSourceKey(node.asset))
+                    : undefined
+                }
+                dressing={materials.get(node.id)}
+                sourceDimensions={facts?.sourceDimensions ?? null}
+                originConvention={facts?.originConvention ?? null}
+                originInBounds={facts?.originInBounds ?? null}
+                blockout={blockout}
+                undecided={undecidedNodeIds?.has(node.id) ?? false}
+                renderTime={renderTime}
+                onLoadError={onNodeLoadError}
+                onLoadSettled={(nodeId, loaded) => {
+                  resourceAdmission.onNodeSettled(nodeId, loaded)
+                  onNodeLoadSettled?.(nodeId, loaded)
+                }}
+              />
+            )
+          })}
 
-        <SceneDocumentLights
-          lights={document.lights}
-          shadowsEnabled={viewportQuality.shadowsEnabled}
-        />
-
-        {document.nodes.map(node => {
-          const facts = nodeFacts.get(node.id)
-          return (
-            <SceneNodeObject
-              key={node.id}
-              node={node}
-              selected={node.id === selectedNodeId}
-              onSelect={onSelectNode}
-              source={
-                node.asset && resourceAdmission.isAdmitted(node.asset)
-                  ? sources.get(sceneAssetSourceKey(node.asset))
-                  : undefined
-              }
-              dressing={materials.get(node.id)}
-              sourceDimensions={facts?.sourceDimensions ?? null}
-              originConvention={facts?.originConvention ?? null}
-              originInBounds={facts?.originInBounds ?? null}
-              blockout={blockout}
-              undecided={undecidedNodeIds?.has(node.id) ?? false}
-              renderTime={renderTime}
-              onLoadError={onNodeLoadError}
-              onLoadSettled={(nodeId, loaded) => {
-                resourceAdmission.onNodeSettled(nodeId, loaded)
-                onNodeLoadSettled?.(nodeId, loaded)
-              }}
+          {interactive ? (
+            <OrbitControls
+              makeDefault
+              enableDamping
+              dampingFactor={0.1}
+              onStart={viewportQuality.onControlsStart}
+              onChange={viewportQuality.onControlsChange}
+              onEnd={viewportQuality.onControlsEnd}
             />
-          )
-        })}
-
-        {interactive ? (
-          <OrbitControls
-            makeDefault
-            enableDamping
-            dampingFactor={0.1}
-            onStart={viewportQuality.onControlsStart}
-            onChange={viewportQuality.onControlsChange}
-            onEnd={viewportQuality.onControlsEnd}
-          />
-        ) : null}
-      </Canvas>
+          ) : null}
+        </Canvas>
+      </CanvasErrorBoundary>
       {interactive &&
       !blockout &&
       resourceAdmission.resourceCount > 0 &&
@@ -467,9 +486,12 @@ function AimedLight({
 function SceneEnvironmentRig({
   environment,
   mapUrl,
+  mapExtension,
 }: {
   environment: SceneEnvironment | null
   mapUrl: string | null
+  /** Lower-case extension of the environment file, e.g. `hdr`, `exr`, `png`. */
+  mapExtension: string
 }): JSX.Element | null {
   const { gl } = useThree()
 
@@ -489,22 +511,30 @@ function SceneEnvironmentRig({
       {environment?.background ? (
         <color attach="background" args={[environment.background]} />
       ) : null}
-      {mapUrl ? <SceneEnvironmentMap url={mapUrl} /> : null}
+      {mapUrl ? (
+        <SceneEnvironmentMap url={mapUrl} extension={mapExtension} />
+      ) : null}
     </>
   )
 }
 
 /** Loads one equirectangular environment map and lights the scene with it. */
-function SceneEnvironmentMap({ url }: { url: string }): JSX.Element {
-  const extension = url.split('.').pop()?.toLowerCase() ?? ''
-  const loader =
-    extension === 'exr'
-      ? EXRLoader
-      : extension === 'hdr'
-        ? RGBELoader
-        : THREE.TextureLoader
-
-  const texture = useLoader(loader, url) as THREE.Texture
+function SceneEnvironmentMap({
+  url,
+  extension,
+}: {
+  url: string
+  /**
+   * The source file's extension. The file route (`/files/{id}`) carries no
+   * suffix, so deriving this from the URL always yielded '' and sent every map
+   * through TextureLoader - which decodes an .hdr or .exr to nothing usable.
+   */
+  extension: string
+}): JSX.Element {
+  const texture = useLoader(
+    environmentMapLoader(extension),
+    url
+  ) as THREE.Texture
   texture.mapping = THREE.EquirectangularReflectionMapping
 
   // background: the map is what the camera sees as well as what lights the

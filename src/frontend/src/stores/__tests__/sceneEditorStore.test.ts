@@ -378,6 +378,59 @@ describe('sceneEditorStore', () => {
     expect(useSceneEditorStore.getState().document).toBeNull()
   })
 
+  it('resets the flat projection when the discarded scene is the active one', () => {
+    // Regression: discardDraft deleted only the draft entry, so a reopen (with
+    // no other scene having replaced the projection) early-returned on the equal
+    // scene id and showed the discarded edits as if they were still live.
+    useSceneEditorStore.getState().open(1, makeDocument(), 1)
+    useSceneEditorStore.getState().addNode(makeNode('a'))
+
+    useSceneEditorStore.getState().discardDraft(1)
+
+    expect(useSceneEditorStore.getState().sceneId).toBeNull()
+    expect(useSceneEditorStore.getState().document).toBeNull()
+    expect(useSceneEditorStore.getState().isDirty).toBe(false)
+
+    // Reopening must find nothing to restore.
+    useSceneEditorStore.getState().openScene(1)
+    expect(useSceneEditorStore.getState().document).toBeNull()
+  })
+
+  it('scopes an edit to the scene it names, not the flat projection', () => {
+    // The regression: two scene tabs share the store. Each names its own scene
+    // with every write, so an edit in a background split panel must not land in
+    // whichever draft the flat projection happens to point at.
+    useSceneEditorStore.getState().open(1, makeDocument(), 1)
+    useSceneEditorStore.getState().open(2, makeDocument(), 1)
+
+    useSceneEditorStore.getState().addNode(makeNode('only-in-one'), 1)
+
+    expect(
+      useSceneEditorStore.getState().drafts[1].document?.nodes.map(n => n.id)
+    ).toEqual(['only-in-one'])
+    expect(
+      useSceneEditorStore.getState().drafts[2].document?.nodes
+    ).toHaveLength(0)
+    expect(useSceneEditorStore.getState().drafts[1].isDirty).toBe(true)
+    expect(useSceneEditorStore.getState().drafts[2].isDirty).toBe(false)
+  })
+
+  it('writes a non-active scene without moving the flat projection', () => {
+    useSceneEditorStore.getState().open(1, makeDocument(), 1)
+    useSceneEditorStore.getState().open(2, makeDocument(), 1)
+    // Scene 2 is the flat projection; write scene 1.
+    useSceneEditorStore.getState().selectNode('lamp', 1)
+    useSceneEditorStore.getState().setSaveError('scene 1 failed', 1)
+
+    expect(useSceneEditorStore.getState().drafts[1].selectedNodeId).toBe('lamp')
+    expect(useSceneEditorStore.getState().drafts[1].saveError).toBe(
+      'scene 1 failed'
+    )
+    // The flat projection still describes scene 2.
+    expect(useSceneEditorStore.getState().sceneId).toBe(2)
+    expect(useSceneEditorStore.getState().saveError).toBeNull()
+  })
+
   it('ignores an edit that returns the same document', () => {
     useSceneEditorStore.getState().open(1, makeDocument(), 1)
 

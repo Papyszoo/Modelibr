@@ -5,6 +5,10 @@
  * thumbnail uses. Both material builders (`textureSetMaterial`,
  * `parameterMaterial`) route their mesh assignments through it, so binding a
  * material never discards a glTF map it does not cover or `COLOR_0` vertex
- * colours.
+ * colours. `mergeMaterialChannelsPerMesh` is the variant for a material that is
+ * built once and shared across meshes (the default '' binding).
  */
-export { mergeMaterialChannels } from '../../../../asset-processor/lib/materialChannels.js'
+export {
+  mergeMaterialChannels,
+  mergeMaterialChannelsPerMesh,
+} from '../../../../asset-processor/lib/materialChannels.js'

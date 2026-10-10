@@ -58,6 +58,12 @@
   color: var(--mod-color-text-muted);
 }
 
+/* A failed save must be impossible to miss: `showToast` is optional and no
+   caller passes one, so the panel reports the failure itself. */
+.asset-metadata-error {
+  color: var(--mod-color-danger);
+}
+
 /* Says where a value came from. A read-only field is still shown - an imported
    licence is how an asset states its rights, and hiding it would make a store
    import look like an asset nobody knows anything about. */

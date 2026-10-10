@@ -1,6 +1,7 @@
 import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
+import { ApiClientError } from '@/lib/apiBase'
 import { renderWithProviders } from '@/test/renderWithProviders'
 
 import * as vfxApi from '../../api/vfxApi'
@@ -160,5 +161,30 @@ describe('VfxList', () => {
     await waitFor(() =>
       expect(vfx.deleteVfx).toHaveBeenCalledWith(1, expect.anything())
     )
+  })
+
+  // Regression: a rejected delete was unhandled, so the dialog stayed with no
+  // message and the failure was silent.
+  it('shows an inline error and keeps the dialog when a delete fails', async () => {
+    vfx.deleteVfx.mockRejectedValue(
+      new ApiClientError('That effect could not be deleted.', {
+        status: 500,
+        isNetworkError: false,
+        isTimeout: false,
+        isOffline: false,
+      })
+    )
+
+    renderList()
+    await screen.findByTestId('vfx-list')
+
+    fireEvent.contextMenu(screen.getAllByTestId('vfx-tile')[0])
+    await userEvent.click(await screen.findByTestId('vfx-delete'))
+
+    expect(await screen.findByTestId('vfx-delete-error')).toHaveTextContent(
+      'That effect could not be deleted.'
+    )
+    // The dialog is still open, so the user can retry or cancel.
+    expect(screen.getByTestId('vfx-delete')).toBeInTheDocument()
   })
 })

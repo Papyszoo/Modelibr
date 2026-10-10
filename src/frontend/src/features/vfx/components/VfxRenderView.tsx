@@ -13,6 +13,7 @@ import {
   frameThumbnailCamera,
   pointScaleFor,
   type ThumbnailCamera,
+  thumbnailFarPlane,
   thumbnailWindowSeconds,
 } from '../lib/vfxFraming'
 import type { VfxDefinition } from '../types'
@@ -99,10 +100,14 @@ function LoadedVfxRender({
     () => thumbnailWindowSeconds(definition),
     [definition]
   )
-  const camera = useMemo(
-    () => frameThumbnailCamera(computeEffectBounds(definition, windowSeconds)),
+  const bounds = useMemo(
+    () => computeEffectBounds(definition, windowSeconds),
     [definition, windowSeconds]
   )
+  const camera = useMemo(() => frameThumbnailCamera(bounds), [bounds])
+  // Far plane derived from the framing distance: a fixed 200 clipped any effect
+  // whose bounding radius outgrew it and blanked the frame for larger ones.
+  const far = useMemo(() => thumbnailFarPlane(bounds), [bounds])
 
   const [canvasReady, setCanvasReady] = useState(false)
   const [settledLong, setSettledLong] = useState(false)
@@ -138,7 +143,7 @@ function LoadedVfxRender({
       <Canvas
         dpr={1}
         gl={{ antialias: true }}
-        camera={{ fov: camera.fov, near: 0.1, far: 200 }}
+        camera={{ fov: camera.fov, near: 0.1, far }}
       >
         <CameraRig camera={camera} onMounted={() => setCanvasReady(true)} />
         <VfxStage floor={false} />

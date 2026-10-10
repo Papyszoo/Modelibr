@@ -194,3 +194,23 @@ export function frameThumbnailCamera(bounds: EffectBounds): ThumbnailCamera {
 export function pointScaleFor(heightPx: number, fov: number): number {
   return heightPx / (2 * Math.tan((fov * Math.PI) / 360))
 }
+
+/**
+ * A far plane that holds the whole framed effect.
+ *
+ * The thumbnail camera stands at `frameThumbnailCamera`'s distance and the
+ * sphere extends one more radius past its centre, so a fixed far plane clips
+ * any effect whose radius outgrows it - a fast, long-lived particle burst can
+ * reach tens of metres, and past ~47 units a fixed 200 blanked the frame.
+ * Derived from the framing distance and the radius, so it grows with the
+ * effect and never clips one it could frame.
+ */
+export function thumbnailFarPlane(bounds: EffectBounds): number {
+  const camera = frameThumbnailCamera(bounds)
+  const distance = Math.hypot(
+    camera.position[0] - camera.target[0],
+    camera.position[1] - camera.target[1],
+    camera.position[2] - camera.target[2]
+  )
+  return distance + bounds.radius * 2
+}

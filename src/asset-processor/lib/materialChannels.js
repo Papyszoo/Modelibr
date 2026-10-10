@@ -82,9 +82,35 @@ export function mergeMaterialChannels(original, next, geometry) {
   return next
 }
 
+/**
+ * Complete a per-mesh COPY of a Modelibr material.
+ *
+ * A single built material is often shared across every mesh in a slot - most of
+ * all the default '' texture-set binding, which dresses every unmatched mesh.
+ * `mergeMaterialChannels` writes into the material it is handed, so merging into
+ * that one shared instance lets the first mesh's map and `vertexColors` flag win
+ * for all the later ones (`if (next[channel]) continue` silently keeps it).
+ * Cloning first gives each mesh its own material; textures stay shared by
+ * reference and are never cloned or disposed.
+ *
+ * @param {object|object[]|null|undefined} original - The material(s) already on
+ *   the mesh.
+ * @param {object} next - The shared built material to copy.
+ * @param {{ hasAttribute?: Function }|null} [geometry] - The mesh geometry.
+ * @returns {object} A per-mesh clone of `next` with missing channels filled.
+ */
+export function mergeMaterialChannelsPerMesh(original, next, geometry) {
+  if (!next) return next
+  const perMesh = typeof next.clone === 'function' ? next.clone() : next
+  return mergeMaterialChannels(original, perMesh, geometry)
+}
+
 // Side-effect: expose on window for the Puppeteer page.evaluate (classic-script
 // context), parity with the shared texture-material helpers. Lets the worker
 // call the same rule without an import.
 if (typeof window !== 'undefined') {
-  window.modelibrMaterialChannels = { mergeMaterialChannels }
+  window.modelibrMaterialChannels = {
+    mergeMaterialChannels,
+    mergeMaterialChannelsPerMesh,
+  }
 }

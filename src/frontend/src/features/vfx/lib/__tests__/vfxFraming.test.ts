@@ -3,6 +3,7 @@ import {
   computeEffectBounds,
   frameThumbnailCamera,
   pointScaleFor,
+  thumbnailFarPlane,
   thumbnailWindowSeconds,
 } from '../vfxFraming'
 
@@ -163,5 +164,30 @@ describe('frameThumbnailCamera', () => {
 describe('pointScaleFor', () => {
   it('scales particle sizes with the canvas height', () => {
     expect(pointScaleFor(512, 40)).toBeCloseTo(pointScaleFor(256, 40) * 2)
+  })
+})
+
+describe('thumbnailFarPlane', () => {
+  // Regression: the far plane was a fixed 200 while the camera distance grows
+  // with the effect's radius, so a large (fast, long-lived) effect clipped and
+  // an even larger one blanked the frame entirely.
+  it('reaches past the far side of the bounding sphere', () => {
+    const bounds = {
+      center: [0, 0, 0] as [number, number, number],
+      radius: 80,
+    }
+    const distance = Math.hypot(
+      frameThumbnailCamera(bounds).position[0] - bounds.center[0],
+      frameThumbnailCamera(bounds).position[1] - bounds.center[1],
+      frameThumbnailCamera(bounds).position[2] - bounds.center[2]
+    )
+
+    expect(thumbnailFarPlane(bounds)).toBeGreaterThan(distance + bounds.radius)
+  })
+
+  it('grows with the effect', () => {
+    const small = { center: [0, 0, 0] as [number, number, number], radius: 2 }
+    const large = { center: [0, 0, 0] as [number, number, number], radius: 40 }
+    expect(thumbnailFarPlane(large)).toBeGreaterThan(thumbnailFarPlane(small))
   })
 })

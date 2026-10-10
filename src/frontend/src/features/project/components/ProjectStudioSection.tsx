@@ -8,12 +8,7 @@ import { useState } from 'react'
 
 import {
   createProjectLevel,
-  type ProjectCharacterDto,
-  type ProjectCommentDto,
-  type ProjectCommentTargetKind,
-  type ProjectLevelDto,
   type ProjectLevelStatus,
-  type ProjectReferenceDto,
 } from '@/features/project/api/projectStudioApi'
 import {
   useProjectCharactersQuery,
@@ -21,7 +16,6 @@ import {
   useProjectLevelsQuery,
   useProjectReferencesQuery,
 } from '@/features/project/api/projectStudioQueries'
-import { commentTarget } from '@/features/project/commentTargets'
 import { useScenesQuery } from '@/features/scenes/api/queries'
 import { useTabUiState } from '@/hooks/useTabUiState'
 import {
@@ -31,6 +25,10 @@ import {
 } from '@/shared/components/feedback'
 
 import { LEVEL_STATUSES, levelStatusLabel } from '../levelStatus'
+import {
+  commentTargetLabel,
+  type ProjectAssetNames,
+} from './commentTargetLabels'
 import { ProjectCharactersSection } from './ProjectCharactersSection'
 import { ProjectCommentsBadge } from './ProjectCommentsBadge'
 import { ProjectCommentThread } from './ProjectCommentThread'
@@ -43,66 +41,13 @@ import {
   type ProjectWorkspaceView,
 } from './ProjectWorkspaceShell'
 
-/** Names of the project's own assets, for saying what a comment is about. */
-export type ProjectAssetNames = Partial<
-  Record<
-    'models' | 'textureSets' | 'sprites' | 'environmentMaps' | 'vfx',
-    Array<{ id: number; name: string }>
-  >
->
+export type { ProjectAssetNames } from './commentTargetLabels'
 
 interface ProjectStudioSectionProps {
   projectId: number
   tabId?: string
   onChanged?: () => void
   assets?: ProjectAssetNames
-}
-
-const TARGET_LABELS: Record<ProjectCommentTargetKind, string> = {
-  levelId: 'Level',
-  referenceImageId: 'Reference',
-  characterId: 'Character',
-  modelId: 'Model',
-  textureSetId: 'Texture set',
-  spriteId: 'Sprite',
-  soundId: 'Sound',
-  environmentMapId: 'Environment map',
-  vfxId: 'VFX',
-}
-
-/**
- * What a comment is about, in words rather than ids.
- *
- * Resolving the names needs the levels, characters, references and assets the
- * studio already has, so a comment that pointed at "Level #4" said nothing a
- * user could act on - and the target is the whole point of a comment.
- */
-function commentTargetLabel(
-  comment: ProjectCommentDto,
-  levels: ProjectLevelDto[],
-  characters: ProjectCharacterDto[],
-  references: ProjectReferenceDto[],
-  assets: ProjectAssetNames
-): string {
-  const target = commentTarget(comment)
-  if (!target) return 'Project'
-
-  const named = (items?: Array<{ id: number; name: string }>) =>
-    items?.find(item => item.id === target.id)?.name
-  const name: Partial<Record<ProjectCommentTargetKind, string | undefined>> = {
-    levelId: named(levels),
-    characterId: named(characters),
-    referenceImageId: (() => {
-      const reference = references.find(item => item.id === target.id)
-      return reference ? reference.title || reference.fileName : undefined
-    })(),
-    modelId: named(assets.models),
-    textureSetId: named(assets.textureSets),
-    spriteId: named(assets.sprites),
-    environmentMapId: named(assets.environmentMaps),
-    vfxId: named(assets.vfx),
-  }
-  return `${TARGET_LABELS[target.kind]}: ${name[target.kind] ?? `#${target.id}`}`
 }
 
 export function ProjectStudioSection({

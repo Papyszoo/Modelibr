@@ -13,6 +13,7 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader'
 import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader'
 import { STLLoader } from 'three/examples/jsm/loaders/STLLoader'
 
+import { disposeClonedMaterials } from '@/shared/three/disposeClonedMaterials'
 import { advanceMaterialEffects } from '@/shared/three/materialEffects'
 import { createResourceManager } from '@/shared/three/safeLoadingManager'
 import {
@@ -854,34 +855,6 @@ function PlacedObject({
   }, [camera, clone, onReady, renderer, scene])
 
   return compiled === clone ? <primitive object={clone} /> : null
-}
-
-function collectMaterials(root: THREE.Object3D): Set<THREE.Material> {
-  const materials = new Set<THREE.Material>()
-  root.traverse(child => {
-    const mesh = child as THREE.Mesh
-    if (!mesh.isMesh) return
-    for (const material of Array.isArray(mesh.material)
-      ? mesh.material
-      : [mesh.material]) {
-      if (material) {
-        materials.add(material)
-      }
-    }
-  })
-  return materials
-}
-
-function disposeClonedMaterials(
-  clone: THREE.Object3D,
-  source: THREE.Object3D
-): void {
-  const shared = collectMaterials(source)
-  for (const material of collectMaterials(clone)) {
-    if (!shared.has(material)) {
-      material.dispose()
-    }
-  }
 }
 
 /**

@@ -1,4 +1,4 @@
-import { screen } from '@testing-library/react'
+import { fireEvent, screen, waitFor } from '@testing-library/react'
 
 import { renderWithProviders } from '@/test/renderWithProviders'
 
@@ -77,6 +77,7 @@ describe('VfxEditor', () => {
     jest.clearAllMocks()
     vfx.getVfx.mockResolvedValue(detail as never)
     vfx.updateVfx.mockResolvedValue(detail as never)
+    vfx.vfxProblems.mockReturnValue([])
   })
 
   it('loads the effect into the toolbar, preview and timeline', async () => {
@@ -86,6 +87,78 @@ describe('VfxEditor', () => {
     expect(screen.getByLabelText('Effect name')).toHaveValue('Spark fountain')
     expect(screen.getByTestId('vfx-preview')).toBeInTheDocument()
     expect(screen.getAllByTestId('vfx-timeline-track')).toHaveLength(2)
+  })
+
+  // Regression: the save-state text ignored `update.isError`, and for a
+  // non-400 failure there are no problems to list, so a rejected autosave read
+  // "Saved" while the edit existed only in the browser.
+  it('reports a failed autosave instead of Saved', async () => {
+    vfx.updateVfx.mockRejectedValue(new Error('Network down'))
+
+    renderWithProviders(<VfxEditor vfxId={1} />)
+    await screen.findByTestId('vfx-editor')
+
+    fireEvent.change(screen.getByLabelText('Effect name'), {
+      target: { value: 'Changed name' },
+    })
+
+    await waitFor(
+      () =>
+        expect(screen.getByTestId('vfx-save-state')).toHaveTextContent(
+          'Save failed'
+        ),
+      { timeout: 3000 }
+    )
+  })
+
+  // Regression: `setDirty(false)` ran before the mutation, so a rejected save
+  // left the editor clean - the unmount flush skipped it and the edit was lost
+  // on navigation. A failed save must stay dirty.
+  it('stays dirty after a failed autosave so the edit flushes on unmount', async () => {
+    vfx.updateVfx.mockRejectedValue(new Error('Network down'))
+
+    const { unmount } = renderWithProviders(<VfxEditor vfxId={1} />)
+    await screen.findByTestId('vfx-editor')
+
+    fireEvent.change(screen.getByLabelText('Effect name'), {
+      target: { value: 'Keep me on failure' },
+    })
+
+    await waitFor(
+      () =>
+        expect(screen.getByTestId('vfx-save-state')).toHaveTextContent(
+          'Save failed'
+        ),
+      { timeout: 3000 }
+    )
+    expect(vfx.updateVfx).toHaveBeenCalledTimes(1)
+
+    unmount()
+
+    await waitFor(() => expect(vfx.updateVfx).toHaveBeenCalledTimes(2))
+    expect(vfx.updateVfx).toHaveBeenLastCalledWith(
+      1,
+      expect.objectContaining({ name: 'Keep me on failure' })
+    )
+  })
+
+  // Regression: unmounting the editor (a tab switch) inside the 600 ms
+  // debounce cleared the timer without flushing it, and the edit was lost.
+  it('flushes a pending autosave on unmount', async () => {
+    const { unmount } = renderWithProviders(<VfxEditor vfxId={1} />)
+    await screen.findByTestId('vfx-editor')
+
+    fireEvent.change(screen.getByLabelText('Effect name'), {
+      target: { value: 'Saved on the way out' },
+    })
+    unmount()
+
+    await waitFor(() =>
+      expect(vfx.updateVfx).toHaveBeenCalledWith(
+        1,
+        expect.objectContaining({ name: 'Saved on the way out' })
+      )
+    )
   })
 })
 

@@ -1,5 +1,6 @@
 import { http, HttpResponse } from 'msw'
 
+import { levelWithCharacterVariants } from './projectLevelVariants'
 import {
   buildConceptImage,
   type DemoPack,
@@ -1180,7 +1181,11 @@ export const containerHandlers = [
   http.get('*/projects/:id/levels', async ({ params }) => {
     const project = await getById('projects', Number(params.id))
     if (!project) return new HttpResponse(null, { status: 404 })
-    return HttpResponse.json(project.levels ?? [])
+    return HttpResponse.json(
+      (project.levels ?? []).map(level =>
+        levelWithCharacterVariants(project, level)
+      )
+    )
   }),
 
   http.get('*/projects/:id/levels/:levelId', async ({ params }) => {
@@ -1188,8 +1193,8 @@ export const containerHandlers = [
     const level = project?.levels?.find(
       item => item.id === Number(params.levelId)
     )
-    if (!level) return new HttpResponse(null, { status: 404 })
-    return HttpResponse.json(level)
+    if (!project || !level) return new HttpResponse(null, { status: 404 })
+    return HttpResponse.json(levelWithCharacterVariants(project, level))
   }),
 
   http.post('*/projects/:id/levels', async ({ params, request }) => {
@@ -1218,7 +1223,9 @@ export const containerHandlers = [
     } as NonNullable<DemoProject['levels']>[number]
     project.levels = [...(project.levels ?? []), level]
     await put('projects', project)
-    return HttpResponse.json(level, { status: 201 })
+    return HttpResponse.json(levelWithCharacterVariants(project, level), {
+      status: 201,
+    })
   }),
 
   http.put('*/projects/:id/levels/:levelId', async ({ params, request }) => {
@@ -1246,7 +1253,7 @@ export const containerHandlers = [
     if (body.sortOrder !== undefined) level.sortOrder = body.sortOrder
     level.updatedAt = now()
     await put('projects', project)
-    return HttpResponse.json(level)
+    return HttpResponse.json(levelWithCharacterVariants(project, level))
   }),
 
   http.delete('*/projects/:id/levels/:levelId', async ({ params }) => {

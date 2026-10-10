@@ -167,6 +167,23 @@ export function AssetMetadataPanel({
         </div>
       </div>
 
+      {/*
+        Inline, because `showToast` is optional and no caller passes one: a
+        failed save used to show nothing at all while the draft quietly stayed
+        on screen, which reads as "saved".
+      */}
+      {save.isError ? (
+        <p
+          className="asset-metadata-note asset-metadata-error"
+          role="alert"
+          data-testid="asset-metadata-error"
+        >
+          {save.error instanceof Error
+            ? save.error.message
+            : 'The metadata could not be saved.'}
+        </p>
+      ) : null}
+
       {GROUP_ORDER.map(group => {
         const groupFields = fields.filter(field => field.group === group)
         if (groupFields.length === 0) {

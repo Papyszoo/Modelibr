@@ -52,6 +52,7 @@ export function VfxList(): JSX.Element {
 
   const [pendingDelete, setPendingDelete] = useState<VfxSummary | null>(null)
   const [createError, setCreateError] = useState<string | null>(null)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
 
   const handleCreate = async () => {
     if (createEffect.isPending) return
@@ -144,6 +145,7 @@ export function VfxList(): JSX.Element {
               onClick={() => openVfxEditorTab(String(effect.id), effect.name)}
               onContextMenu={event => {
                 event.preventDefault()
+                setDeleteError(null)
                 setPendingDelete(effect)
               }}
               media={
@@ -165,7 +167,10 @@ export function VfxList(): JSX.Element {
 
       <Dialog
         open={pendingDelete !== null}
-        onClose={() => setPendingDelete(null)}
+        onClose={() => {
+          setDeleteError(null)
+          setPendingDelete(null)
+        }}
         header="Delete effect"
         size="sm"
         // The dialog opens on the right button's contextmenu (pointerdown on
@@ -178,7 +183,10 @@ export function VfxList(): JSX.Element {
               label="Cancel"
               text
               size="small"
-              onClick={() => setPendingDelete(null)}
+              onClick={() => {
+                setDeleteError(null)
+                setPendingDelete(null)
+              }}
             />
             <Button
               label="Delete"
@@ -188,19 +196,46 @@ export function VfxList(): JSX.Element {
               data-testid="vfx-delete"
               loading={deleteEffect.isPending}
               onClick={async () => {
-                if (pendingDelete) {
+                if (!pendingDelete) return
+                setDeleteError(null)
+                try {
                   await deleteEffect.mutateAsync(pendingDelete.id)
+                  setPendingDelete(null)
+                } catch (caught) {
+                  // A 404 means it is already gone; there is nothing left to
+                  // delete, so close rather than report a failure.
+                  if (
+                    caught instanceof ApiClientError &&
+                    caught.status === 404
+                  ) {
+                    setPendingDelete(null)
+                    return
+                  }
+                  setDeleteError(
+                    caught instanceof ApiClientError
+                      ? caught.message
+                      : 'The effect could not be deleted.'
+                  )
                 }
-                setPendingDelete(null)
               }}
             />
           </>
         }
       >
-        <p className="vfx-list-confirm">
+        <p className="vfx-list-confirm" key="confirm">
           Delete <strong>{pendingDelete?.name}</strong>? The assets it
           references are not affected - only the effect is removed.
         </p>
+        {deleteError ? (
+          <p
+            className="vfx-list-error"
+            role="alert"
+            data-testid="vfx-delete-error"
+            key="error"
+          >
+            {deleteError}
+          </p>
+        ) : null}
       </Dialog>
     </div>
   )

@@ -84,15 +84,48 @@ export function VfxEditor({ vfxId }: { vfxId: number }): JSX.Element {
     setDirty(true)
   }, [])
 
-  // Autosave, debounced.
+  // The latest autosave the debounce still owes. Read on unmount so a tab
+  // switch inside the window flushes the edit instead of cancelling it: the
+  // effect cleanup cleared the timer and the change existed only in the
+  // browser. Held in a ref because the flush effect must not re-run per edit.
+  const pendingSave = useRef<{
+    dirty: boolean
+    definition: VfxDefinition | null
+    name: string
+    update: typeof update
+  }>({ dirty: false, definition: null, name: '', update })
+  pendingSave.current = { dirty, definition, name, update }
+
+  useEffect(() => {
+    return () => {
+      const {
+        dirty: wasDirty,
+        definition: flushed,
+        name: flushedName,
+        update: mutation,
+      } = pendingSave.current
+      if (wasDirty && flushed) {
+        mutation.mutate({
+          name: flushedName.trim() || 'Untitled effect',
+          definition: flushed,
+        })
+      }
+    }
+  }, [])
+
+  // Autosave, debounced. `dirty` is cleared only once the save succeeds, so a
+  // rejected save stays dirty: the state still says "not saved" and the unmount
+  // flush below still owes the edit instead of dropping it.
   useEffect(() => {
     if (!dirty || !definition) return
     const handle = window.setTimeout(() => {
-      setDirty(false)
       update.mutate(
         { name: name.trim() || 'Untitled effect', definition },
         {
-          onSuccess: () => setProblems([]),
+          onSuccess: () => {
+            setProblems([])
+            setDirty(false)
+          },
           onError: error => setProblems(vfxProblems(error)),
         }
       )
@@ -159,12 +192,18 @@ export function VfxEditor({ vfxId }: { vfxId: number }): JSX.Element {
     setPlaying(value => !value)
   }
 
-  const saveState =
-    update.isPending || dirty
-      ? 'Saving...'
-      : problems.length > 0
-        ? `${problems.length} problem${problems.length === 1 ? '' : 's'} - not saved`
-        : 'Saved'
+  const saveFailed = update.isError
+  // A rejection (or a server validation problem) outranks "dirty": `dirty` now
+  // survives a failed save, so checking it first would show "Saving..." forever.
+  const saveState = update.isPending
+    ? 'Saving...'
+    : problems.length > 0
+      ? `${problems.length} problem${problems.length === 1 ? '' : 's'} - not saved`
+      : saveFailed
+        ? 'Save failed - not saved'
+        : dirty
+          ? 'Saving...'
+          : 'Saved'
 
   const selected =
     selectedIndex >= 0 ? definition.components[selectedIndex] : null
@@ -290,7 +329,7 @@ export function VfxEditor({ vfxId }: { vfxId: number }): JSX.Element {
 
         <div className="vfx-toolbar-group vfx-toolbar-end">
           <span
-            className={`vfx-save-state${problems.length > 0 ? ' has-problems' : ''}`}
+            className={`vfx-save-state${problems.length > 0 || saveFailed ? ' has-problems' : ''}`}
             data-testid="vfx-save-state"
           >
             {saveState}

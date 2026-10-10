@@ -126,7 +126,12 @@ export class ModelAnimationController {
       if (!mesh.isMesh || !mesh.morphTargetDictionary) return
       const keys = Object.keys(mesh.morphTargetDictionary)
       if (keys.length > 0) {
-        this.morphMeshes.push({ mesh, name: mesh.name || 'Mesh', keys })
+        // The mesh's own name, however empty: the extractor stores
+        // `mesh.name || ''` for the same meshes (puppeteerRenderer) and the
+        // backend keys shape keys on that, so inventing 'Mesh' here made the
+        // panel name a mesh the metadata calls ''. The empty case is labelled
+        // at the display site instead.
+        this.morphMeshes.push({ mesh, name: mesh.name, keys })
       }
     })
 

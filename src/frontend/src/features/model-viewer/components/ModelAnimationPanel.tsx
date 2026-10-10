@@ -130,13 +130,13 @@ export function ModelAnimationPanel({
             />
           </div>
 
-          {shapeKeyGroups.map(group => (
+          {shapeKeyGroups.map((group, groupIndex) => (
             <div
               className="model-animation-shapekey-group"
-              key={group.meshName}
+              key={`${group.meshName}-${groupIndex}`}
             >
               <div className="model-animation-shapekey-group-title">
-                {group.meshName}
+                {group.meshName || 'Mesh'}
               </div>
               {group.keys.map(key => {
                 const value = shapeKeyValue(group.meshName, key)

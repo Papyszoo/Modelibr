@@ -47,6 +47,7 @@ export function SceneList({ onOpenScene }: SceneListProps): JSX.Element {
   const [projectId, setProjectId] = useState<number | null>(null)
   const [pendingDelete, setPendingDelete] = useState<SceneSummary | null>(null)
   const [createError, setCreateError] = useState<string | null>(null)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
 
   /**
    * The scene that exists, and the project it still wants, after a link failed.
@@ -297,6 +298,7 @@ export function SceneList({ onOpenScene }: SceneListProps): JSX.Element {
               onClick={() => onOpenScene(scene.id, scene.name)}
               onContextMenu={event => {
                 event.preventDefault()
+                setDeleteError(null)
                 setPendingDelete(scene)
               }}
               media={
@@ -430,7 +432,10 @@ export function SceneList({ onOpenScene }: SceneListProps): JSX.Element {
 
       <Dialog
         open={pendingDelete !== null}
-        onClose={() => setPendingDelete(null)}
+        onClose={() => {
+          setDeleteError(null)
+          setPendingDelete(null)
+        }}
         header="Delete scene"
         size="sm"
         footer={
@@ -439,7 +444,10 @@ export function SceneList({ onOpenScene }: SceneListProps): JSX.Element {
               label="Cancel"
               text
               size="small"
-              onClick={() => setPendingDelete(null)}
+              onClick={() => {
+                setDeleteError(null)
+                setPendingDelete(null)
+              }}
             />
             <Button
               label="Delete"
@@ -448,10 +456,28 @@ export function SceneList({ onOpenScene }: SceneListProps): JSX.Element {
               size="small"
               loading={deleteScene.isPending}
               onClick={async () => {
-                if (pendingDelete) {
+                if (!pendingDelete) return
+                setDeleteError(null)
+                try {
                   await deleteScene.mutateAsync(pendingDelete.id)
+                  setPendingDelete(null)
+                } catch (caught) {
+                  // A scene already gone is not a failure: the dialog's job is
+                  // done, so close. Anything else stays on screen with the
+                  // reason, rather than vanishing with no message.
+                  if (
+                    caught instanceof ApiClientError &&
+                    caught.status === 404
+                  ) {
+                    setPendingDelete(null)
+                    return
+                  }
+                  setDeleteError(
+                    caught instanceof ApiClientError
+                      ? caught.message
+                      : 'The scene could not be deleted.'
+                  )
                 }
-                setPendingDelete(null)
               }}
             />
           </>
@@ -461,6 +487,15 @@ export function SceneList({ onOpenScene }: SceneListProps): JSX.Element {
           Delete <strong>{pendingDelete?.name}</strong>? The assets it
           references are not affected - only the composition is removed.
         </p>
+        {deleteError ? (
+          <p
+            className="scene-list-error"
+            role="alert"
+            data-testid="scene-delete-error"
+          >
+            {deleteError}
+          </p>
+        ) : null}
       </Dialog>
     </div>
   )

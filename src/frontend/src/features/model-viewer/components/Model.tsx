@@ -12,6 +12,7 @@ import { LoadingPlaceholder } from '@/components/LoadingPlaceholder'
 import { useModelAnimationController } from '@/features/model-viewer/animation/ModelAnimationContext'
 import { useModelObject } from '@/features/model-viewer/hooks/useModelObject'
 import { cloneSkinnedModel } from '@/shared/three/cloneSkinnedModel'
+import { disposeClonedMaterials } from '@/shared/three/disposeClonedMaterials'
 import { advanceMaterialEffects } from '@/shared/three/materialEffects'
 import {
   createResourceManager,
@@ -52,10 +53,13 @@ function useRenderedModel(
     }
   })
 
-  // Reset the scaled flag when the model changes
+  // Reset the scaled flag when the model changes. `preserveMaterials` is a
+  // dependency too: it is read inside the build below, and without it here the
+  // flag stayed true across a toggle, so the effect re-ran but its `!scaledRef`
+  // guard skipped the rebuild and the toggle did nothing.
   useEffect(() => {
     scaledRef.current = false
-  }, [model])
+  }, [model, preserveMaterials])
 
   useEffect(() => {
     if (model && !scaledRef.current) {
@@ -103,6 +107,11 @@ function useRenderedModel(
 
       // Store the cloned model in the ref
       if (meshRef.current) {
+        // Release the materials the last build introduced before dropping it -
+        // a model change otherwise leaks one MeshStandardMaterial per mesh for
+        // the life of the session. Materials the clone shares with the source
+        // (preserveMaterials) are left alone.
+        disposeClonedMaterials(meshRef.current, model)
         // Clear previous children
         meshRef.current.clear()
         // Add cloned model

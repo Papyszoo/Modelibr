@@ -198,6 +198,49 @@ describe('applyParameterMaterials', () => {
     expect(created).toHaveLength(1)
   })
 
+  // Regression: one material instance was shared per slot, and the merge that
+  // carries the model's own maps mutated it. The first mesh's map won and every
+  // later mesh in the same slot silently wore it, so the default '' binding
+  // across differently textured meshes rendered all of them with one texture.
+  it('gives each mesh its own material instance in a shared slot', () => {
+    const root = new THREE.Group()
+    const first = meshNamed('frame')
+    const second = meshNamed('cushions')
+    const firstMap = new THREE.Texture()
+    const secondMap = new THREE.Texture()
+    ;(first.material as THREE.MeshStandardMaterial).map = firstMap
+    ;(second.material as THREE.MeshStandardMaterial).map = secondMap
+    root.add(first, second)
+
+    applyParameterMaterials(root, { '': material() })
+
+    const firstApplied = first.material as THREE.MeshPhysicalMaterial
+    const secondApplied = second.material as THREE.MeshPhysicalMaterial
+    expect(firstApplied).not.toBe(secondApplied)
+    expect(firstApplied.map).toBe(firstMap)
+    expect(secondApplied.map).toBe(secondMap)
+  })
+
+  it('applies the stored normalScale and occlusion strength after the merge', () => {
+    const root = new THREE.Group()
+    const mesh = meshNamed('frame')
+    const original = mesh.material as THREE.MeshStandardMaterial
+    original.normalMap = new THREE.Texture()
+    original.normalScale.set(2, 2)
+    original.aoMap = new THREE.Texture()
+    original.aoMapIntensity = 0.2
+    root.add(mesh)
+
+    applyParameterMaterials(root, {
+      '': material({ normalScale: 0.35, occlusionStrength: 0.8 }),
+    })
+
+    const applied = mesh.material as THREE.MeshPhysicalMaterial
+    expect(applied.normalScale.x).toBeCloseTo(0.35)
+    expect(applied.normalScale.y).toBeCloseTo(0.35)
+    expect(applied.aoMapIntensity).toBeCloseTo(0.8)
+  })
+
   it('does nothing at all when there is nothing to apply', () => {
     const root = new THREE.Group()
     const frame = meshNamed('frame')

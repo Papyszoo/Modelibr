@@ -1,4 +1,4 @@
-import { screen, waitFor } from '@testing-library/react'
+import { fireEvent, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
 import { ApiClientError } from '@/lib/apiBase'
@@ -407,5 +407,66 @@ describe('SceneList - creating a scene', () => {
     expect(useSceneLinkHoldStore.getState().tryBegin(9, 'link')).toBe(false)
     // And the unresolved record is untouched by the attempt.
     expect(useSceneLinkHoldStore.getState().holds[9]?.phase).toBe('reconciling')
+  })
+})
+
+describe('SceneList - deleting a scene', () => {
+  let onOpenScene: jest.Mock
+
+  beforeEach(() => {
+    jest.clearAllMocks()
+    onOpenScene = jest.fn()
+    projects.getAllProjects.mockResolvedValue([] as never)
+    scenes.getScenes.mockResolvedValue([sceneView(9)] as never)
+    scenes.deleteScene.mockResolvedValue(undefined as never)
+  })
+
+  async function openDeleteDialog() {
+    renderWithProviders(<SceneList onOpenScene={onOpenScene} />)
+    const tile = await screen.findByTestId('scene-tile')
+    fireEvent.contextMenu(tile)
+    return screen.findByRole('button', { name: 'Delete' })
+  }
+
+  // Regression: the delete rejection was unhandled, so the dialog stayed with
+  // no message and the failure was silent.
+  it('shows an inline error and keeps the dialog when a delete fails', async () => {
+    scenes.deleteScene.mockRejectedValue(
+      new ApiClientError('That scene could not be deleted.', {
+        status: 500,
+        isNetworkError: false,
+        isTimeout: false,
+        isOffline: false,
+      })
+    )
+
+    const confirm = await openDeleteDialog()
+    await userEvent.click(confirm)
+
+    expect(await screen.findByTestId('scene-delete-error')).toHaveTextContent(
+      'That scene could not be deleted.'
+    )
+    expect(screen.getByRole('button', { name: 'Delete' })).toBeInTheDocument()
+  })
+
+  it('closes the dialog without an error when the scene is already gone', async () => {
+    scenes.deleteScene.mockRejectedValue(
+      new ApiClientError('not found', {
+        status: 404,
+        isNetworkError: false,
+        isTimeout: false,
+        isOffline: false,
+      })
+    )
+
+    const confirm = await openDeleteDialog()
+    await userEvent.click(confirm)
+
+    await waitFor(() =>
+      expect(
+        screen.queryByText(/only the composition is removed/)
+      ).not.toBeInTheDocument()
+    )
+    expect(screen.queryByTestId('scene-delete-error')).not.toBeInTheDocument()
   })
 })

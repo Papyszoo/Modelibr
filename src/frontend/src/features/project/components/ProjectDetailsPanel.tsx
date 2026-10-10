@@ -17,7 +17,10 @@ import { projectDetailsFormSchema } from '@/shared/validation/formSchemas'
 import { type ProjectDetailDto } from '@/types'
 
 import { ProjectProfileSection } from './ProjectProfileSection'
-import { ProjectStudioSection } from './ProjectStudioSection'
+import {
+  type ProjectAssetNames,
+  ProjectStudioSection,
+} from './ProjectStudioSection'
 
 type ProjectDetailsInput = z.input<typeof projectDetailsFormSchema>
 type ProjectDetailsOutput = z.output<typeof projectDetailsFormSchema>
@@ -213,13 +216,27 @@ export function ProjectDetailsPanel({
   const onSave = handleSubmit(values => updateMutation.mutate(values))
   const thumbnailUrl = resolveApiAssetUrl(project.customThumbnailUrl)
 
+  // The project's asset lists, for naming what a comment points at. `sounds` is
+  // read defensively: the API DTO declares only a sound COUNT, while the demo
+  // and seed projects carry the actual list - only a real array is a name source.
+  const assetNames: ProjectAssetNames = {
+    models: project.models,
+    textureSets: project.textureSets,
+    sprites: project.sprites,
+    environmentMaps: project.environmentMaps,
+    vfx: project.vfx,
+    sounds: Array.isArray((project as { sounds?: unknown }).sounds)
+      ? (project as { sounds: { id: number; name: string }[] }).sounds
+      : undefined,
+  }
+
   return (
     <div className="container-rich-details">
       <ProjectStudioSection
         projectId={project.id}
         tabId={tabStateKey}
         onChanged={refetchContainer}
-        assets={project}
+        assets={assetNames}
       />
       <div className="container-rich-layout">
         <div className="container-rich-main">

@@ -25,7 +25,6 @@ export function SceneEditorTab({ sceneId }: { sceneId?: string }): JSX.Element {
   const openScene = useSceneEditorStore(state => state.openScene)
   const close = useSceneEditorStore(state => state.close)
   const discardDraft = useSceneEditorStore(state => state.discardDraft)
-  const storeSceneId = useSceneEditorStore(state => state.sceneId)
   const registerCloseGuard = useTabCloseGuardStore(state => state.register)
 
   const numericId = sceneId ? Number(sceneId) : null
@@ -59,7 +58,7 @@ export function SceneEditorTab({ sceneId }: { sceneId?: string }): JSX.Element {
     return registerCloseGuard(tabId, async () => {
       // A clean scene closes without a question: there is nothing to lose, and
       // asking anyway trains people to click through the dialog.
-      if (!isDirty().isDirty) {
+      if (!isDirty().drafts[numericId]?.isDirty) {
         return 'discard'
       }
 
@@ -97,13 +96,6 @@ export function SceneEditorTab({ sceneId }: { sceneId?: string }): JSX.Element {
     )
   }
 
-  // Until the store points at this scene the editor would paint whichever draft
-  // the previously active tab left behind. One loading frame beats one frame of
-  // the wrong scene.
-  if (storeSceneId !== null && storeSceneId !== numericId) {
-    return <div className="tab-loading">Loading scene…</div>
-  }
-
   return (
     <>
       <SceneEditor
@@ -122,7 +114,7 @@ export function SceneEditorTab({ sceneId }: { sceneId?: string }): JSX.Element {
           // Explicit "I am done with this scene": forget its session and give up
           // the tab, which is what the user was on when they asked. The dirty case
           // never reaches here - the close guard above asks first.
-          close()
+          close(numericId)
           closeTab(tabId)
         }}
       />
