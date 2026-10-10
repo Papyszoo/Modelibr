@@ -56,10 +56,20 @@ Rendering must be offline-safe: local Three.js/Blender, no CDN imports.
 
 ## Puppeteer / RendererPool rules
 
-- One shared browser, one page per pool renderer (= isolated WebGL context per
-  concurrent job). Always `acquire()` / `release()` in try/finally.
+- ONE browser per worker (`browserManager.js`), shared by every renderer family
+  (model / texture-set / environment-map / extraction / scene / vfx). Launch is
+  lazy; a crashed/disconnected browser is relaunched on the next page request;
+  `browserManager.dispose()` closes it on shutdown. Never launch `puppeteer` from
+  a renderer - `import { browserManager }` and take a page from it.
+- A page belongs to a job: opened on first use, closed when the job releases its
+  slot (`RendererPool.release()` / scene+vfx `finally`). Between jobs no WebGL
+  context is held.
+- `MAX_CONCURRENT_RENDER_JOBS` (config `maxConcurrentRenderJobs`, default 1) caps
+  concurrent render jobs worker-wide; `browserManager.acquireSlot()`/`releaseSlot()`
+  enforce it. Renderer-backed processors still `acquire()` / `release()` in
+  try/finally (and arm `_armRendererAbort`).
 - Pages crash (frame detach, OOM on 4K textures). `PuppeteerRenderer` has
-  `isPageUsable()` + `reinitialize()` - check/recover instead of inventing recovery.
+  `_isPageUsable()` + `reinitialize()` - check/recover instead of inventing recovery.
 - The odd launch flags (`--disable-crashpad`, `--crash-dumps-dir=/tmp`, …) are
   load-bearing container fixes - don't remove; macOS uses Metal (swiftshader has
   no WebGL there).

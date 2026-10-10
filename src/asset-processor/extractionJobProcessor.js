@@ -48,7 +48,7 @@ export class ExtractionJobProcessor {
       this.pollHandle = null
     }
     if (this.rendererPool) {
-      await this.rendererPool.shutdown?.()
+      await this.rendererPool.dispose()
       this.rendererPool = null
     }
     this.rendererPoolReady = null

@@ -2001,8 +2001,25 @@ export class PuppeteerRenderer {
   }
 
   /**
+   * Close the job's page, leaving the browser for the next job. Called by
+   * RendererPool.release() so a job's WebGL scene does not outlive its job;
+   * the next use recreates the page through _reinitialize().
+   */
+  async closePage() {
+    if (!this.page) return
+
+    try {
+      await this.page.close()
+    } catch (error) {
+      logger.debug('Error closing renderer page', { error: error.message })
+    }
+    this.page = null
+  }
+
+  /**
    * Clean up resources.
-   * In shared-browser mode, only the page is closed (the browser is managed by RendererPool).
+   * In shared-browser mode, only the page is closed (the browser is managed
+   * worker-wide by browserManager). Standalone renderers still own theirs.
    */
   async dispose() {
     logger.debug('Disposing Puppeteer renderer', {
@@ -2010,10 +2027,7 @@ export class PuppeteerRenderer {
     })
 
     try {
-      if (this.page) {
-        await this.page.close()
-        this.page = null
-      }
+      await this.closePage()
 
       if (this._ownsBrowser && this.browser) {
         await this.browser.close()

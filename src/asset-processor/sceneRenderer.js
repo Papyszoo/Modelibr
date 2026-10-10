@@ -5,11 +5,9 @@
  * as puppeteerRenderer.js.
  */
 /* eslint-disable no-undef */
-import puppeteer from 'puppeteer'
-
 import { config } from './config.js'
 import logger from './logger.js'
-import { PuppeteerRenderer } from './puppeteerRenderer.js'
+import { browserManager } from './browserManager.js'
 
 /**
  * Renders a saved scene by photographing the real application.
@@ -30,20 +28,19 @@ import { PuppeteerRenderer } from './puppeteerRenderer.js'
 export class SceneRenderer {
   /**
    * @param {import('puppeteer').Browser|null} sharedBrowser - Reuse a browser
-   *   from the pool rather than launching one. Scene renders and thumbnail
+   *   from the worker instead of launching one. Scene renders and thumbnail
    *   renders compete for the same GPU/software-WebGL budget, so sharing keeps
    *   that contention in one place.
    */
   constructor(sharedBrowser = null) {
     this.browser = sharedBrowser
-    this._ownsBrowser = !sharedBrowser
+    // An injected browser (tests) is never swapped for the shared one.
+    this._injectedBrowser = Boolean(sharedBrowser)
   }
 
   async initialize() {
     if (!this.browser) {
-      this.browser = await puppeteer.launch(
-        PuppeteerRenderer.getLaunchOptions()
-      )
+      this.browser = await browserManager.getBrowser()
     }
     return true
   }
@@ -79,15 +76,25 @@ export class SceneRenderer {
       await this.initialize()
     }
 
+    if (!this._injectedBrowser) {
+      // The shared browser may have been relaunched after a crash since the
+      // last render; always take the current one.
+      this.browser = await browserManager.getBrowser()
+    }
+
     const url = buildSceneRenderUrl(frontendUrl, {
       sceneId,
       viewpoint,
       apiBaseUrl: config.apiBaseUrl,
     })
-    const page = await this.browser.newPage()
-    const pageErrors = []
+
+    await browserManager.acquireSlot()
+    let page
 
     try {
+      page = await this.browser.newPage()
+      const pageErrors = []
+
       await page.setViewport({ width, height, deviceScaleFactor: 1 })
       page.on('pageerror', error => pageErrors.push(error.message))
 
@@ -161,15 +168,14 @@ export class SceneRenderer {
       // them from config would be guessing right only while nothing overrides them.
       return { image, status, width, height }
     } finally {
-      await page.close().catch(() => {})
+      if (page) await page.close().catch(() => {})
+      browserManager.releaseSlot()
     }
   }
 
   async dispose() {
-    if (this._ownsBrowser && this.browser) {
-      await this.browser.close().catch(() => {})
-    }
-    this.browser = null
+    // The browser is shared worker-wide (browserManager owns it); this renderer
+    // opens a page per job and never holds one between jobs.
   }
 }
 

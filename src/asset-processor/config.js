@@ -13,6 +13,16 @@ export const config = {
 
   // Job processing settings
   maxConcurrentJobs: parseInt(process.env.MAX_CONCURRENT_JOBS || '3', 10),
+  // How many render jobs one worker may run at once. Every render (model,
+  // texture-set, environment-map, extraction, scene, vfx) shares one Chromium
+  // and closes its page when the job ends, so this caps how many live WebGL
+  // contexts the worker holds. Default 1: a worker drives Chromium with one
+  // context no matter how many jobs the queue has in flight, which is what
+  // keeps a large re-queue from ballooning memory. Raise it deliberately.
+  maxConcurrentRenderJobs: Math.max(
+    1,
+    parseInt(process.env.MAX_CONCURRENT_RENDER_JOBS, 10) || 1
+  ),
   jobTimeout: parseInt(process.env.JOB_TIMEOUT_MS) || 300000, // 5 minutes default
   // Poll interval for the decoupled extraction queue (prompt 20 executor).
   extractionPollIntervalMs:

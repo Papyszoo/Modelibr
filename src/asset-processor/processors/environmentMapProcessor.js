@@ -90,7 +90,7 @@ export class EnvironmentMapProcessor extends BaseProcessor {
     } finally {
       disarmAbort()
       if (renderer) {
-        this.rendererPool.release(renderer)
+        await this.rendererPool.release(renderer)
       }
       if (source) {
         await this.environmentMapFileService.cleanupSource(source)

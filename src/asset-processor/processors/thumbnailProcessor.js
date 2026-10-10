@@ -362,7 +362,7 @@ export class ThumbnailProcessor extends BaseProcessor {
     } finally {
       disarmAbort()
       if (renderer) {
-        this.rendererPool.release(renderer)
+        await this.rendererPool.release(renderer)
       }
       if (tempFilePath) {
         await this.modelFileService.cleanupFile(tempFilePath)

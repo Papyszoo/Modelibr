@@ -27,6 +27,7 @@ vi.mock('puppeteer', () => ({
 
 const mockInitialize = vi.fn()
 const mockReinitialize = vi.fn()
+const mockClosePage = vi.fn()
 
 vi.mock('../puppeteerRenderer.js', () => {
   const PuppeteerRenderer = vi.fn(function (sharedBrowser) {
@@ -34,12 +35,14 @@ vi.mock('../puppeteerRenderer.js', () => {
     this.page = { closed: false }
     this.initialize = (...args) => mockInitialize(...args)
     this.reinitialize = (...args) => mockReinitialize(...args)
+    this.closePage = (...args) => mockClosePage(...args)
   })
   PuppeteerRenderer.getLaunchOptions = vi.fn(() => ({}))
   return { PuppeteerRenderer }
 })
 
 const { RendererPool } = await import('../rendererPool.js')
+const { browserManager } = await import('../browserManager.js')
 
 describe('RendererPool.forceReinit', () => {
   beforeEach(() => {
@@ -47,6 +50,13 @@ describe('RendererPool.forceReinit', () => {
     mockLaunch.mockResolvedValue({ close: vi.fn() })
     mockInitialize.mockResolvedValue(true)
     mockReinitialize.mockResolvedValue(undefined)
+    // The browser/slot manager is a worker-wide singleton; start each test
+    // with an empty pool and no held render slot so tests don't leak into one
+    // another (a test that acquires without releasing would block the next).
+    browserManager.browser = null
+    browserManager._launching = null
+    browserManager._active = 0
+    browserManager._waiters = []
   })
 
   it('reinitializes the renderer in place instead of tearing down the whole pool', async () => {
@@ -78,10 +88,20 @@ describe('RendererPool.forceReinit', () => {
 
     const renderer = await pool.acquire()
     await pool.forceReinit(renderer)
-    pool.release(renderer)
+    await pool.release(renderer)
 
     const nextRenderer = await pool.acquire()
     expect(nextRenderer).toBe(renderer)
+  })
+
+  it('closes the job page on release so it does not outlive the job', async () => {
+    const pool = new RendererPool(1)
+    await pool.initialize()
+
+    const renderer = await pool.acquire()
+    await pool.release(renderer)
+
+    expect(mockClosePage).toHaveBeenCalledTimes(1)
   })
 
   it('propagates reinit failures to the caller instead of silently losing the slot', async () => {
