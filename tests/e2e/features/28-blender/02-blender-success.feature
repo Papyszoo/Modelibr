@@ -41,3 +41,12 @@ Feature: Blender operations run for real
         When the agent waits for the operation to finish
         Then the operation should be done
         And the bake should have imported a texture set bound to the model
+
+    Scenario: Baking a rigged blend for web collapses the rig into the new version
+        Given a rigged blend model exists
+        When an agent bakes the rigged blend for web
+        Then the operation should be queued as a job
+        When the agent waits for the operation to finish
+        Then the operation should be done
+        And the operation should have written a new inactive version
+        And the baked version should carry the collapsed rig

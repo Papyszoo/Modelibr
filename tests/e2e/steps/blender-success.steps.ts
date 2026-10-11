@@ -104,6 +104,28 @@ When(
     },
 );
 
+Given("a rigged blend model exists", async ({ page }) => {
+    // rig-web-bake.blend carries an IK chain, a Copy Location constraint, a
+    // driven and an action-keyed shape key, and an Array modifier on the
+    // shape-keyed mesh. A plain conversion drops or breaks every one of them;
+    // only a real bake turns them into keyframes and applied geometry.
+    const filePath = await UniqueFileGenerator.generate("rig-web-bake.blend");
+    const uploaded = await apiHelper.uploadModel(filePath);
+    const versions = await apiHelper.getModelVersions(uploaded.id);
+    getScenarioState(page).setCustom<BlenderSuccessModel>(MODEL_KEY, {
+        id: uploaded.id,
+        name: uploaded.name,
+        versionCount: versions.length,
+    });
+});
+
+When("an agent bakes the rigged blend for web", async ({ page }) => {
+    await queueOperation(page, "convert_model", {
+        format: "glb",
+        bakeForWeb: true,
+    });
+});
+
 Then("the operation should be queued as a job", async ({ page }) => {
     const queued = state<QueuedJob>(page, JOB_KEY);
     expect(typeof queued.jobId).toBe("number");
@@ -199,3 +221,23 @@ Then(
         ).toContain(result.boundToVersionId);
     },
 );
+
+Then("the baked version should carry the collapsed rig", async ({ page }) => {
+    const job = state<any>(page, RESULT_KEY);
+    const result = job.result;
+    expect(result.baked).toBe(true);
+    expect(result.fileName).toMatch(/-web\.glb$/);
+
+    // The counts are the job's own evidence that the real Blender run found the
+    // fixture's rig (IK + constraint + driver + dropped modifier) and collapsed
+    // it, rather than exporting a file that merely looks plausible.
+    const summary = result.bakeSummary;
+    expect(summary, JSON.stringify(job)).toBeTruthy();
+    expect(summary.inspectBefore.ikConstraints).toBeGreaterThan(0);
+    expect(summary.inspectBefore.shapeKeyDrivers).toBeGreaterThan(0);
+    expect(summary.inspectBefore.droppedModifiers.length).toBeGreaterThan(0);
+    expect(summary.poseBaked).toBeGreaterThan(0);
+    expect(summary.driversRemoved).toBeGreaterThan(0);
+    expect(summary.meshesRebuilt).toBeGreaterThan(0);
+    expect(summary.modifiersApplied).toBeGreaterThan(0);
+});

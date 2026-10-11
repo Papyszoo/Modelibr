@@ -136,7 +136,7 @@ of truth for what a change means:
 | `generate_uvs`              | Unwrap a model with Blender and store the result as a **new, inactive version** - the uploaded file is never touched. Returns a job id; collect it with `get_job_status`.                                                                                                                                                                                                                  |
 | `bake_textures`             | Bake a model's own appearance and geometry into texture maps with Blender, imported as a texture set bound to it. Returns a job id; collect it with `get_job_status`.                                                                                                                                                                                                                      |
 | `analyze_meshes`            | Measure a model with Blender - UV overlap, texel density, surface area (world-space on the job, local-space in the shared cache), watertightness. Changes nothing. Returns a job id; collect it with `get_job_status`.                                                                                                                                                                     |
-| `convert_model`             | Convert a model to another format with Blender - `glb`, `fbx` or `stl` - written as a **new, inactive version**. `gltf` and `obj` are refused: each keeps part of itself in a sidecar file and a version holds one. Returns a job id; collect it with `get_job_status`.                                                                                                                    |
+| `convert_model`             | Convert a model to another format with Blender - `glb`, `fbx` or `stl` - written as a **new, inactive version**. `gltf` and `obj` are refused: each keeps part of itself in a sidecar file and a version holds one. `bakeForWeb` collapses a `.blend`'s rig (constraints, drivers, shape-key animation, modifiers glTF drops) into keyframes first, written as a `-web` version. Returns a job id; collect it with `get_job_status`.                                                                                                                    |
 | `import_model`              | Import a model. Pass a `path` the **server** can read for a co-located import; omit `path` to get an upload ticket plus the HTTP endpoints to stream bytes to when the agent is remote.                                                                                                                                                                                                    |
 | `import_store_asset`        | Pull a **free** asset from the companion Asset Store into the library. Returns a job id; collect it with `get_store_import`.                                                                                                                                                                                                                                                               |
 | `set_asset_metadata`        | Merge schema fields onto an asset - licence, author, credit, style, theme, source - for **any** family. A field you omit is left alone; a field set to `null` is cleared. The call resolves where each field lives, so a caller names fields rather than families.                                                                                                                         |
@@ -607,7 +607,18 @@ had is a legitimate thing to want - it just has to say so.
 Only one conversion of a version runs at a time. Asking for the same target twice hands
 back the same job; asking for a **different** target while one is in flight is refused
 rather than deduplicated, because the two produce different files and returning the live
-job's id would hand you a format you did not ask for.
+job's id would hand you a format you did not ask for. A baked conversion and a plain one
+are two such different results, so they do not dedupe into each other either.
+
+`bakeForWeb: true` is for `.blend` sources whose rig a web viewer would otherwise lose: IK
+and other constraints, drivers, shape-key drivers, and modifiers stacked on a shape-keyed
+mesh (an Array on a morph-targeted mesh is dropped even by exports that apply modifiers).
+The bake collapses all of it into plain keyframes and applied geometry before exporting,
+and the new version is named `<name>-web.<format>` so the web copy is obvious. Only `glb`
+and `fbx` accept it; `stl` is refused, because a bake written into a geometry-only format
+would be dropped on the way out. The job result carries `baked: true` and a `bakeSummary`
+with the counts (what was found, what was collapsed), which is the honest record of what
+the viewer can now play.
 
 **What may be cached is what the geometry hash actually determines, and that is a shorter
 list than it looks.** The compute cache is keyed by that hash, which is computed from

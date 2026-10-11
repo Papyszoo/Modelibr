@@ -33,4 +33,32 @@ public class SceneGraphRollupsDtoTests
         Assert.Equal(1, clip.DurationSeconds);
         Assert.Equal(new[] { "skeletal" }, clip.Kinds);
     }
+
+    [Fact]
+    public void Deserialize_WhenWorkerSendsUnbakedRig_BindsTheCounts()
+    {
+        const string json = """
+        {
+          "meshCount": 1,
+          "unbakedRig": {
+            "objectConstraints": 1,
+            "boneConstraints": 1,
+            "ikConstraints": 1,
+            "shapeKeyDrivers": 1,
+            "shapeKeyActions": 1,
+            "droppedModifiers": ["Morph:Array (ARRAY)"],
+            "hasRigFeatures": true
+          }
+        }
+        """;
+
+        var rollups = JsonSerializer.Deserialize<SceneGraphRollupsDto>(
+            json, new JsonSerializerOptions(JsonSerializerDefaults.Web));
+
+        Assert.NotNull(rollups?.UnbakedRig);
+        Assert.Equal(1, rollups!.UnbakedRig!.ObjectConstraints);
+        Assert.Equal(1, rollups.UnbakedRig.IkConstraints);
+        Assert.Equal(new[] { "Morph:Array (ARRAY)" }, rollups.UnbakedRig.DroppedModifiers);
+        Assert.True(rollups.UnbakedRig.HasRigFeatures);
+    }
 }

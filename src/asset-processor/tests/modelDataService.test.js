@@ -183,9 +183,28 @@ describe('ModelDataService.saveSceneGraph', () => {
       animationCount: 1,
       animationNames: ['Wave'],
       animations: [{ name: 'Wave', durationSeconds: 1, kinds: ['skeletal'] }],
+      // Only a .blend source gets one, and only when web_bake.inspect() found
+      // something a plain conversion cannot run.
+      unbakedRig: {
+        objectConstraints: 1,
+        boneConstraints: 1,
+        ikConstraints: 1,
+        objectDrivers: 0,
+        armatureDrivers: 0,
+        shapeKeyDrivers: 1,
+        shapeKeyActions: 1,
+        droppedModifiers: ['Morph:Array (ARRAY)'],
+        hasRigFeatures: true,
+      },
       referencedImages: { resolvedCount: 0, unresolved: [] },
     },
-    warnings: [],
+    // The plain-language line attachUnbakedRigReport() adds beside the counts;
+    // it must travel to the stored payload with them.
+    warnings: [
+      'This .blend source carries rig features the web viewer cannot run ' +
+        '(2 constraints, 1 driver, 1 modifier glTF would drop). Bake for web ' +
+        'writes them into the mesh; without it the rig arrives frozen or broken.',
+    ],
   }
 
   it('PUTs to the version scene-graph endpoint with the mapped contract', async () => {
@@ -214,6 +233,26 @@ describe('ModelDataService.saveSceneGraph', () => {
     expect(body.rollups.animations).toEqual([
       { name: 'Wave', durationSeconds: 1, kinds: ['skeletal'] },
     ])
+    // The unbaked-rig counts travel too; the stored raw payload is where the
+    // viewer reads them from.
+    expect(body.rollups.unbakedRig).toEqual(sceneGraph.rollups.unbakedRig)
+    // And the warning line attached beside them.
+    expect(body.warnings).toEqual(sceneGraph.warnings)
+  })
+
+  it('sends a null unbakedRig when the extractor reported none', async () => {
+    // Every non-.blend source, and a .blend with nothing to warn about. The key
+    // is still sent so the server's binding never treats "absent" as unknown.
+    const withoutRig = {
+      ...sceneGraph,
+      rollups: { ...sceneGraph.rollups },
+    }
+    delete withoutRig.rollups.unbakedRig
+
+    await service.saveSceneGraph(42, 'a'.repeat(64), withoutRig)
+
+    const [, body] = putSpy.mock.calls[0]
+    expect(body.rollups.unbakedRig).toBeNull()
   })
 
   it('returns false when the request fails, without throwing', async () => {

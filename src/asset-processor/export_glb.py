@@ -3,11 +3,19 @@ Blender headless script to export the active scene as GLB.
 
 Usage:
     blender -b input.blend --python-exit-code 1 -P export_glb.py -- output.glb
+
+Also prints one machine-readable line about the rig features the export cannot
+carry, so the thumbnail pipeline can flag a .blend source that needs a web bake:
+
+    EXPORT_GLB_REPORT: {"objectConstraints":0,"boneConstraints":1,...}
 """
 
+import json
 import os
 import sys
 import bpy
+
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "blender"))
 
 
 def fail(message):
@@ -36,6 +44,18 @@ def ensure_gltf_addon():
         fail(f"Could not enable the glTF exporter addon: {exc}")
     if not hasattr(bpy.ops.export_scene, "gltf"):
         fail("glTF exporter operator (export_scene.gltf) is unavailable in this Blender build.")
+
+
+def print_rig_report():
+    """One REPORT line with the counts web_bake found; never fatal for the export."""
+    try:
+        import web_bake
+
+        report = web_bake.inspect()
+    except Exception as exc:  # noqa: BLE001
+        report = {"error": f"Rig inspection failed: {exc}"}
+        print(f"export_glb: rig inspection failed ({exc})", flush=True)
+    print(f"EXPORT_GLB_REPORT: {json.dumps(report)}", flush=True)
 
 
 def main():
@@ -69,6 +89,8 @@ def main():
     if not exportable:
         fail("Loaded .blend has no exportable geometry in the active scene "
              "(no MESH/CURVE/SURFACE/META/FONT/GPENCIL objects) - nothing to export.")
+
+    print_rig_report()
 
     ensure_gltf_addon()
 

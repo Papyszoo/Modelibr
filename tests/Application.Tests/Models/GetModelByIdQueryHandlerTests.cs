@@ -83,5 +83,47 @@ public class GetModelByIdQueryHandlerTests
         Assert.True(result.IsSuccess);
         Assert.Empty(result.Value.Model.TechnicalMetadata.Animations);
         Assert.Empty(result.Value.Model.TechnicalMetadata.ShapeKeys);
+        Assert.Null(result.Value.Model.TechnicalMetadata.UnbakedRig);
+    }
+
+    [Fact]
+    public async Task Handle_WhenRawPayloadCarriesAnUnbakedRig_TechnicalMetadataExposesIt()
+    {
+        // The .blend source's scene-graph row carries web_bake.inspect()'s counts;
+        // the viewer reads them from here to decide whether to warn.
+        var model = ModelWithLatestVersion(7, 11);
+        _models.Setup(r => r.GetByIdAsync(7, It.IsAny<CancellationToken>())).ReturnsAsync(model);
+
+        const string payload = """
+        {
+          "Rollups": {
+            "UnbakedRig": {
+              "ObjectConstraints": 1,
+              "BoneConstraints": 1,
+              "IkConstraints": 1,
+              "ShapeKeyDrivers": 1,
+              "ShapeKeyActions": 1,
+              "DroppedModifiers": ["Morph:Array (ARRAY)"],
+              "HasRigFeatures": true
+            }
+          }
+        }
+        """;
+        _extractions
+            .Setup(r => r.GetLatestForAssetAsync("Model", 7, 11, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(AssetExtraction.Create("Model", 7, 11, ModelHash, payload, 1, 1, DateTime.UtcNow));
+
+        var result = await _handler.Handle(new GetModelByIdQuery(7), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        var rig = result.Value.Model.TechnicalMetadata.UnbakedRig;
+        Assert.NotNull(rig);
+        Assert.True(rig!.HasRigFeatures);
+        Assert.Equal(1, rig.ObjectConstraints);
+        Assert.Equal(1, rig.BoneConstraints);
+        Assert.Equal(1, rig.IkConstraints);
+        Assert.Equal(1, rig.ShapeKeyDrivers);
+        Assert.Equal(1, rig.ShapeKeyActions);
+        Assert.Equal(new[] { "Morph:Array (ARRAY)" }, rig.DroppedModifiers);
     }
 }

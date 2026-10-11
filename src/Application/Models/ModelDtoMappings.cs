@@ -62,6 +62,7 @@ internal static class ModelDtoMappings
             BoneCount = version?.BoneCount,
             Animations = animationMetadata?.Animations ?? Array.Empty<ModelAnimationDto>(),
             ShapeKeys = animationMetadata?.ShapeKeys ?? Array.Empty<ModelShapeKeysDto>(),
+            UnbakedRig = animationMetadata?.UnbakedRig,
             UpdatedAt = version?.TechnicalDetailsUpdatedAt
         };
     }
@@ -114,6 +115,15 @@ public record ModelTechnicalMetadataDto
     /// </summary>
     public IReadOnlyList<ModelShapeKeysDto> ShapeKeys { get; init; } = Array.Empty<ModelShapeKeysDto>();
 
+    /// <summary>
+    /// The rig features a .blend source carries that the web viewer cannot run
+    /// (constraints, drivers, shape-key animation, modifiers glTF would drop), from
+    /// the worker's scene-graph walk. Null for sources with none and for every
+    /// non-.blend source: the viewer warns and offers "Bake for web" only when this
+    /// is present.
+    /// </summary>
+    public ModelUnbakedRigDto? UnbakedRig { get; init; }
+
     public DateTime? UpdatedAt { get; init; }
 }
 
@@ -137,6 +147,28 @@ public sealed record ModelShapeKeysDto
 {
     public string MeshName { get; init; } = string.Empty;
     public IReadOnlyList<string> Names { get; init; } = Array.Empty<string>();
+}
+
+/// <summary>
+/// The rig features a .blend source carries that the web viewer cannot run, from
+/// the worker's <c>web_bake.inspect()</c>: constraints (IK among them), drivers,
+/// shape-key animation and modifiers glTF would drop. Present only when at least
+/// one of them is non-zero.
+/// </summary>
+public sealed record ModelUnbakedRigDto
+{
+    public int ObjectConstraints { get; init; }
+    public int BoneConstraints { get; init; }
+    public int IkConstraints { get; init; }
+    public int ObjectDrivers { get; init; }
+    public int ArmatureDrivers { get; init; }
+    public int ShapeKeyDrivers { get; init; }
+    public int ShapeKeyActions { get; init; }
+
+    /// <summary>The modifiers glTF would drop, named `object:modifier (TYPE)`.</summary>
+    public IReadOnlyList<string> DroppedModifiers { get; init; } = Array.Empty<string>();
+
+    public bool HasRigFeatures { get; init; }
 }
 
 /// <summary>

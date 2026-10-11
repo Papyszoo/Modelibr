@@ -382,8 +382,18 @@ public static class BlenderOperationSpecs
     };
 
     /// <summary>
-    /// The single target format a conversion writes.
+    /// The single target format a conversion writes, plus the one modifier that changes
+    /// WHAT the file is: a bake.
     /// </summary>
+    /// <remarks>
+    /// <c>bake</c> collapses the rig features a web viewer cannot run (IK and other
+    /// constraints, drivers, shape-key animation, modifiers stacked on shape-keyed meshes)
+    /// into keyframes and applied geometry before export. It only exists for glb and fbx;
+    /// STL carries geometry only, so the bake would be dropped on the way out and asking
+    /// for it is refused with that reason. The normalized blob always carries the flag, so
+    /// two conversions of one version are only the same result when their bake state
+    /// matches.
+    /// </remarks>
     private static Result<string> NormalizeConvertFormat(JsonObject supplied)
     {
         if (!TryReadString(supplied, "format", out var formatStr))
@@ -416,10 +426,32 @@ public static class BlenderOperationSpecs
                 $"Unknown target format '{format}'. Convertible to: {string.Join(", ", ConvertTargets.Keys.Order())}."));
         }
 
-        return Result.Success(new JsonObject { ["format"] = format }.ToJsonString());
+        if (!TryReadBool(supplied, "bake", false, out var bake))
+        {
+            return Result.Failure<string>(new Error(
+                "Blender.InvalidParameters", "bake must be a boolean."));
+        }
+
+        if (bake && format == "stl")
+        {
+            return Result.Failure<string>(new Error(
+                "Blender.InvalidParameters",
+                "Cannot bake to 'stl': STL carries geometry only, so a baked rig (constraints, " +
+                "drivers, shape keys, applied modifiers) would be dropped on the way out. Bake to glb or fbx."));
+        }
+
+        return Result.Success(new JsonObject
+        {
+            ["format"] = format,
+            ["bake"] = bake
+        }.ToJsonString());
     }
 
-    /// <summary>The target format a stored convert-format parameter blob asks for.</summary>
+    /// <summary>
+    /// The target a stored convert-format parameter blob asks for, bake included: a
+    /// "glb" and a "glb baked for web" are two different results, so the dedup comparison
+    /// must tell them apart.
+    /// </summary>
     /// <remarks>
     /// Reads a blob this validator did not necessarily write. Before <c>convert-format</c>
     /// had a case above it fell through to "store the caller's JSON verbatim", so a row
@@ -427,16 +459,29 @@ public static class BlenderOperationSpecs
     /// The kind is therefore checked rather than the value being asked for: <c>GetValue</c>
     /// on a number throws <c>InvalidOperationException</c>, which is not a
     /// <c>JsonException</c> and would have left the handler instead of returning null.
+    /// <c>bake</c> is optional (rows written before it existed do not carry it, and mean
+    /// "not baked"), but a present value that is not a boolean reads as unreadable rather
+    /// than being guessed at.
     /// </remarks>
     public static string? ConvertTarget(string? parametersJson)
     {
         if (string.IsNullOrWhiteSpace(parametersJson)) return null;
         try
         {
-            var format = (JsonNode.Parse(parametersJson) as JsonObject)?["format"];
-            return format?.GetValueKind() == JsonValueKind.String
-                ? format.GetValue<string>()
-                : null;
+            if (JsonNode.Parse(parametersJson) is not JsonObject parameters) return null;
+
+            var format = parameters["format"];
+            if (format?.GetValueKind() != JsonValueKind.String) return null;
+            var target = format.GetValue<string>();
+
+            if (parameters.TryGetPropertyValue("bake", out var bake) && bake is not null)
+            {
+                var kind = bake.GetValueKind();
+                if (kind is not (JsonValueKind.True or JsonValueKind.False)) return null;
+                if (bake.GetValue<bool>()) return $"{target} baked for web";
+            }
+
+            return target;
         }
         catch (JsonException)
         {

@@ -24,6 +24,7 @@ import { getModelFileFormat } from '@/utils/fileUtils'
 
 import { useModelAnimationController } from '../animation/ModelAnimationContext'
 import { ModelAnimationPanel } from './ModelAnimationPanel'
+import { UnbakedRigWarning } from './UnbakedRigWarning'
 
 // Source units differ per format (glTF is meters, FBX/OBJ vary by DCC tool),
 // so dimensions are shown unitless.
@@ -235,6 +236,11 @@ export function ModelInfo({ model, onModelUpdated }) {
             </div>
           </div>
         </div>
+
+        <UnbakedRigWarning
+          modelId={Number(model.id)}
+          unbakedRig={technicalMetadata.unbakedRig}
+        />
 
         {animationController && (
           <ModelAnimationPanel controller={animationController} />

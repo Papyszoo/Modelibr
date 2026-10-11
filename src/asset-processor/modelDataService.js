@@ -445,6 +445,9 @@ export class ModelDataService {
           // Per-clip {name, durationSeconds, kinds} from the shared scene-graph
           // walk, so the stored raw payload can answer what each clip moves.
           animations: sceneGraph.rollups.animations ?? [],
+          // Present only for a .blend source whose rig a plain web conversion
+          // cannot carry (web_bake.inspect()'s counts); null for everything else.
+          unbakedRig: sceneGraph.rollups.unbakedRig ?? null,
         },
         parts: sceneGraph.parts.map(p => ({
           partPath: p.partPath,

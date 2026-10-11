@@ -30,6 +30,26 @@ export interface ModelShapeKeysDto {
   names: string[]
 }
 
+/**
+ * The rig features a .blend source carries that a plain glTF export cannot
+ * carry (constraints, IK, drivers, shape-key animation, modifiers glTF would
+ * drop), from the worker's scene-graph walk. Present on the technical metadata
+ * only when at least one is non-zero; `hasRigFeatures` is the summary the
+ * viewer warns on.
+ */
+export interface ModelUnbakedRigDto {
+  objectConstraints: number
+  boneConstraints: number
+  ikConstraints: number
+  objectDrivers: number
+  armatureDrivers: number
+  shapeKeyDrivers: number
+  shapeKeyActions: number
+  /** The modifiers glTF would drop, named `object:modifier (TYPE)`. */
+  droppedModifiers: string[]
+  hasRigFeatures: boolean
+}
+
 export interface ModelTechnicalMetadataDto {
   latestVersionId?: number | null
   latestVersionNumber?: number | null
@@ -47,6 +67,11 @@ export interface ModelTechnicalMetadataDto {
   /** Shape-key names per mesh when the extraction recorded them; may be empty. */
   shapeKeys?: ModelShapeKeysDto[]
   boneCount?: number | null
+  /**
+   * Rig features the web viewer cannot run, from a .blend source. Null (or
+   * absent) for every non-.blend source and for sources with no rig features.
+   */
+  unbakedRig?: ModelUnbakedRigDto | null
   updatedAt?: string | null
 }
 

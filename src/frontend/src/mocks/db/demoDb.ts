@@ -58,6 +58,18 @@ export interface DemoConceptImage {
   mimeType?: string
 }
 
+export interface DemoUnbakedRig {
+  objectConstraints: number
+  boneConstraints: number
+  ikConstraints: number
+  objectDrivers: number
+  armatureDrivers: number
+  shapeKeyDrivers: number
+  shapeKeyActions: number
+  droppedModifiers: string[]
+  hasRigFeatures: boolean
+}
+
 export interface DemoModelVersion {
   id: number
   modelId: number
@@ -75,6 +87,12 @@ export interface DemoModelVersion {
   animationCount?: number | null
   animationNames?: string[]
   boneCount?: number | null
+  /**
+   * Rig features a .blend source carries that the web viewer cannot run, as the
+   * backend's `unbakedRig` rollup. Present only on the demo's stand-in for a
+   * rigged .blend source; every other demo version leaves it off.
+   */
+  unbakedRig?: DemoUnbakedRig | null
   /** UV layout, as the search projection classifies it. See `@/shared/types/uvStatus`. */
   uvStatus?: UvStatus | null
   technicalDetailsUpdatedAt?: string | null
@@ -964,6 +982,20 @@ export async function seedIfEmpty(): Promise<void> {
       animationCount: 2,
       animationNames: ['Idle', 'Walk'],
       boneCount: 18,
+      // Demo stand-in for a rigged .blend source. The real pipeline only emits
+      // this for .blend files; the demo file cannot be one (the browser cannot
+      // render it), so the rig counts are carried on this version by hand.
+      unbakedRig: {
+        objectConstraints: 1,
+        boneConstraints: 1,
+        ikConstraints: 1,
+        objectDrivers: 0,
+        armatureDrivers: 0,
+        shapeKeyDrivers: 1,
+        shapeKeyActions: 1,
+        droppedModifiers: ['Morph:Array (ARRAY)'],
+        hasRigFeatures: true,
+      },
       technicalDetailsUpdatedAt: now,
       thumbnailUrl: null,
       pngThumbnailUrl: null,

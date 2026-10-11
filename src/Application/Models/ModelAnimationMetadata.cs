@@ -3,15 +3,15 @@ using System.Text.Json;
 namespace Application.Models;
 
 /// <summary>
-/// The clip and shape-key metadata inside a model's raw extraction payload.
+/// The clip, shape-key and unbaked-rig metadata inside a model's raw extraction payload.
 ///
 /// <para>
 /// Two payload shapes carry it, written by two different commands, and both are read
 /// here: the flat technical-metadata payload with top-level <c>animations</c> and
 /// <c>shapeKeys</c> (<see cref="UpdateTechnicalMetadataCommand"/>), and the verbatim
-/// scene-graph payload with <c>rollups.animations</c> plus each part's
-/// <c>detail.shapeKeys</c> (<c>ImportModelSceneGraphCommand</c> - which owns the raw
-/// row whenever it runs, so its shape is the usual one).
+/// scene-graph payload with <c>rollups.animations</c> plus <c>rollups.unbakedRig</c> and
+/// each part's <c>detail.shapeKeys</c> (<c>ImportModelSceneGraphCommand</c> - which owns
+/// the raw row whenever it runs, so its shape is the usual one).
 /// </para>
 ///
 /// <para>
@@ -22,11 +22,13 @@ namespace Application.Models;
 /// </summary>
 internal sealed record ModelAnimationMetadata(
     IReadOnlyList<ModelAnimationDto> Animations,
-    IReadOnlyList<ModelShapeKeysDto> ShapeKeys)
+    IReadOnlyList<ModelShapeKeysDto> ShapeKeys,
+    ModelUnbakedRigDto? UnbakedRig)
 {
     public static readonly ModelAnimationMetadata Empty = new(
         Array.Empty<ModelAnimationDto>(),
-        Array.Empty<ModelShapeKeysDto>());
+        Array.Empty<ModelShapeKeysDto>(),
+        null);
 
     /// <summary>
     /// Reads the clip/shape-key metadata out of a raw extraction payload, whichever
@@ -60,7 +62,16 @@ internal sealed record ModelAnimationMetadata(
                 shapeKeys = ReadPartShapeKeys(partsElement);
             }
 
-            return new ModelAnimationMetadata(animations, shapeKeys);
+            // The unbaked-rig counts ride inside the scene-graph payload's rollups;
+            // a flat payload would carry them at the top level, so read both.
+            JsonElement? rigElement = null;
+            if (Property(root, "rollups") is { } rigRollups)
+            {
+                rigElement = Property(rigRollups, "unbakedRig");
+            }
+            rigElement ??= Property(root, "unbakedRig");
+
+            return new ModelAnimationMetadata(animations, shapeKeys, ReadUnbakedRig(rigElement));
         }
         catch (JsonException)
         {
@@ -145,8 +156,7 @@ internal sealed record ModelAnimationMetadata(
     }
 
     /// <summary>The scene-graph payload's parts: mesh name + `detail.shapeKeys`.</summary>
-    private static IReadOnlyList<ModelShapeKeysDto> ReadPartShapeKeys(JsonElement parts)
-    {
+    private static IReadOnlyList<ModelShapeKeysDto> ReadPartShapeKeys(JsonElement parts)    {
         if (parts.ValueKind != JsonValueKind.Array)
         {
             return Array.Empty<ModelShapeKeysDto>();
@@ -182,6 +192,45 @@ internal sealed record ModelAnimationMetadata(
         return result;
     }
 
+    /// <summary>
+    /// The scene-graph payload's `rollups.unbakedRig` (or a flat payload's
+    /// `unbakedRig`): counts of the rig features a plain web conversion cannot
+    /// carry. Null when absent, of the wrong kind, or when nothing it reports
+    /// would need a bake - a payload with every count at zero is "no warning",
+    /// not an object with zeroes.
+    /// </summary>
+    private static ModelUnbakedRigDto? ReadUnbakedRig(JsonElement? element)
+    {
+        if (element is null || element.Value.ValueKind != JsonValueKind.Object)
+        {
+            return null;
+        }
+
+        var rig = element.Value;
+        var dto = new ModelUnbakedRigDto
+        {
+            ObjectConstraints = IntValue(rig, "objectConstraints") ?? 0,
+            BoneConstraints = IntValue(rig, "boneConstraints") ?? 0,
+            IkConstraints = IntValue(rig, "ikConstraints") ?? 0,
+            ObjectDrivers = IntValue(rig, "objectDrivers") ?? 0,
+            ArmatureDrivers = IntValue(rig, "armatureDrivers") ?? 0,
+            ShapeKeyDrivers = IntValue(rig, "shapeKeyDrivers") ?? 0,
+            ShapeKeyActions = IntValue(rig, "shapeKeyActions") ?? 0,
+            DroppedModifiers = StringArray(rig, "droppedModifiers"),
+        };
+
+        var hasFeatures = BoolValue(rig, "hasRigFeatures") == true
+            || dto.ObjectConstraints > 0
+            || dto.BoneConstraints > 0
+            || dto.ObjectDrivers > 0
+            || dto.ArmatureDrivers > 0
+            || dto.ShapeKeyDrivers > 0
+            || dto.ShapeKeyActions > 0
+            || dto.DroppedModifiers.Count > 0;
+
+        return hasFeatures ? dto with { HasRigFeatures = true } : null;
+    }
+
     private static string WhiteSpaceToEmpty(string? value) =>
         string.IsNullOrWhiteSpace(value) ? string.Empty : value.Trim();
 
@@ -214,6 +263,28 @@ internal sealed record ModelAnimationMetadata(
     {
         var value = Property(element, name);
         return value is { } number && number.TryGetDouble(out var parsed) ? parsed : null;
+    }
+
+    private static int? IntValue(JsonElement element, string name)
+    {
+        var value = Property(element, name);
+        return value is { } number && number.TryGetInt32(out var parsed) ? parsed : null;
+    }
+
+    private static bool? BoolValue(JsonElement element, string name)
+    {
+        var value = Property(element, name);
+        if (value is not { } flag)
+        {
+            return null;
+        }
+
+        return flag.ValueKind switch
+        {
+            JsonValueKind.True => true,
+            JsonValueKind.False => false,
+            _ => null,
+        };
     }
 
     private static List<string> StringArray(JsonElement element, string name)

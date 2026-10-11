@@ -257,6 +257,11 @@ export class BlenderOperationProcessor {
    * the new version is NOT made active - promoting it would change what every scene
    * referencing this model renders, on the strength of a conversion nobody has looked at.
    *
+   * `bake` tells Blender to collapse the rig features a future viewer cannot run (IK and
+   * other constraints, drivers, shape-key drivers, modifiers stacked on shape-keyed
+   * meshes) into keyframes and applied geometry before the export. The result is named
+   * "-web" and its job result carries the bake's counts.
+   *
    * The target is always a single-file format. The version this writes holds one file, so a
    * `.gltf` (geometry in a sidecar .bin) or an `.obj` (materials in a sidecar .mtl) would
    * arrive stripped; the backend validator refuses both and says which single-file format to
@@ -265,6 +270,7 @@ export class BlenderOperationProcessor {
   async convert(job, jobLogger) {
     const parameters = this.parameters(job)
     const format = parameters.format
+    const bake = parameters.bake === true
     // Checked against the list rather than for presence, because this value goes into a
     // filesystem path below. The backend validator is the only writer of a job's parameters
     // and it normalises to exactly these three - but a path built out of queue data should
@@ -299,12 +305,15 @@ export class BlenderOperationProcessor {
           outputPath,
           '--format',
           format,
+          ...(bake ? ['--bake'] : []),
         ],
         'CONVERT_FORMAT',
         jobLogger
       )
 
-      const fileName = this.convertedFileName(source.originalFileName, format)
+      const fileName = bake
+        ? this.webBakedFileName(source.originalFileName, format)
+        : this.convertedFileName(source.originalFileName, format)
       // Creating the version raises ModelUploadedEvent, so the converted file is
       // thumbnailed and indexed by the ordinary upload pass - nothing here touches
       // search or thumbnails directly.
@@ -312,7 +321,9 @@ export class BlenderOperationProcessor {
         job.assetId,
         outputPath,
         fileName,
-        `Converted to ${format.toUpperCase()} with Blender from version ${job.versionId}.`,
+        bake
+          ? `Baked for web with Blender from version ${job.versionId} (${format.toUpperCase()}).`
+          : `Converted to ${format.toUpperCase()} with Blender from version ${job.versionId}.`,
         false
       )
 
@@ -331,6 +342,8 @@ export class BlenderOperationProcessor {
           meshCount: result.meshCount,
           inputSizeBytes: result.inputSizeBytes,
           outputSizeBytes: result.outputSizeBytes,
+          baked: bake,
+          bakeSummary: result.baked ?? null,
           note: 'Written as a new, inactive version. Review it, then set it active to use it.',
         },
       }
@@ -774,6 +787,21 @@ export class BlenderOperationProcessor {
       )
       .trim()
     return `${base || 'model'}.${format}`
+  }
+
+  /**
+   * Names a baked-for-web conversion. The "-web" suffix says the file is not just a
+   * recased copy of the source: its rig was collapsed into keyframes so a web viewer can
+   * play it. The extension follows the target, so a baked GLB is `chair-web.glb`.
+   */
+  webBakedFileName(originalFileName, format) {
+    const base = path
+      .basename(
+        originalFileName || 'model',
+        path.extname(originalFileName || '')
+      )
+      .trim()
+    return `${base || 'model'}-web.${format}`
   }
 
   versionDescription(job, parameters) {

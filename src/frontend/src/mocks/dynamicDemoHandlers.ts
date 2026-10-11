@@ -1365,6 +1365,32 @@ export const dynamicDemoHandlers = [
     })
   }),
 
+  // Blender operations (uv-unwrap, bake-textures, convert-format, mesh-analysis).
+  // The demo has no Blender installed (see `settings/blender-enabled`), so this
+  // answers exactly as the backend does for that state: 409 Blender.NotAvailable.
+  // The UI keeps "Bake for web" disabled in that state, so reaching here means
+  // something bypassed it; "not available" is still the honest answer.
+  http.post('*/models/:modelId/blender/:operation', async ({ params }) => {
+    const model = await getById('models', Number(params.modelId))
+    if (!model) {
+      return HttpResponse.json(
+        {
+          error: 'Blender.ModelNotFound',
+          message: `Model ${params.modelId} was not found.`,
+        },
+        { status: 404 }
+      )
+    }
+    return HttpResponse.json(
+      {
+        error: 'Blender.NotAvailable',
+        message:
+          'Blender is not installed or is disabled. Install a Blender version in Settings, then ask again.',
+      },
+      { status: 409 }
+    )
+  }),
+
   // Regenerate thumbnail
   http.post('*/models/:id/thumbnail/regenerate', async ({ params }) => {
     const model = await getById('models', Number(params.id))

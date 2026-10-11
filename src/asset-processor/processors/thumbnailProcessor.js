@@ -48,6 +48,9 @@ export class ThumbnailProcessor extends BaseProcessor {
     let texturePaths = null
     let renderer = null
     let disarmAbort = () => {}
+    // web_bake.inspect()'s counts from the .blend-to-GLB export, when there was one.
+    // Attached to the scene graph below so the viewer can offer "Bake for web".
+    let blendRigReport = null
 
     try {
       jobLogger.info('Starting model processing', {
@@ -114,7 +117,10 @@ export class ThumbnailProcessor extends BaseProcessor {
           // Blender-specific "killed by SIGTERM" message wins cleanly instead
           // of racing the outer job timeout; emulated linux-x64 Blender on
           // Apple Silicon still gets ~4 min, which covers typical scenes.
-          execFileSync(
+          // The stdout is kept: export_glb.py reports the source rig's unbaked
+          // features on an EXPORT_GLB_REPORT line, and dropping it here is why
+          // the viewer would never learn the .blend needs a web bake.
+          const blenderStdout = execFileSync(
             blenderPath,
             [
               '-b',
@@ -128,6 +134,7 @@ export class ThumbnailProcessor extends BaseProcessor {
             ],
             { timeout: 240000, stdio: ['pipe', 'pipe', 'pipe'] }
           )
+          blendRigReport = this.parseRigReport(blenderStdout)
         } catch (blenderError) {
           const stderr = blenderError.stderr?.toString() || ''
           const stdout = blenderError.stdout?.toString() || ''
@@ -261,6 +268,7 @@ export class ThumbnailProcessor extends BaseProcessor {
       try {
         const sceneGraph = await renderer.extractSceneGraph()
         if (sceneGraph && job.modelHash) {
+          this.attachUnbakedRigReport(sceneGraph, blendRigReport)
           await this.modelDataService.saveSceneGraph(
             job.modelVersionId,
             job.modelHash,
@@ -374,6 +382,71 @@ export class ThumbnailProcessor extends BaseProcessor {
         await this.modelDataService.cleanupTextureFiles(texturePaths)
       }
     }
+  }
+
+  /**
+   * Read export_glb.py's EXPORT_GLB_REPORT line out of its stdout.
+   *
+   * The line is web_bake.inspect()'s counts: what a .blend carries that a plain
+   * GLB conversion cannot run. Returns null when the export did not print one
+   * (a non-.blend run, or an older script); the report itself may carry an
+   * `error` field when the inspection failed - callers ignore both.
+   */
+  parseRigReport(output) {
+    if (!output) return null
+    const line = String(output)
+      .split('\n')
+      .findLast(line => line.includes('EXPORT_GLB_REPORT:'))
+    if (!line) return null
+    try {
+      return JSON.parse(line.split('EXPORT_GLB_REPORT:')[1].trim())
+    } catch {
+      return null
+    }
+  }
+
+  /**
+   * Put the rig report on the scene graph the viewer reads: the counts under
+   * rollups.unbakedRig and a plain-language warning line beside them.
+   *
+   * Only meaningful for a .blend source with at least one feature a plain
+   * conversion cannot carry; anything else (no report, an inspection error, all
+   * counts zero) leaves the payload untouched.
+   */
+  attachUnbakedRigReport(sceneGraph, report) {
+    if (!report || report.error || !report.hasRigFeatures) return false
+    if (!sceneGraph.rollups) return false
+    sceneGraph.rollups.unbakedRig = report
+    if (!Array.isArray(sceneGraph.warnings)) sceneGraph.warnings = []
+    sceneGraph.warnings.push(this.unbakedRigWarning(report))
+    return true
+  }
+
+  /** The sentence shown beside a .blend source that needs "Bake for web". */
+  unbakedRigWarning(report) {
+    const plural = (count, noun) => `${count} ${noun}${count === 1 ? '' : 's'}`
+    const parts = []
+    const constraints =
+      (report.objectConstraints || 0) + (report.boneConstraints || 0)
+    if (constraints > 0) parts.push(plural(constraints, 'constraint'))
+    const drivers =
+      (report.objectDrivers || 0) +
+      (report.armatureDrivers || 0) +
+      (report.shapeKeyDrivers || 0)
+    if (drivers > 0) parts.push(plural(drivers, 'driver'))
+    if ((report.shapeKeyActions || 0) > 0) {
+      parts.push(plural(report.shapeKeyActions, 'shape-key animation'))
+    }
+    const modifiers = (report.droppedModifiers || []).length
+    if (modifiers > 0) {
+      parts.push(`${plural(modifiers, 'modifier')} glTF would drop`)
+    }
+    if (parts.length === 0) parts.push('rig features')
+    return (
+      `This .blend source carries rig features the web viewer cannot run ` +
+      `(${parts.join(', ')}). Bake for web writes them into the mesh; ` +
+      'without it the rig arrives frozen or broken.'
+    )
   }
 
   /**

@@ -98,8 +98,9 @@ internal sealed class RequestBlenderOperationCommandHandler
             // A conversion is the one operation whose parameters change WHAT is produced
             // rather than how well. Two unwraps of a version differing in margin are two
             // attempts at one result, and handing back the live job is a fair answer; a
-            // convert to glb and a convert to fbx are two different files, and handing back
-            // the glb job's id would silently give the caller a format it did not ask for.
+            // convert to glb and a convert to fbx are two different files, and so are a
+            // plain conversion and one baked for web - handing back the wrong one would
+            // silently give the caller a result it did not ask for.
             // The dedup key is (operation, version) and widening it is a schema change, so
             // the ambiguity is refused here instead of being answered wrongly.
             if (operation == BlenderOperations.ConvertFormat)
