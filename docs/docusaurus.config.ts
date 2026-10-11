@@ -125,6 +125,10 @@ const config: Config = {
                             label: "Blender and WebDAV",
                             to: "/docs/features/webdav",
                         },
+                        {
+                            label: "Changelog",
+                            to: "/docs/changelog",
+                        },
                     ],
                 },
                 {

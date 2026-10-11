@@ -27,25 +27,36 @@ Texture Sets allow you to manage PBR (Physically Based Rendering) textures and a
 
 A Texture Set is a collection of texture images that define a material's appearance:
 
-| Texture Type | Purpose |
-|--------------|---------|
-| **Albedo** | Base color/diffuse |
-| **Normal** | Surface detail bumps |
-| **Metallic** | Metal vs non-metal areas |
-| **Roughness** | Surface smoothness |
-| **Ambient Occlusion** | Soft shadows in crevices |
-| **Emissive** | Self-illuminating areas |
-| **Height** | Displacement mapping |
-| **Opacity** | Transparency |
+| Texture Type          | Purpose                                              |
+| --------------------- | ---------------------------------------------------- |
+| **Albedo**            | Base color/diffuse                                   |
+| **Normal**            | Surface detail bumps                                 |
+| **Metallic**          | Metal vs non-metal areas                             |
+| **Roughness**         | Surface smoothness                                   |
+| **Glossiness**        | Inverted roughness (mutually exclusive with Roughness) |
+| **Ambient Occlusion** | Soft shadows in crevices                             |
+| **Emissive**          | Self-illuminating areas                              |
+| **Specular**          | Specular reflection color/intensity (legacy workflows) |
+| **Height**            | Displacement mapping                                 |
+| **Displacement**      | Actual vertex displacement                           |
+| **Bump**              | Bump mapping                                         |
+| **Alpha**             | Transparency                                         |
 
 ## Texture Set Kinds
 
-Modelibr distinguishes two kinds of texture sets, and the tab system gives each its own view:
+Modelibr distinguishes kinds of texture sets, and the tab system gives two of them their own library page:
 
-- **Global Materials** - reusable PBR materials that aren't tied to a particular model and can be shared across many models.
+- **Global Materials** - tileable PBR materials that aren't tied to a particular model and can be shared across many models. They sample a UV layout.
 - **Multi-Model Textures** - texture sets created for specific models (for example baked maps), which can still be linked to more than one model.
 
-The **Texture Sets** tab shows everything; the **Global Materials** and **Multi-Model Textures** tabs filter the same library down to one kind. You can open any of the three from the New Tab page.
+Open **Global Materials** or **Multi-Model Textures** from the New Tab page. A
+set that belongs to a single model opens from that model's viewer. A third kind,
+**model-owned** sets, is never listed on its own - it lives only inside the model
+it was made for.
+
+If you want a material with no image files at all, use **PBR Materials** instead -
+they are defined by parameters (colour, roughness, metallic, and similar) and
+need no UVs. See [Materials](/docs/features/materials).
 
 ## Creating Texture Sets
 
@@ -169,6 +180,10 @@ These three texture types are **mutually exclusive** - only one can be active pe
 - Special card with a **mode dropdown**
 - Switching modes changes the texture type
 - Helps when importing to Blender (determines shader node type)
+
+**Roughness** and **Glossiness** are mutually exclusive in the same way - they
+describe the same surface property, one inverted, so a set carries one or the
+other.
 
 ### Merging Texture Sets
 

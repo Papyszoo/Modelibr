@@ -1,6 +1,6 @@
 ---
 description: Group models, textures, environment maps, sprites, sounds, scripts, and VFX into a project for one level, scene, or production, with briefs and levels.
-sidebar_position: 8
+sidebar_position: 11
 ---
 
 # Projects
@@ -25,7 +25,7 @@ Projects in Modelibr let you group related assets together for organized workflo
 
 ## Creating a Project
 
-1. Open the **Projects** tab from the left sidebar
+1. Open **Projects** from the New Tab page (Projects is pinned by default)
 2. Click **Create New Project**
 3. Enter a name and optional description
 4. Click **Create**
@@ -157,7 +157,8 @@ A Level has no assets of its own. Its **Level assets** section is derived: it
 reads the Scenes filed under the selected Level and reports what those Scenes
 place, with the Scene each reference came from named on the row. There is no
 second relationship to maintain, and nothing on this surface is editable - a
-placement is changed in the Scene, where it is authored.
+placement is changed in the Scene, where it is authored (see
+[Scenes](/docs/features/scenes)).
 
 ### Opening a level's scene
 
@@ -225,8 +226,9 @@ resolved**: "works in both" is a constraint someone has to decide about.
 A scene linked to a project shows the project as a chip in the scene editor's header, and
 the same brief opens from there. The chip is also where the link is changed or cleared - a
 scene belonging to no project says so plainly, because it means the agent gets no budget, no
-style and no world convention rather than a quiet default. **New scene** takes a project up
-front for the same reason.
+style and no world convention rather than a quiet default. **New scene** offers a project up
+front for the same reason, but it stays optional - leaving it as **No project** is allowed,
+and the scene simply gets none of that.
 
 Linking is a scene write: the revision moves, it is audited, and it can be reversed.
 

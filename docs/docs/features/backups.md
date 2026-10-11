@@ -1,6 +1,6 @@
 ---
 description: Back up your whole Modelibr library, database and files, into one archive and restore it on the next restart. A safety-net backup runs before every migration.
-sidebar_position: 12
+sidebar_position: 15
 ---
 
 # Backups & Restore
@@ -13,7 +13,8 @@ migration is applied.
 
 ## Creating a backup
 
-Open the **Settings** page and go to **Backup & Restore**.
+Open the **Settings** page and go to **Backup & Restore** (see
+[Settings](/docs/features/settings)).
 
 1. Click **Create backup**.
 2. Choose whether to include thumbnails. Thumbnails regenerate

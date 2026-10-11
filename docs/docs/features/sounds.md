@@ -1,6 +1,6 @@
 ---
 description: Keep sound effects, dialogue, and ambient loops in your asset library. Modelibr generates waveform thumbnails and previews audio in the browser.
-sidebar_position: 6
+sidebar_position: 9
 ---
 
 # Sounds

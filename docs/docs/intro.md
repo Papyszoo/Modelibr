@@ -28,16 +28,18 @@ If you want the simplest local setup, download the **Modelibr** (host) installer
 - Windows, macOS, and Linux installers bundle the frontend, WebApi, asset processor, and PostgreSQL.
 - The host runs from a tray / menu-bar icon. Use its **Show Status** window for live service health (backend, database, asset processor) and the frontend URL.
 - The application and WebDAV are exposed on the same local configurable port.
-- Turning on **Allow access from my network** in the **Configuration** panel serves the app over HTTPS with a self-signed certificate, so a device on your network opens `https://<host-address>:<port>`. The browser shows a one-time certificate warning the first time; accept it to continue.
-- Worker process count, jobs per worker, GPU acceleration, and the app port are configured in the host status window's **Configuration** panel.
-- The host checks GitHub Releases for newer versions and shows an update prompt in the tray and status window.
-- An optional **Modelibr Client** installer opens a running host in its own desktop window instead of a browser tab.
+- Turning on **Allow access from my network** in the status window's **Settings** panel serves the app over HTTPS with a self-signed certificate, so a device on your network opens `https://<host-address>:<port>`. The browser shows a one-time certificate warning the first time; accept it to continue.
+- Worker process count, jobs per worker, GPU acceleration, and the app port are configured in the host status window's **Settings** panel, under **Advanced**. Changes there need a restart.
+- The host checks GitHub Releases for newer versions and shows an update prompt in the tray and status window. In the app, **Settings → Desktop** can start Modelibr on login and download updates automatically; installing stays your choice.
+- An optional **Modelibr Client** installer opens a running host in its own desktop window instead of a browser tab. See [Desktop app](/docs/features/desktop).
+
+Once it is running, [Your First 10 Minutes](/docs/first-10-minutes) walks through importing, organizing and viewing your first assets.
 
 Native installs store data in your operating system's application data folder instead of the repository `data` directory.
 
 ### Option B: Docker
 
-### 1. Prerequisites
+#### 1. Prerequisites
 
 Modelibr runs on Docker. This remains the most transparent source-based setup and keeps all runtime data in the repository folder.
 
@@ -54,7 +56,7 @@ Docker Desktop is the easiest way to get started.
 
 </details>
 
-### 2. Get the Application
+#### 2. Get the Application
 
 <details>
 <summary>**How to download the source code**</summary>
@@ -87,7 +89,7 @@ You need to run commands in a terminal (command prompt) inside the Modelibr fold
 
 </details>
 
-### 3. Configuration (Optional)
+#### 3. Configuration (Optional)
 
 Modelibr comes with a default configuration that works out of the box, but you can customize it if needed.
 
@@ -108,7 +110,7 @@ Modelibr comes with a default configuration that works out of the box, but you c
 
 </details>
 
-### 4. Start the Application
+#### 4. Start the Application
 
 Open your terminal in the project folder and run:
 
@@ -123,7 +125,7 @@ This command tells Docker to download the necessary components (images) and star
 **Check if it's running:**
 Run `docker compose ps` to see the status of the containers. All services (`webapi`, `frontend`, `asset-processor`, `postgres`) should be "running" or "healthy".
 
-### 5. Access the Interface
+#### 5. Access the Interface
 
 Open your browser and visit:
 [**https://localhost:3010**](https://localhost:3010)
@@ -142,12 +144,19 @@ All your uploaded assets, generated thumbnails, and database files are stored in
 Back up the `data` folder regularly to keep your library safe!
 :::
 
-For native installs, the same data lives in the host-managed application data directory. Open it from the host tray menu's **Open Data Folder** action (or the **Data folder** button in the status window).
+For native installs, the same data lives in the host-managed application data directory. Open it from the host tray menu's **Open Data Folder** action, or from the **Data folder** row in the status window's **Settings** panel (which has **Browse…** to move it and **Open current folder** to reveal it).
 
 ## Next Steps
 
+- [Your First 10 Minutes](/docs/first-10-minutes) - A guided first session, end to end
 - [Model Management](/docs/features/models) - Learn about versions and organization
 - [Texture Sets](/docs/features/texture-sets) - Apply PBR textures to your models
+- [Materials](/docs/features/materials) - Parameter materials and tiling Global Materials
+- [Scenes](/docs/features/scenes) - Compose assets into a 3D composition
+- [VFX](/docs/features/vfx) - Layer particles, meshes, lights and sounds
 - [Environment Maps](/docs/features/environment-maps) - Manage panoramic and cube-based lighting assets
 - [Packs](/docs/features/packs) - Build reusable asset bundles
 - [Projects](/docs/features/projects) - Organize assets for a specific production
+- [Settings](/docs/features/settings) - Every option and its default
+- [Desktop app](/docs/features/desktop) - The native host and its client
+- [Troubleshooting](/docs/features/troubleshooting) - Common problems and what to do

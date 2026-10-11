@@ -1,6 +1,6 @@
 ---
 description: Modelibr ships a local, read-only-by-default MCP server so AI agents like Claude Code can search your asset library and read the metadata it extracts.
-sidebar_position: 14
+sidebar_position: 17
 ---
 
 # Agent server (MCP)
@@ -16,6 +16,10 @@ The server is **local-first**: it runs inside your own Modelibr instance, never
 calls a hosted service, and works fully offline. It is **read-only by default** -
 the tools that change anything only appear when you opt in with
 `MCP_WRITE_ENABLED=true`.
+
+The features these tools act on have their own pages: [Scenes](/docs/features/scenes),
+[VFX](/docs/features/vfx), [Materials](/docs/features/materials) and
+[Asset Store](/docs/features/asset-store).
 
 ## What the agent can read
 
@@ -744,7 +748,7 @@ Web API on.)
 
 Native installers host the endpoint on the app's own local port, so it is
 `http://127.0.0.1:3010/api/mcp` by default; change that port in the host status
-window's **Configuration** panel and restart Modelibr.
+window's **Settings** panel and restart Modelibr.
 
 Point your agent at that URL. For Claude Code, add it as an SSE MCP server:
 

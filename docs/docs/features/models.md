@@ -33,6 +33,10 @@ The easiest way to upload models is to drag and drop files directly onto the Mod
 
 **Supported formats:** GLB, GLTF, FBX, OBJ, STL, 3MF, Blend
 
+The upload dialog accepts those seven; the server also accepts 3ds Max (`.max`)
+and Maya (`.ma`, `.mb`) files, which are stored as project files rather than
+rendered.
+
 ### What Happens After Upload
 
 1. **Model Created** - A new model entry appears in your library

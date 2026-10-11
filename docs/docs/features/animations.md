@@ -1,6 +1,6 @@
 ---
 description: Preview animation clips and shape keys in the Modelibr viewer. Models with animation get an animated thumbnail and a clip picker in the Model Info panel.
-sidebar_position: 15
+sidebar_position: 18
 ---
 
 # Animations and Shape Keys
@@ -63,6 +63,19 @@ worth knowing before you export:
 
 Bake the animation in Blender, export glTF or GLB, and upload the result. The
 viewer then plays the baked keyframes.
+
+## Bake for web
+
+When a `.blend` source carries rig features the web viewer cannot play as
+authored - IK and other constraints, drivers, shape-key animation, modifiers
+glTF would drop - the **Model Info** panel shows a warning above the Animation
+section and a **Bake for web** button. The bake collapses all of it into plain
+keyframes and applied geometry before exporting, and the result arrives as a new,
+inactive version named `<name>-web.glb`; the original file is never touched. The
+button stays disabled until Blender is installed in **Settings → Blender**. The
+same bake is available to an agent as `convert_model`'s `bakeForWeb`, and a long
+bake is bounded by the Blender operation timeout, also set in **Settings →
+Blender**.
 
 See [Model Management](./models) for upload and versioning, and
 [Texture Sets](./texture-sets) for materials.

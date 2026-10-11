@@ -1,6 +1,6 @@
 ---
-description: Store 2D sprites and images next to your 3D models. Preview PNG, JPG, WebP, GIF, and APNG files in the browser and organize them into projects and packs.
-sidebar_position: 5
+description: Store 2D sprites and images next to your 3D models. Preview PNG, JPG, WebP, GIF, and BMP files in the browser and organize them into projects and packs.
+sidebar_position: 8
 ---
 
 # Sprites
@@ -29,7 +29,7 @@ Modelibr includes a built-in sprite manager for organizing 2D image assets along
 
 Drag image files directly onto the Sprite Library panel to upload them.
 
-**Supported formats:** common image formats - PNG, JPG, WebP, GIF, APNG, BMP
+**Supported formats:** common image formats - PNG, JPG/JPEG, WebP, GIF, BMP
 
 ### What Happens After Upload
 

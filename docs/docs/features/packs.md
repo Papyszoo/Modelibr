@@ -1,6 +1,6 @@
 ---
 description: Build reusable asset packs and import them into any project. Packs bundle the models, textures, environment maps, sprites, and sounds you use again and again.
-sidebar_position: 9
+sidebar_position: 12
 ---
 
 # Packs
@@ -25,7 +25,7 @@ Packs in Modelibr are reusable asset bundles that can be shared across multiple 
 
 ## Creating a Pack
 
-1. Open the **Packs** tab from the left sidebar
+1. Open **Packs** from the New Tab page
 2. Click **Create New Pack**
 3. Enter a name and optional description
 4. Click **Create**
