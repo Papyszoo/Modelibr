@@ -4,7 +4,6 @@ using System.Text.Json;
 using Application.Abstractions.Services;
 using Application.StoreCatalog;
 using Application.StoreImports;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using SharedKernel;
 
@@ -57,7 +56,7 @@ internal sealed class StoreCatalogClient : IStoreCatalogClient
 
     public StoreCatalogClient(
         IHttpClientFactory httpClientFactory,
-        IConfiguration configuration,
+        IStoreBaseUrlProvider storeBaseUrls,
         ILogger<StoreCatalogClient> logger)
     {
         _httpClientFactory = httpClientFactory;
@@ -67,13 +66,10 @@ internal sealed class StoreCatalogClient : IStoreCatalogClient
         // Canonicalized the same way the importer canonicalizes it: the store URL is also the
         // key the "already imported" probe matches against, and a raw uppercase host or an
         // explicit :443 would make every comparison miss, so the import guard never fired.
-        var configured = configuration.GetValue<string?>("STORE_URL");
-        StoreUrl = string.IsNullOrWhiteSpace(configured)
-            ? null
-            : StoreUrlCanonicalizer.Canonicalize(configured);
+        StoreUrl = storeBaseUrls.StoreBaseUrl;
     }
 
-    public string? StoreUrl { get; }
+    public string StoreUrl { get; }
 
     public async Task<Result<StoreCatalogPage>> SearchAsync(
         StoreCatalogQuery query,
@@ -167,11 +163,6 @@ internal sealed class StoreCatalogClient : IStoreCatalogClient
 
     private Result<Uri> ValidatedBaseUrl()
     {
-        if (string.IsNullOrWhiteSpace(StoreUrl))
-        {
-            return Result.Failure<Uri>(StoreCatalogErrors.NotConfigured);
-        }
-
         var validation = StoreUrlSafety.ValidateStoreBaseUrl(StoreUrl);
         if (validation.IsFailure || !Uri.TryCreate(StoreUrl, UriKind.Absolute, out var uri))
         {
@@ -334,7 +325,7 @@ internal sealed class StoreCatalogClient : IStoreCatalogClient
 
     /// <summary>
     /// The store returns absolute URLs when <c>Store:PublicBaseUrl</c> is set and relative
-    /// ones otherwise, so both are resolved against the configured store rather than handed
+    /// ones otherwise, so both are resolved against the store base rather than handed
     /// to the agent as-is - a relative path is useless to anything outside the store's own SPA.
     /// </summary>
     private static string? Absolute(string? url, Uri baseUrl)

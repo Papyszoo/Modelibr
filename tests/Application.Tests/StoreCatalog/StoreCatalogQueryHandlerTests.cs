@@ -54,20 +54,6 @@ public class StoreCatalogQueryHandlerTests
     }
 
     [Fact]
-    public async Task Search_When_StoreNotConfigured_Returns_NotConfigured()
-    {
-        // The store is optional. An instance without one must say so distinguishably rather
-        // than reporting an empty catalog, which would read as "the store has nothing".
-        _catalog.SetupGet(c => c.StoreUrl).Returns((string?)null);
-
-        var result = await CreateSearchHandler().Handle(
-            new SearchStoreAssetsQuery("chair"), CancellationToken.None);
-
-        Assert.True(result.IsFailure);
-        Assert.Equal("StoreCatalog.NotConfigured", result.Error.Code);
-    }
-
-    [Fact]
     public async Task Search_When_StoreUnreachable_Propagates_UnreachableError()
     {
         // Distinct from an empty result on purpose: an agent that cannot tell them apart

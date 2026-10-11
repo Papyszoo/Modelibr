@@ -9,7 +9,6 @@ import type { InternalAxiosRequestConfig } from 'axios'
 import { ApiClientError } from '@/lib/apiBase'
 import { useAssetStoreAuthStore } from '@/stores/assetStoreAuthStore'
 
-import * as storeConfig from '../../lib/storeConfig'
 import {
   attachStoreAuthHeader,
   getStoreLibrary,
@@ -310,27 +309,10 @@ describe('refreshStoreTokensOnce', () => {
 })
 
 describe('store-origin binding', () => {
-  // Regression: the client was built with `createApiClient(storeUrl ?? '')`. With
-  // VITE_STORE_URL unset that is an EMPTY base URL, so '/api/library' resolved
-  // against Modelibr's own origin and the store bearer token was sent to the
-  // local backend. Nothing credentialed may leave without a configured store.
-  it('refuses to send a store request when the store URL is not configured', () => {
-    loggedInState()
-    jest.spyOn(storeConfig, 'getConfiguredStoreUrl').mockReturnValue(null)
-
-    expect(() =>
-      attachStoreAuthHeader({
-        url: '/api/library',
-        headers: {},
-      } as unknown as InternalAxiosRequestConfig)
-    ).toThrow(/not configured/i)
-  })
-
+  // Regression: an absolute config.url ignores baseURL, so a store request aimed
+  // anywhere but the store origin must be refused before the bearer token leaves.
   it('refuses to send a store request aimed at a different origin', () => {
     loggedInState()
-    jest
-      .spyOn(storeConfig, 'getConfiguredStoreUrl')
-      .mockReturnValue('https://store.test')
 
     expect(() =>
       attachStoreAuthHeader({
@@ -338,5 +320,17 @@ describe('store-origin binding', () => {
         headers: {},
       } as unknown as InternalAxiosRequestConfig)
     ).toThrow(/Refusing to send a store request/i)
+  })
+
+  it('pins the request to the store origin before attaching the token', () => {
+    loggedInState()
+
+    const config = attachStoreAuthHeader({
+      url: '/api/library',
+      headers: {},
+    } as unknown as InternalAxiosRequestConfig)
+
+    expect(config.baseURL).toBe('https://store.modelibr.com')
+    expect(config.headers.Authorization).toBe('Bearer access-1')
   })
 })

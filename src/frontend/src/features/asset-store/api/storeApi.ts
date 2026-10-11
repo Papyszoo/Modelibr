@@ -4,7 +4,7 @@ import { ApiClientError, createApiClient } from '@/lib/apiBase'
 import { useAssetStoreAuthStore } from '@/stores/assetStoreAuthStore'
 
 import { isTerminalAuthFailure } from '../lib/authFailure'
-import { getConfiguredStoreUrl } from '../lib/storeConfig'
+import { STORE_URL } from '../lib/storeConfig'
 import type {
   MintImportTokenResponse,
   StoreAssetDetail,
@@ -17,38 +17,28 @@ import type {
  * token attached here, never cookies). Store credentials and tokens never
  * touch the local Modelibr backend.
  *
- * The module-load base URL is only a seed - the interceptor below re-derives it
- * per request. `createApiClient('')` (store unset) would otherwise leave an EMPTY
- * baseURL, resolving '/api/library' against Modelibr's own origin and mailing the
- * store bearer token to the local backend.
+ * The base URL is pinned again per request by the interceptor below, so a stale
+ * base URL can never resolve '/api/library' against Modelibr's own origin and
+ * mail the store bearer token to the local backend.
  */
-export const storeClient: AxiosInstance = createApiClient(
-  getConfiguredStoreUrl() ?? ''
-)
+export const storeClient: AxiosInstance = createApiClient(STORE_URL)
 
 /**
- * Pins every store request to the configured store origin and attaches the
- * access token. Throwing here rejects the request before it is sent - the
- * correct outcome when there is nowhere legitimate to send it. Exported for tests.
+ * Pins every store request to the store origin and attaches the access token.
+ * Throwing here rejects the request before it is sent - the correct outcome when
+ * there is nowhere legitimate to send it. Exported for tests.
  */
 export function attachStoreAuthHeader(
   config: InternalAxiosRequestConfig
 ): InternalAxiosRequestConfig {
-  const storeUrl = getConfiguredStoreUrl()
-  if (!storeUrl) {
-    throw new Error(
-      'The Asset Store is not configured (VITE_STORE_URL) - refusing to send a store request.'
-    )
-  }
-
-  // Re-pin rather than merely check: the seeded baseURL may be stale or empty.
-  config.baseURL = storeUrl
+  // Re-pin rather than merely check: the seeded baseURL may be stale.
+  config.baseURL = STORE_URL
   // An absolute config.url ignores baseURL entirely, so validate the resolved
-  // target too - credentials only ever leave for the configured origin.
-  const target = new URL(config.url ?? '', storeUrl)
-  if (target.origin !== new URL(storeUrl).origin) {
+  // target too - credentials only ever leave for the store origin.
+  const target = new URL(config.url ?? '', STORE_URL)
+  if (target.origin !== new URL(STORE_URL).origin) {
     throw new Error(
-      `Refusing to send a store request to ${target.origin} - the configured store is ${new URL(storeUrl).origin}.`
+      `Refusing to send a store request to ${target.origin} - the store is ${new URL(STORE_URL).origin}.`
     )
   }
 

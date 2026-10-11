@@ -5,7 +5,7 @@ import { getStoreImportJob, startStoreImport } from '../api/importApi'
 import { mintImportToken } from '../api/storeApi'
 import { storeImportSignalRService } from '../services/storeImportSignalR'
 import type { StoreImportJobDto, StoreLibraryItem } from '../types'
-import { getConfiguredStoreUrl } from './storeConfig'
+import { STORE_URL } from './storeConfig'
 
 /**
  * Orchestrates one pack import: mint an import token on the store (browser →
@@ -113,13 +113,8 @@ export async function startImport(
   item: StoreLibraryItem,
   selectedItemIds?: string[]
 ): Promise<void> {
-  const storeUrl = getConfiguredStoreUrl()
+  const storeUrl = STORE_URL
   const importStore = useAssetStoreImportStore.getState()
-
-  if (!storeUrl) {
-    importStore.markFailed(item.assetId, 'Store URL is not configured.')
-    return
-  }
 
   importStore.beginImport(item.assetId)
 

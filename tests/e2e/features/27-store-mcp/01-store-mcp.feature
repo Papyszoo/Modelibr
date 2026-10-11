@@ -1,10 +1,11 @@
 @batch3 @mcp @store-mcp @infra
 Feature: The companion Asset Store
-    The store is optional, and this stack runs a stand-in it and the backend can
-    both reach (store-fixture-e2e plus STORE_URL). Covered here are the browser
-    sign-in surface the UI owns and the agent catalog path over MCP: search,
-    read, import, and the import job poll, plus the honest answer a missing job
-    still gives.
+    The store is built in at a fixed address, and this stack runs a stand-in the
+    browser and the backend are both pointed at (store-fixture-e2e, reached by a
+    host-resolver rule for the browser and the test-only override for the
+    backend). Covered here are the browser sign-in surface the UI owns and the
+    agent catalog path over MCP: search, read, import, and the import job poll,
+    plus the honest answer a missing job still gives.
 
     Scenario: The store login form reports a rejected sign-in
         Given I am on the Asset Store tab

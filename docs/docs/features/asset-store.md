@@ -9,12 +9,12 @@ The **Asset Store** tab connects your Modelibr instance to a companion asset
 store: sign in with your store account, see the packs in your store library,
 and import them into your local library with one click.
 
-This is an **optional online surface**. Modelibr stays fully local-first - if
-the store is unreachable, the page shows a single quiet status and nothing
-else in the app is affected.
+This is an **online surface**. Modelibr stays fully local-first - if the store
+is unreachable, the page shows a single quiet status and nothing else in the
+app is affected.
 
-The tab always connects to Modelibr's hosted Asset Store. Its address is not a
-user-facing setting.
+The Asset Store is built in and always connects to the hosted Asset Store -
+Modelibr's fixed store address. There is nothing to configure.
 
 ## Signing in
 

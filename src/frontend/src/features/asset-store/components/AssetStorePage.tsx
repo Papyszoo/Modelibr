@@ -13,10 +13,7 @@ import { useAssetStoreAuthStore } from '@/stores/assetStoreAuthStore'
 
 import { useStoreLibraryQuery } from '../api/queries'
 import { logoutOfStoreSession } from '../lib/session'
-import {
-  getConfiguredStoreUrl,
-  getStoreUrlConfigError,
-} from '../lib/storeConfig'
+import { STORE_URL } from '../lib/storeConfig'
 import type { StoreLibraryItem } from '../types'
 import { StoreLibraryGrid } from './StoreLibraryGrid'
 import { StoreLoginForm } from './StoreLoginForm'
@@ -26,11 +23,11 @@ import { StorePackDetail } from './StorePackDetail'
  * Asset Store tab - the user signs into the companion store, sees their
  * library, and imports packs into this Modelibr instance with one click.
  * Browsing/purchasing happens on the store site; this page is library +
- * import only. It is an OPTIONAL online surface: unconfigured, offline, or
- * store-down all degrade to one quiet feedback state.
+ * import only. It is an online surface: offline or store-down degrade to one
+ * quiet feedback state.
  */
 export function AssetStorePage() {
-  const storeUrl = getConfiguredStoreUrl()
+  const storeUrl = STORE_URL
   const status = useAssetStoreAuthStore(state => state.status)
   const username = useAssetStoreAuthStore(state => state.username)
   const isLoggedIn = status === 'loggedIn'
@@ -66,26 +63,6 @@ export function AssetStorePage() {
   ) : undefined
 
   const renderContent = () => {
-    if (!storeUrl) {
-      const configError = getStoreUrlConfigError()
-      if (configError) {
-        return (
-          <EmptyState
-            icon="pi-shopping-bag"
-            title="Store URL rejected"
-            message={`${configError} The configured value is ignored until it is fixed.`}
-          />
-        )
-      }
-      return (
-        <EmptyState
-          icon="pi-shopping-bag"
-          title="Asset Store not configured"
-          message="Set VITE_STORE_URL in your environment to connect this instance to an asset store. Everything else in Modelibr works without it."
-        />
-      )
-    }
-
     if (!isLoggedIn) {
       return (
         <div className="asset-store-login-center">
@@ -145,7 +122,7 @@ export function AssetStorePage() {
       <ListHeader
         variant="tab"
         title="Asset Store"
-        subtitle={storeUrl ?? undefined}
+        subtitle={storeUrl}
         stats={
           isLoggedIn && library.data
             ? [{ icon: 'pi-inbox', label: `${library.data.totalCount} items` }]

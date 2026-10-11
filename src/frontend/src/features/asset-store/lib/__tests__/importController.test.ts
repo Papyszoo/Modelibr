@@ -101,7 +101,7 @@ describe('startImport', () => {
     // Let mint + start settle, then walk the two poll ticks.
     await jest.advanceTimersByTimeAsync(0)
     expect(importApi.startStoreImport).toHaveBeenCalledWith({
-      storeUrl: 'https://store.test',
+      storeUrl: 'https://store.modelibr.com',
       assetId: 'asset-1',
       importToken: 'tok-1',
     })

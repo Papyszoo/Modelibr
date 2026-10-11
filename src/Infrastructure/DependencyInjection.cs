@@ -187,6 +187,9 @@ namespace Infrastructure
 
             services.AddScoped<Application.Abstractions.Services.IStoreImportClient, StoreImportClient>();
 
+            // The companion Asset Store's fixed base URL (with the e2e test-only override).
+            services.AddSingleton<Application.Abstractions.Services.IStoreBaseUrlProvider, StoreBaseUrlProvider>();
+
             // Store catalog reader (v0.6 prompt 15): anonymous, small JSON, short timeout.
             // Deliberately NOT the importer's client - that one is sized for multi-gigabyte
             // file transfer, and a catalog query behind a two-minute timeout would let an

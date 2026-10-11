@@ -12,8 +12,8 @@ namespace Application.Abstractions.Services;
 /// </summary>
 public interface IStoreCatalogClient
 {
-    /// <summary>The configured store, or null when none is configured.</summary>
-    string? StoreUrl { get; }
+    /// <summary>The companion Asset Store's base URL (fixed; a test-only override in e2e).</summary>
+    string StoreUrl { get; }
 
     Task<Result<StoreCatalogPage>> SearchAsync(
         StoreCatalogQuery query,

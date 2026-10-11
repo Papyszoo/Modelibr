@@ -11,10 +11,16 @@
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import http from "node:http";
+import https from "node:https";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const PORT = Number(process.env.PORT || 9280);
+// The browser talks to the store's fixed https origin, so the fixture also
+// serves TLS for the host-resolver mapping the Playwright config installs.
+const TLS_PORT = Number(process.env.TLS_PORT || 0);
+const TLS_CERT = process.env.TLS_CERT || "server.crt";
+const TLS_KEY = process.env.TLS_KEY || "server.key";
 // The base baked into manifest downloadUrls - must be the store's own host
 // so the backend trusts it (same-host rule) and sends the import token.
 const PUBLIC_BASE = process.env.PUBLIC_BASE || `http://localhost:${PORT}`;
@@ -322,7 +328,7 @@ const hasImportToken = (req) =>
     req.headers.authorization === `ImportToken ${IMPORT_TOKEN}` ||
     hasBearer(req);
 
-const server = http.createServer(async (req, res) => {
+const handleRequest = async (req, res) => {
     // Open CORS - mirrors the store's credential-less ModelibrImport policy.
     res.setHeader("Access-Control-Allow-Origin", "*");
     res.setHeader("Access-Control-Allow-Headers", "Authorization, Content-Type");
@@ -442,8 +448,24 @@ const server = http.createServer(async (req, res) => {
     }
 
     return json(res, 404, { message: `No route: ${route}` });
-});
+};
 
-server.listen(PORT, () => {
+http.createServer(handleRequest).listen(PORT, () => {
     console.log(`[store-fixture] listening on :${PORT} (base ${PUBLIC_BASE})`);
 });
+
+if (TLS_PORT) {
+    https
+        .createServer(
+            {
+                cert: readFileSync(TLS_CERT),
+                key: readFileSync(TLS_KEY),
+            },
+            handleRequest,
+        )
+        .listen(TLS_PORT, () => {
+            console.log(
+                `[store-fixture] listening on https://store.modelibr.com:${TLS_PORT}`,
+            );
+        });
+}

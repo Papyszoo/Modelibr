@@ -76,8 +76,9 @@ the block is absent.
 ### Looking at the Asset Store
 
 When the library genuinely has nothing that fits, an agent should be able to say what
-would - not settle for the closest wrong asset. Set `STORE_URL` in your root `.env` and
-two more read tools appear, over the companion Asset Store's **public** catalog.
+would - not settle for the closest wrong asset. Two more read tools are built in, over the
+companion Asset Store's **public** catalog (the store is part of Modelibr, so there is
+nothing to configure).
 
 They send no credential, because that catalog needs none. They also acquire nothing: what
 an agent can do here is find and describe, and then propose.

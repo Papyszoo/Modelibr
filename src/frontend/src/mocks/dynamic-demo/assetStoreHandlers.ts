@@ -1,8 +1,10 @@
 import { http, HttpResponse } from 'msw'
 
+import { STORE_URL } from '@/features/asset-store/lib/storeConfig'
+
 import { BASE_MESHES_COMMIT } from '../db/baseMeshesSeed'
-import { meshHash, missingMeshes } from './importGapFill'
 import type { DemoModel, DemoModelVersion, DemoPack } from '../db/demoDb'
+import { meshHash, missingMeshes } from './importGapFill'
 import {
   getAll,
   nextId,
@@ -22,7 +24,6 @@ import {
  * (SHA-pinned raw URLs, same source the seeded pack uses).
  */
 
-const STORE_URL = import.meta.env.VITE_STORE_URL || ''
 const storeEndpoint = (path: string) => `${STORE_URL}${path}`
 
 const RAW_BASE = `https://raw.githubusercontent.com/Papyszoo/base-meshes/${BASE_MESHES_COMMIT}/models`
