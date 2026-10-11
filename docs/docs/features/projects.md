@@ -1,4 +1,5 @@
 ---
+description: Group models, textures, environment maps, sprites, sounds, scripts, and VFX into a project for one level, scene, or production, with briefs and levels.
 sidebar_position: 8
 ---
 
@@ -7,9 +8,18 @@ sidebar_position: 8
 Projects in Modelibr let you group related assets together for organized workflows. A project can contain models, texture sets, environment maps, sprites, sounds, scripts, and visual effects - everything needed for a game level, scene, or creative work.
 
 <div className="feature-video-container">
-  <video controls width="100%" autoPlay muted loop>
+  <video
+    controls
+    width="100%"
+    autoPlay
+    muted
+    loop
+    playsInline
+    preload="metadata"
+    poster="/img/videos/projects-poster.webp"
+  >
     <source src="/videos/projects.webm" type="video/webm" />
-    <p className="video-fallback">Demo video is being generated...</p>
+    <p className="video-fallback">A short screen recording of browsing a project board in Modelibr</p>
   </video>
 </div>
 

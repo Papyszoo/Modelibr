@@ -1,4 +1,5 @@
 ---
+description: Preview animation clips and shape keys in the Modelibr viewer. Models with animation get an animated thumbnail and a clip picker in the Model Info panel.
 sidebar_position: 15
 ---
 

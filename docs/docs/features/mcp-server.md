@@ -1,4 +1,5 @@
 ---
+description: Modelibr ships a local, read-only-by-default MCP server so AI agents like Claude Code can search your asset library and read the metadata it extracts.
 sidebar_position: 14
 ---
 
@@ -461,8 +462,8 @@ what the gate stopped.
 #### Dressing a node by hand
 
 The scene editor's property panel dresses the selected node too, so `apply_material` is
-not the only way in. The panel lists the node's **default binding** — which dresses every
-slot no override names — and a row per material slot the model declares, and it picks from
+not the only way in. The panel lists the node's **default binding** (which dresses every
+slot no override names) and a row per material slot the model declares, and it picks from
 one merged list of **PBR materials and Global Materials** together: filling a slot is the
 one place the mechanism does not matter, and a material that needs UVs says so on its
 entry. A binding made here is scene-local, undoes with the rest of the editor's history,

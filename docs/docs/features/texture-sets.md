@@ -1,4 +1,5 @@
 ---
+description: Manage PBR texture sets in Modelibr. Import albedo, normal, roughness, and packed channels, then preview them on any shape in real time.
 sidebar_position: 2
 ---
 
@@ -7,9 +8,18 @@ sidebar_position: 2
 Texture Sets allow you to manage PBR (Physically Based Rendering) textures and apply them to your 3D models.
 
 <div className="feature-video-container">
-  <video controls width="100%" autoPlay muted loop>
+  <video
+    controls
+    width="100%"
+    autoPlay
+    muted
+    loop
+    playsInline
+    preload="metadata"
+    poster="/img/videos/texture-sets-poster.webp"
+  >
     <source src="/videos/texture-sets.webm" type="video/webm" />
-    <p className="video-fallback">Demo video is being generated...</p>
+    <p className="video-fallback">A short screen recording of inspecting a PBR texture set in Modelibr</p>
   </video>
 </div>
 
@@ -41,7 +51,7 @@ The **Texture Sets** tab shows everything; the **Global Materials** and **Multi-
 
 ### From the Texture Sets Panel
 
-![Texture Sets](/img/screenshots/texture-sets.png)
+![A PBR texture set in Modelibr previewed on a shape with its channel maps listed](/img/screenshots/texture-sets.png)
 
 1. Navigate to the **Texture Sets** tab
 2. Click **Upload Textures** or drag and drop image files

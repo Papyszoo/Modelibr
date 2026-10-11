@@ -1,4 +1,5 @@
 ---
+description: Work in a dual-panel workspace with tabs, shareable layout URLs, global search on Ctrl or Command + K, and a launcher page for every asset type.
 sidebar_position: 4
 ---
 
@@ -7,9 +8,18 @@ sidebar_position: 4
 Modelibr uses a flexible panel system that lets you organize your workspace and share layouts with URLs.
 
 <div className="feature-video-container">
-  <video controls width="100%" autoPlay muted loop>
+  <video
+    controls
+    width="100%"
+    autoPlay
+    muted
+    loop
+    playsInline
+    preload="metadata"
+    poster="/img/videos/user-interface-poster.webp"
+  >
     <source src="/videos/user-interface.webm" type="video/webm" />
-    <p className="video-fallback">Demo video is being generated...</p>
+    <p className="video-fallback">A short screen recording of navigating tabs and workspace controls in Modelibr</p>
   </video>
 </div>
 

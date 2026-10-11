@@ -1,3 +1,7 @@
+---
+description: How Modelibr verifies changes and builds release artifacts and the documentation site with GitHub Actions, including the verification jobs and the video lanes.
+---
+
 # CI/CD Pipeline
 
 Modelibr uses GitHub Actions to verify changes, build release artifacts, and

@@ -1,4 +1,5 @@
 ---
+description: Mount your Modelibr library as a WebDAV drive in Finder or File Explorer. Save a .blend file and Modelibr creates a new model version automatically.
 sidebar_position: 10
 ---
 

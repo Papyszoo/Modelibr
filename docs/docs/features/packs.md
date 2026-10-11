@@ -1,4 +1,5 @@
 ---
+description: Build reusable asset packs and import them into any project. Packs bundle the models, textures, environment maps, sprites, and sounds you use again and again.
 sidebar_position: 9
 ---
 
@@ -7,9 +8,18 @@ sidebar_position: 9
 Packs in Modelibr are reusable asset bundles that can be shared across multiple projects. Unlike projects, which represent unique work contexts, packs let you group commonly used assets together - such as a set of environment props, environment maps, or character models - and reuse them wherever needed.
 
 <div className="feature-video-container">
-  <video controls width="100%" autoPlay muted loop>
+  <video
+    controls
+    width="100%"
+    autoPlay
+    muted
+    loop
+    playsInline
+    preload="metadata"
+    poster="/img/videos/packs-poster.webp"
+  >
     <source src="/videos/packs.webm" type="video/webm" />
-    <p className="video-fallback">Demo video is being generated...</p>
+    <p className="video-fallback">A short screen recording of creating a pack and attaching assets in Modelibr</p>
   </video>
 </div>
 

@@ -1,4 +1,5 @@
 ---
+description: Connect the optional companion asset store to browse your store library and import packs into Modelibr with one click. Modelibr stays local-first without it.
 sidebar_position: 13
 ---
 

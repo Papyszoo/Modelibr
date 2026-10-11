@@ -1,4 +1,5 @@
 ---
+description: Recover deleted models, texture sets, environment maps, sprites, sounds, and scripts from the recycle bin. Identical files are deduplicated automatically.
 sidebar_position: 3
 ---
 
@@ -7,9 +8,18 @@ sidebar_position: 3
 The Recycle Bin provides a safety net for deleted items, allowing you to recover accidentally deleted models, versions, texture sets, environment maps, sprites, sounds, and scripts.
 
 <div className="feature-video-container">
-  <video controls width="100%" autoPlay muted loop>
+  <video
+    controls
+    width="100%"
+    autoPlay
+    muted
+    loop
+    playsInline
+    preload="metadata"
+    poster="/img/videos/recycled-files-poster.webp"
+  >
     <source src="/videos/recycled-files.webm" type="video/webm" />
-    <p className="video-fallback">Demo video is being generated...</p>
+    <p className="video-fallback">A short screen recording of recycling and restoring assets in Modelibr</p>
   </video>
 </div>
 
@@ -17,7 +27,7 @@ The Recycle Bin provides a safety net for deleted items, allowing you to recover
 
 Navigate to the **Recycled Files** tab in the left panel.
 
-![Recycled Files](/img/screenshots/recycled-files.png)
+![The Modelibr recycle bin listing deleted assets that can be restored](/img/screenshots/recycled-files.png)
 
 ## What Can Be Recycled?
 

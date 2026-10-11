@@ -1,4 +1,5 @@
 ---
+description: Keep sound effects, dialogue, and ambient loops in your asset library. Modelibr generates waveform thumbnails and previews audio in the browser.
 sidebar_position: 6
 ---
 
@@ -7,9 +8,18 @@ sidebar_position: 6
 Modelibr includes a built-in sound manager for organizing audio assets alongside your 3D models and sprites. Sounds are ideal for sound effects, ambient audio, UI feedback, and any audio content your project needs.
 
 <div className="feature-video-container">
-  <video controls width="100%" autoPlay muted loop>
+  <video
+    controls
+    width="100%"
+    autoPlay
+    muted
+    loop
+    playsInline
+    preload="metadata"
+    poster="/img/videos/sounds-poster.webp"
+  >
     <source src="/videos/sounds.webm" type="video/webm" />
-    <p className="video-fallback">Demo video is being generated...</p>
+    <p className="video-fallback">A short screen recording of browsing and previewing sounds in Modelibr</p>
   </video>
 </div>
 

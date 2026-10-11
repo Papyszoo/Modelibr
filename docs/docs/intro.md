@@ -1,4 +1,5 @@
 ---
+description: Install Modelibr and run your self-hosted game asset library. Native installers for Windows, macOS, and Linux, or Docker Compose, with a five-step quick start.
 sidebar_position: 1
 slug: /
 ---

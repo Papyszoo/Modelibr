@@ -1,4 +1,5 @@
 ---
+description: Back up your whole Modelibr library, database and files, into one archive and restore it on the next restart. A safety-net backup runs before every migration.
 sidebar_position: 12
 ---
 

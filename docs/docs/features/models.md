@@ -1,4 +1,5 @@
 ---
+description: Upload and organize 3D models in Modelibr. Supported formats are GLB, GLTF, FBX, OBJ, STL, 3MF, and Blend, with animated thumbnails and version history.
 sidebar_position: 1
 ---
 
@@ -7,9 +8,18 @@ sidebar_position: 1
 Modelibr helps you organize and manage your 3D model library with automatic thumbnails, version control, and easy navigation.
 
 <div className="feature-video-container">
-  <video controls width="100%" autoPlay muted loop>
+  <video
+    controls
+    width="100%"
+    autoPlay
+    muted
+    loop
+    playsInline
+    preload="metadata"
+    poster="/img/videos/model-management-poster.webp"
+  >
     <source src="/videos/model-management.webm" type="video/webm" />
-    <p className="video-fallback">Demo video is being generated...</p>
+    <p className="video-fallback">A short screen recording of uploading and previewing a model in Modelibr</p>
   </video>
 </div>
 
@@ -19,7 +29,7 @@ Modelibr helps you organize and manage your 3D model library with automatic thum
 
 The easiest way to upload models is to drag and drop files directly onto the Model Library panel.
 
-![Model List](/img/screenshots/model-list.png)
+![The Modelibr library grid showing uploaded 3D models with tags, versions, and categories](/img/screenshots/model-list.png)
 
 **Supported formats:** GLB, GLTF, FBX, OBJ, STL, 3MF, Blend
 
@@ -112,7 +122,7 @@ and projects are not category-filtered.
 
 Click any model card to open it in the 3D viewer:
 
-![Model Viewer](/img/screenshots/model-viewer.png)
+![The Modelibr model viewer showing a 3D model in the browser with the version list beside it](/img/screenshots/model-viewer.png)
 
 ### Viewer Controls
 

@@ -1,4 +1,5 @@
 ---
+description: Store 2D sprites and images next to your 3D models. Preview PNG, JPG, WebP, GIF, and APNG files in the browser and organize them into projects and packs.
 sidebar_position: 5
 ---
 
@@ -7,9 +8,18 @@ sidebar_position: 5
 Modelibr includes a built-in sprite manager for organizing 2D image assets alongside your 3D models. Sprites are ideal for icons, UI elements, reference images, and texture previews.
 
 <div className="feature-video-container">
-  <video controls width="100%" autoPlay muted loop>
+  <video
+    controls
+    width="100%"
+    autoPlay
+    muted
+    loop
+    playsInline
+    preload="metadata"
+    poster="/img/videos/sprites-poster.webp"
+  >
     <source src="/videos/sprites.webm" type="video/webm" />
-    <p className="video-fallback">Demo video is being generated...</p>
+    <p className="video-fallback">A short screen recording of organizing and renaming sprites in Modelibr</p>
   </video>
 </div>
 
