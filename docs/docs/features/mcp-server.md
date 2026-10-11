@@ -755,6 +755,11 @@ server settings. Once connected, the tools above appear to the agent.
 
 ## Configuration
 
+You can change the three toggles from **Settings → MCP explorer**. The `.env`
+variables below are the deployment-level control: when one is explicitly set (as
+the Docker Compose file always does), it wins over the stored setting, and a
+change applies after restarting the Web API.
+
 | Setting                   | Default | Effect                                                                                                                    |
 | ------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------- |
 | `MCP_ENABLED`             | `true`  | Set to `false` in your root `.env` to disable the MCP endpoint entirely.                                                  |

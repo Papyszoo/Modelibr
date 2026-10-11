@@ -54,6 +54,17 @@ Once permanently deleted, the item and its associated files are removed from the
 For environment maps, this means unused variant files and custom-thumbnail files are deleted only when nothing else still references them.
 :::
 
+## Automatic retention
+
+By default, recycled items are kept until you delete them permanently. You can
+choose a retention in **Settings → Backup & Restore → Keep recycled files for
+(days)**: once a day, items recycled longer ago than that are permanently
+deleted through the same path as **Delete Permanently**. `0` (the default)
+means nothing is ever purged automatically.
+
+Automatic cleanup never removes files that a live asset still references,
+even when their recycled entry ages out.
+
 ## Shared File Protection
 
 Modelibr uses file deduplication - identical files are stored only once. This means:

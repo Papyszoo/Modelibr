@@ -15,6 +15,16 @@ public record GetSettingsQueryResponse(
     string BlenderPath,
     bool BlenderEnabled,
     string DuplicateNamePolicy,
+    bool AutoAssignOnImport,
+    int CleanRecycledFilesAfterDays,
+    bool PreMigrationBackupEnabled,
+    int PreMigrationBackupRetention,
+    bool SkipDuplicateThumbnails,
+    bool McpEnabled,
+    bool McpWriteEnabled,
+    bool McpDestructiveEnabled,
+    string ThumbnailBackground,
+    int BlenderOperationTimeoutMinutes,
     DateTime CreatedAt,
     DateTime UpdatedAt
 );

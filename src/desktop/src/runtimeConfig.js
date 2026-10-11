@@ -33,6 +33,13 @@ export const DEFAULT_RUNTIME_CONFIG = Object.freeze({
   // can connect - but Modelibr has no authentication, so this exposes it to
   // everyone on the network. Opt-in, with a warning in the UI. Needs a restart.
   allowNetworkAccess: false,
+  // Start the tray host when the user signs in. Applied live through Electron's
+  // login-item API; off by default.
+  startOnLogin: false,
+  // Download new builds in the background as soon as they are found. Installing
+  // stays the user's explicit action. Applied live through the update manager;
+  // off by default.
+  autoDownloadUpdates: false,
 })
 
 // Settings whose new value only takes effect when the whole runtime is
@@ -106,6 +113,12 @@ export function sanitizeRuntimeConfig(input = {}) {
     // Opt-in network exposure: only true when explicitly set.
     allowNetworkAccess:
       input.allowNetworkAccess === true || input.allowNetworkAccess === 'true',
+    // Desktop-only options, applied live (not restart-required).
+    startOnLogin:
+      input.startOnLogin === true || input.startOnLogin === 'true',
+    autoDownloadUpdates:
+      input.autoDownloadUpdates === true ||
+      input.autoDownloadUpdates === 'true',
   }
 }
 

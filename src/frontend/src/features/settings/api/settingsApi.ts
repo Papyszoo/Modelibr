@@ -11,6 +11,16 @@ export async function getSettings(): Promise<{
   blenderPath: string
   blenderEnabled: boolean
   duplicateNamePolicy: string
+  autoAssignOnImport: boolean
+  cleanRecycledFilesAfterDays: number
+  preMigrationBackupEnabled: boolean
+  preMigrationBackupRetention: number
+  skipDuplicateThumbnails: boolean
+  mcpEnabled: boolean
+  mcpWriteEnabled: boolean
+  mcpDestructiveEnabled: boolean
+  thumbnailBackground: string
+  blenderOperationTimeoutMinutes: number
   createdAt: string
   updatedAt: string
 }> {

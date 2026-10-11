@@ -1,4 +1,7 @@
+using Application.Abstractions.Repositories;
 using Application.Abstractions.Services;
+using Application.Settings;
+using Domain.Models;
 using Infrastructure.Extensions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -28,7 +31,8 @@ public sealed class PreMigrationBackupGateTests
 {
     private static ServiceProvider BuildProvider(
         IBackupService backupService,
-        Dictionary<string, string?>? extraConfig = null)
+        Dictionary<string, string?>? extraConfig = null,
+        ISettingRepository? settingRepository = null)
     {
         var services = new ServiceCollection();
         services.AddLogging(b => b.AddProvider(NullLoggerProvider.Instance));
@@ -37,7 +41,21 @@ public sealed class PreMigrationBackupGateTests
                 .AddInMemoryCollection(extraConfig ?? new Dictionary<string, string?>())
                 .Build());
         services.AddSingleton(backupService);
+        if (settingRepository is not null)
+        {
+            services.AddSingleton(settingRepository);
+        }
         return services.BuildServiceProvider();
+    }
+
+    private static Mock<ISettingRepository> StoredBackupSettings(string? enabled, string? retention)
+    {
+        var mock = new Mock<ISettingRepository>();
+        mock.Setup(r => r.GetByKeyAsync(SettingKeys.PreMigrationBackupEnabled, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(enabled is null ? null : Setting.Create(SettingKeys.PreMigrationBackupEnabled, enabled, DateTime.UtcNow));
+        mock.Setup(r => r.GetByKeyAsync(SettingKeys.PreMigrationBackupRetention, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(retention is null ? null : Setting.Create(SettingKeys.PreMigrationBackupRetention, retention, DateTime.UtcNow));
+        return mock;
     }
 
     private static BackupSummary FakeSnapshot() => new(
@@ -138,5 +156,129 @@ public sealed class PreMigrationBackupGateTests
                 It.IsAny<string>(),
                 It.IsAny<CancellationToken>()),
             Times.Never);
+    }
+
+    [Fact]
+    public async Task StoredSettingDisabled_NoEnv_TakesNoSnapshot()
+    {
+        var mock = new Mock<IBackupService>(MockBehavior.Strict);
+        await using var provider = BuildProvider(mock.Object, settingRepository: StoredBackupSettings("false", null).Object);
+
+        await DatabaseExtensions.TakePreMigrationBackupAsync(
+            provider,
+            NullLogger.Instance,
+            provider.GetRequiredService<IConfiguration>());
+
+        mock.Verify(
+            b => b.CreateSnapshotAsync(It.IsAny<BackupScope>(), It.IsAny<string>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task StoredSettingDisabled_EnvExplicitlyEnabled_EnvWins()
+    {
+        // Docker forwards MODELIBR_SKIP_PREMIGRATION_BACKUP=false explicitly; that
+        // operator statement must beat a stored opt-out.
+        var mock = WorkingBackup();
+        await using var provider = BuildProvider(
+            mock.Object,
+            new Dictionary<string, string?> { [DatabaseExtensions.SkipEnvVar] = "false" },
+            StoredBackupSettings("false", null).Object);
+
+        await DatabaseExtensions.TakePreMigrationBackupAsync(
+            provider,
+            NullLogger.Instance,
+            provider.GetRequiredService<IConfiguration>());
+
+        mock.Verify(
+            b => b.CreateSnapshotAsync(
+                It.IsAny<BackupScope>(),
+                BackupNaming.PreMigrationSnapshotPrefix,
+                It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task EnvSkipTrue_BeatsStoredEnabled()
+    {
+        var mock = new Mock<IBackupService>(MockBehavior.Strict);
+        await using var provider = BuildProvider(
+            mock.Object,
+            new Dictionary<string, string?> { [DatabaseExtensions.SkipEnvVar] = "true" },
+            StoredBackupSettings("true", null).Object);
+
+        await DatabaseExtensions.TakePreMigrationBackupAsync(
+            provider,
+            NullLogger.Instance,
+            provider.GetRequiredService<IConfiguration>());
+
+        mock.Verify(
+            b => b.CreateSnapshotAsync(It.IsAny<BackupScope>(), It.IsAny<string>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task StoredRetention_UsedWhenEnvAbsent()
+    {
+        var mock = WorkingBackup();
+        await using var provider = BuildProvider(mock.Object, settingRepository: StoredBackupSettings(null, "7").Object);
+
+        await DatabaseExtensions.TakePreMigrationBackupAsync(
+            provider,
+            NullLogger.Instance,
+            provider.GetRequiredService<IConfiguration>());
+
+        mock.Verify(
+            b => b.CleanupSnapshots(BackupNaming.PreMigrationSnapshotPrefix, 7),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task EnvRetention_BeatsStoredRetention()
+    {
+        var mock = WorkingBackup();
+        await using var provider = BuildProvider(
+            mock.Object,
+            new Dictionary<string, string?> { [DatabaseExtensions.RetentionEnvVar] = "5" },
+            StoredBackupSettings(null, "7").Object);
+
+        await DatabaseExtensions.TakePreMigrationBackupAsync(
+            provider,
+            NullLogger.Instance,
+            provider.GetRequiredService<IConfiguration>());
+
+        mock.Verify(
+            b => b.CleanupSnapshots(BackupNaming.PreMigrationSnapshotPrefix, 5),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task UnreadableStoredSettings_FallBackToDefaults()
+    {
+        // The Settings table does not exist yet on a fresh database; the decision
+        // must fall back to env/defaults instead of failing.
+        var mock = WorkingBackup();
+        var unreadable = new Mock<ISettingRepository>();
+        unreadable
+            .Setup(r => r.GetByKeyAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("relation \"Settings\" does not exist"));
+        await using var provider = BuildProvider(mock.Object, settingRepository: unreadable.Object);
+
+        await DatabaseExtensions.TakePreMigrationBackupAsync(
+            provider,
+            NullLogger.Instance,
+            provider.GetRequiredService<IConfiguration>());
+
+        mock.Verify(
+            b => b.CreateSnapshotAsync(
+                It.IsAny<BackupScope>(),
+                BackupNaming.PreMigrationSnapshotPrefix,
+                It.IsAny<CancellationToken>()),
+            Times.Once);
+        mock.Verify(
+            b => b.CleanupSnapshots(
+                BackupNaming.PreMigrationSnapshotPrefix,
+                DatabaseExtensions.DefaultPreMigrationBackupRetention),
+            Times.Once);
     }
 }

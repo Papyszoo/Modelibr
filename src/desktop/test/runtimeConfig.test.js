@@ -51,6 +51,18 @@ test('network access is opt-in (true / "true" only) and needs a restart', () => 
   assert.equal(requiresRestart(base, { ...base, allowNetworkAccess: true }), true)
 })
 
+test('desktop options are opt-in and never restart-required', () => {
+  assert.equal(sanitizeRuntimeConfig({}).startOnLogin, false)
+  assert.equal(sanitizeRuntimeConfig({}).autoDownloadUpdates, false)
+  assert.equal(sanitizeRuntimeConfig({ startOnLogin: true }).startOnLogin, true)
+  assert.equal(sanitizeRuntimeConfig({ autoDownloadUpdates: 'true' }).autoDownloadUpdates, true)
+  assert.equal(sanitizeRuntimeConfig({ startOnLogin: 'yes' }).startOnLogin, false)
+
+  const base = sanitizeRuntimeConfig({})
+  assert.equal(requiresRestart(base, { ...base, startOnLogin: true }), false)
+  assert.equal(requiresRestart(base, { ...base, autoDownloadUpdates: true }), false)
+})
+
 test('save then load round-trips a config', async () => {
   const dir = await tempDir()
   try {
@@ -122,6 +134,8 @@ test('every setting survives a full save → load round-trip', async () => {
       enableHardwareAcceleration: true,
       dataDirectory: path.join(os.tmpdir(), 'mlbr-roundtrip-data'),
       allowNetworkAccess: true,
+      startOnLogin: true,
+      autoDownloadUpdates: true,
     }
     await saveRuntimeConfig(configPath, desired)
 

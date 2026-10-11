@@ -214,7 +214,11 @@ test('web api environment needs no PostgreSQL client tools and keeps backups on'
   assert.equal(env.POSTGRES_DB, 'Modelibr')
   assert.equal(env.POSTGRES_USER, 'modelibr')
   assert.equal(env.POSTGRES_PASSWORD, 'modelibr')
-  assert.equal(env.MODELIBR_SKIP_PREMIGRATION_BACKUP, 'false')
+  // Deliberately NOT set: the child environment is this exact object (nothing
+  // leaks in from the developer's shell), and leaving the variable unset lets
+  // the Settings page's stored "back up before updates" choice decide. The
+  // WebApi default keeps backups on.
+  assert.equal('MODELIBR_SKIP_PREMIGRATION_BACKUP' in env, false)
 })
 
 test('worker environment points scene render-back at the active UI port', () => {
@@ -276,9 +280,9 @@ test('a runtime with only the server binaries passes the asset check', async () 
     await pm.ensureRuntimeAssets()
 
     const env = pm.buildWebApiEnvironment()
-    // Boot did not throw, and the WebApi is told to keep taking pre-migration
-    // backups - a runtime that cannot back up is no longer a state that exists.
-    assert.equal(env.MODELIBR_SKIP_PREMIGRATION_BACKUP, 'false')
+    // Boot did not throw, and no skip switch is forced: with no stored setting
+    // the WebApi default keeps pre-migration backups on.
+    assert.equal('MODELIBR_SKIP_PREMIGRATION_BACKUP' in env, false)
   } finally {
     await fs.rm(root, { recursive: true, force: true })
   }

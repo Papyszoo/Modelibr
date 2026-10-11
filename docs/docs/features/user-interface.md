@@ -37,14 +37,14 @@ The interface is split into **two panels** (left and right), each containing mul
 
 **Organize and system:**
 
-| Tab                | Description                                     |
-| ------------------ | ----------------------------------------------- |
-| **Packs**          | Reusable asset bundles                          |
-| **Projects**       | Project workspaces                              |
-| **Asset Store**    | Import packs from your store library (optional) |
-| **History**        | Recent uploads, renames, and version bumps      |
-| **Recycled Files** | Recover deleted items                           |
-| **Settings**       | Storage, appearance, WebDAV, and Blender CLI    |
+| Tab                | Description                                              |
+| ------------------ | -------------------------------------------------------- |
+| **Packs**          | Reusable asset bundles                                   |
+| **Projects**       | Project workspaces                                       |
+| **Asset Store**    | Import packs from your store library (optional)          |
+| **History**        | Recent uploads, renames, and version bumps               |
+| **Recycled Files** | Recover deleted items                                    |
+| **Settings**       | Storage, appearance, thumbnails, backups, MCP and WebDAV |
 
 **Viewers** open when you click an asset: **Model Viewer** (3D), **Texture Set Viewer**, **Environment Map Viewer**, **Script Viewer**, **VFX Editor**, plus **Pack** and **Project** viewers.
 

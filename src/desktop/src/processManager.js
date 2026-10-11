@@ -282,6 +282,10 @@ export class ProcessManager {
     const active = this.runningConfig
     return {
       ...active,
+      // Desktop-only options apply live, so the saved value is the effective
+      // one - unlike ports, which describe what is actually bound right now.
+      startOnLogin: this.config.startOnLogin === true,
+      autoDownloadUpdates: this.config.autoDownloadUpdates === true,
       webApiHealthUrl: `http://127.0.0.1:${active.internalApiPort}/health`,
       publicAppUrl: `http://127.0.0.1:${active.appPort}`,
       publicWebDavUrl: `http://127.0.0.1:${active.appPort}/modelibr`,
@@ -742,8 +746,11 @@ export class ProcessManager {
       POSTGRES_DB: POSTGRES_DATABASE,
       POSTGRES_USER,
       POSTGRES_PASSWORD,
-      // Do not inherit a developer's skip switch into the installed app.
-      MODELIBR_SKIP_PREMIGRATION_BACKUP: 'false',
+      // MODELIBR_SKIP_PREMIGRATION_BACKUP is deliberately NOT set here: the
+      // child environment is this exact object (no process.env merge), so a
+      // developer's skip switch cannot leak in anyway, and leaving the variable
+      // unset is what lets the Settings page's "Back up before updates" choice
+      // apply on the desktop (an explicitly set env var would win over it).
     }
   }
 

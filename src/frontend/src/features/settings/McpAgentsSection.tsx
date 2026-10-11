@@ -1,3 +1,4 @@
+import { useQueryClient } from '@tanstack/react-query'
 import { type JSX, useMemo, useState } from 'react'
 
 import {
@@ -5,7 +6,13 @@ import {
   type McpAgentTool,
   type McpTool,
 } from './api/mcpAgentsApi'
-import { useMcpAgentsQuery, useMcpToolsQuery } from './api/queries'
+import {
+  useMcpAgentsQuery,
+  useMcpToolsQuery,
+  useSettingsQuery,
+} from './api/queries'
+import { updateSetting } from './api/settingsApi'
+import { SettingToggle } from './SettingToggle'
 
 /** Above this many tools, the list collapses behind a summary. */
 const TOOL_COLLAPSE_THRESHOLD = 3
@@ -44,6 +51,7 @@ function ordinalByName(a: McpTool, b: McpTool): number {
 }
 
 export function McpAgentsSection(): JSX.Element {
+  const queryClient = useQueryClient()
   const {
     data: agentsData,
     isLoading: agentsLoading,
@@ -56,9 +64,27 @@ export function McpAgentsSection(): JSX.Element {
     isError: toolsIsError,
     error: toolsError,
   } = useMcpToolsQuery()
+  const settingsQuery = useSettingsQuery()
 
   const [toolFilter, setToolFilter] = useState('')
   const [agentFilter, setAgentFilter] = useState(ALL_TOOLS)
+  const [savingSettingKey, setSavingSettingKey] = useState<string | null>(null)
+  const [settingError, setSettingError] = useState<string | null>(null)
+
+  const saveSetting = async (key: string, next: boolean): Promise<void> => {
+    setSavingSettingKey(key)
+    setSettingError(null)
+    try {
+      await updateSetting(key, String(next))
+      await queryClient.invalidateQueries({ queryKey: ['settings'] })
+    } catch (err) {
+      setSettingError(
+        err instanceof Error ? err.message : 'Failed to save MCP setting'
+      )
+    } finally {
+      setSavingSettingKey(null)
+    }
+  }
 
   // Memoised so the derived lists below keep stable identities across renders.
   const agents = useMemo(() => agentsData ?? [], [agentsData])
@@ -99,21 +125,69 @@ export function McpAgentsSection(): JSX.Element {
   const isError = agentsIsError || toolsIsError
   const error = agentsError ?? toolsError
 
+  // Rendered in every state - when MCP is switched off the agent list cannot
+  // load, and hiding the switch would leave no way to turn it back on.
+  const settingsBlock = (
+    <div className="mcp-settings-block">
+      <SettingToggle
+        id="mcpEnabled"
+        label="MCP server"
+        help="Serve the /mcp endpoint. Applies after restarting the app. MCP_ENABLED overrides this."
+        isOn={settingsQuery.data?.mcpEnabled ?? true}
+        disabled={!settingsQuery.data}
+        saving={savingSettingKey === 'McpEnabled'}
+        onChange={next => void saveSetting('McpEnabled', next)}
+      />
+      <SettingToggle
+        id="mcpWriteEnabled"
+        label="Allow write tools"
+        help="Let agents create, tag and import. Applies after restarting the app. MCP_WRITE_ENABLED overrides this."
+        isOn={settingsQuery.data?.mcpWriteEnabled ?? false}
+        disabled={!settingsQuery.data}
+        saving={savingSettingKey === 'McpWriteEnabled'}
+        onChange={next => void saveSetting('McpWriteEnabled', next)}
+      />
+      <SettingToggle
+        id="mcpDestructiveEnabled"
+        label="Allow destructive tools"
+        help="Let agents recycle assets and undo destructive writes. Applies after restarting the app. MCP_DESTRUCTIVE_ENABLED overrides this."
+        isOn={settingsQuery.data?.mcpDestructiveEnabled ?? false}
+        disabled={!settingsQuery.data}
+        saving={savingSettingKey === 'McpDestructiveEnabled'}
+        onChange={next => void saveSetting('McpDestructiveEnabled', next)}
+      />
+      {settingError && (
+        <div className="settings-error">
+          <strong>Error:</strong> {settingError}
+        </div>
+      )}
+    </div>
+  )
+
   if (isLoading) {
-    return <div className="settings-help">Loading MCP agents…</div>
+    return (
+      <div className="mcp-agents-section">
+        {settingsBlock}
+        <div className="settings-help">Loading MCP agents…</div>
+      </div>
+    )
   }
 
   if (isError) {
     return (
-      <div className="settings-error">
-        <strong>Error:</strong>{' '}
-        {error instanceof Error ? error.message : 'Failed to load MCP agents'}
+      <div className="mcp-agents-section">
+        {settingsBlock}
+        <div className="settings-error">
+          <strong>Error:</strong>{' '}
+          {error instanceof Error ? error.message : 'Failed to load MCP agents'}
+        </div>
       </div>
     )
   }
 
   return (
     <div className="mcp-agents-section">
+      {settingsBlock}
       {agents.length === 0 ? (
         <div className="settings-help mcp-agents-empty">
           No MCP agents are available.

@@ -1,4 +1,5 @@
 using Application.Abstractions.Services;
+using Application.Settings;
 using Infrastructure.Persistence;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.EntityFrameworkCore;
@@ -161,12 +162,19 @@ public static class DatabaseExtensions
         ILogger logger,
         IConfiguration configuration)
     {
-        if (configuration.GetValue<bool>(SkipEnvVar))
+        var stored = await ReadStoredBackupSettingsAsync(services, logger);
+
+        // An explicitly set env var wins (Docker deployments keep behaving exactly
+        // as their .env says); otherwise the stored setting decides, then the
+        // default. The stored row is only read when the Settings table exists.
+        var skipEnv = configuration[SkipEnvVar];
+        if (!SettingResolution.ResolvePreMigrationBackupEnabled(stored.Enabled, skipEnv))
         {
             logger.LogWarning(
-                "{EnvVar}=true - skipping the automatic pre-migration backup. If the " +
-                "upcoming migration fails or is destructive there is no automatic rollback " +
-                "point. This is not recommended outside throwaway environments.",
+                "Automatic pre-migration backup is disabled (stored setting or " +
+                "{EnvVar}=true). If the upcoming migration fails or is destructive " +
+                "there is no automatic rollback point. This is not recommended outside " +
+                "throwaway environments.",
                 SkipEnvVar);
             return;
         }
@@ -202,7 +210,8 @@ public static class DatabaseExtensions
                 summary.FileName,
                 summary.SizeBytes);
 
-            var retention = configuration.GetValue<int?>(RetentionEnvVar) ?? DefaultPreMigrationBackupRetention;
+            var retention = SettingResolution.ResolvePreMigrationBackupRetention(
+                stored.Retention, configuration[RetentionEnvVar]);
             backupService.CleanupSnapshots(BackupNaming.PreMigrationSnapshotPrefix, retention);
         }
         catch (Exception ex)
@@ -216,6 +225,37 @@ public static class DatabaseExtensions
             throw new PreMigrationBackupFailedException(
                 "Automatic pre-migration backup failed; aborting startup before applying pending migrations.",
                 ex);
+        }
+    }
+
+    /// <summary>
+    /// Reads the stored pre-migration backup settings, tolerating a missing
+    /// Settings table: this runs before migrations, so on a fresh database the
+    /// table genuinely does not exist yet and the env/defaults must decide.
+    /// </summary>
+    private static async Task<(string? Enabled, string? Retention)> ReadStoredBackupSettingsAsync(
+        IServiceProvider services,
+        ILogger logger)
+    {
+        var settingRepository = services.GetService<Application.Abstractions.Repositories.ISettingRepository>();
+        if (settingRepository is null)
+        {
+            return (null, null);
+        }
+
+        try
+        {
+            var enabled = await settingRepository.GetByKeyAsync(SettingKeys.PreMigrationBackupEnabled);
+            var retention = await settingRepository.GetByKeyAsync(SettingKeys.PreMigrationBackupRetention);
+            return (enabled?.Value, retention?.Value);
+        }
+        catch (Exception ex)
+        {
+            logger.LogDebug(
+                ex,
+                "Stored pre-migration backup settings are not readable yet; " +
+                "falling back to environment/defaults.");
+            return (null, null);
         }
     }
 }

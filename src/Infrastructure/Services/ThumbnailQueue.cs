@@ -1,6 +1,7 @@
 using Application.Abstractions;
 using Application.Abstractions.Repositories;
 using Application.Abstractions.Services;
+using Application.Settings;
 using Domain.Models;
 using Domain.ValueObjects;
 using Microsoft.Extensions.Logging;
@@ -20,6 +21,10 @@ namespace Infrastructure.Services;
 public class ThumbnailQueue : IThumbnailQueue
 {
     private readonly IThumbnailJobRepository _thumbnailJobRepository;
+    private readonly IThumbnailRepository _thumbnailRepository;
+    private readonly IModelVersionRepository _modelVersionRepository;
+    private readonly ISettingRepository _settingRepository;
+    private readonly SettingEnvironmentDefaults _environmentDefaults;
     private readonly IThumbnailJobQueueNotificationService _queueNotificationService;
     private readonly IUnitOfWork _unitOfWork;
     private readonly IPostCommitActions _postCommit;
@@ -27,12 +32,20 @@ public class ThumbnailQueue : IThumbnailQueue
 
     public ThumbnailQueue(
         IThumbnailJobRepository thumbnailJobRepository,
+        IThumbnailRepository thumbnailRepository,
+        IModelVersionRepository modelVersionRepository,
+        ISettingRepository settingRepository,
+        SettingEnvironmentDefaults environmentDefaults,
         IThumbnailJobQueueNotificationService queueNotificationService,
         IUnitOfWork unitOfWork,
         IPostCommitActions postCommit,
         ILogger<ThumbnailQueue> logger)
     {
         _thumbnailJobRepository = thumbnailJobRepository ?? throw new ArgumentNullException(nameof(thumbnailJobRepository));
+        _thumbnailRepository = thumbnailRepository ?? throw new ArgumentNullException(nameof(thumbnailRepository));
+        _modelVersionRepository = modelVersionRepository ?? throw new ArgumentNullException(nameof(modelVersionRepository));
+        _settingRepository = settingRepository ?? throw new ArgumentNullException(nameof(settingRepository));
+        _environmentDefaults = environmentDefaults ?? throw new ArgumentNullException(nameof(environmentDefaults));
         _queueNotificationService = queueNotificationService ?? throw new ArgumentNullException(nameof(queueNotificationService));
         _unitOfWork = unitOfWork ?? throw new ArgumentNullException(nameof(unitOfWork));
         _postCommit = postCommit ?? throw new ArgumentNullException(nameof(postCommit));
@@ -110,12 +123,93 @@ public class ThumbnailQueue : IThumbnailQueue
             return existingJob;
         }
 
+        // Nothing queued for this version yet: before creating a render job, see
+        // whether the same model file already has a ready thumbnail to reuse.
+        if (!forceRegenerate)
+        {
+            var reusedJob = await TryReuseDuplicateThumbnailAsync(
+                modelId, modelVersionId, modelHash, maxAttempts, lockTimeoutMinutes, cancellationToken);
+            if (reusedJob is not null)
+            {
+                return reusedJob;
+            }
+        }
+
         var job = ThumbnailJob.Create(modelId, modelVersionId, modelHash, DateTime.UtcNow, maxAttempts, lockTimeoutMinutes);
         var createdJob = await _thumbnailJobRepository.AddAsync(job, cancellationToken);
         await SaveAndNotifyAsync(createdJob, cancellationToken);
 
         _logger.LogInformation("Enqueued thumbnail job {JobId} for model {ModelId} version {ModelVersionId} with hash {ModelHash}",
             createdJob.Id, modelId, modelVersionId, modelHash);
+
+        return createdJob;
+    }
+
+    /// <summary>
+    /// When duplicate-thumbnail reuse is on, an upload whose model hash already
+    /// has a ready thumbnail gets that thumbnail attached to its version instead
+    /// of a render job. The file is content-addressed, so the new version points
+    /// at the same bytes; the job row is created already completed so callers
+    /// keep their contract. Returns null when there is nothing to reuse.
+    /// </summary>
+    private async Task<ThumbnailJob?> TryReuseDuplicateThumbnailAsync(
+        int modelId,
+        int modelVersionId,
+        string modelHash,
+        int maxAttempts,
+        int lockTimeoutMinutes,
+        CancellationToken cancellationToken)
+    {
+        var skipDuplicatesSetting = await _settingRepository.GetByKeyAsync(SettingKeys.SkipDuplicateThumbnails, cancellationToken);
+        var reuseEnabled = SettingResolution.ResolveBoolStoredThenEnv(
+            skipDuplicatesSetting?.Value,
+            _environmentDefaults.SkipDuplicateThumbnails,
+            defaultValue: false);
+
+        if (!reuseEnabled)
+        {
+            return null;
+        }
+
+        // Never touch a version that already has a thumbnail row: the unique
+        // index allows one per version, and the ordinary render path is what
+        // replaces an existing (e.g. store-supplied) thumbnail.
+        if (await _thumbnailRepository.GetByModelVersionIdAsync(modelVersionId, cancellationToken) is not null)
+        {
+            return null;
+        }
+
+        var reusable = await _thumbnailRepository.GetByModelHashAsync(modelHash, cancellationToken);
+        if (reusable is not { Status: ThumbnailStatus.Ready, ThumbnailPath: not null, Width: > 0, Height: > 0 } ||
+            reusable.ModelVersionId == modelVersionId)
+        {
+            return null;
+        }
+
+        var now = DateTime.UtcNow;
+        var reusedThumbnail = Thumbnail.Create(modelId, modelVersionId, now);
+        reusedThumbnail.MarkAsReady(
+            reusable.ThumbnailPath,
+            reusable.PngThumbnailPath,
+            reusable.SizeBytes ?? 0,
+            reusable.Width.Value,
+            reusable.Height.Value,
+            now);
+
+        await _thumbnailRepository.AddAsync(reusedThumbnail, cancellationToken);
+        // Commit so the thumbnail has its real id before the version is linked to it.
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
+        await _modelVersionRepository.SetThumbnailIdAsync(modelVersionId, reusedThumbnail.Id, cancellationToken);
+
+        var reusedJob = ThumbnailJob.Create(modelId, modelVersionId, modelHash, now, maxAttempts, lockTimeoutMinutes);
+        reusedJob.MarkAsCompleted(now);
+        var createdJob = await _thumbnailJobRepository.AddAsync(reusedJob, cancellationToken);
+        // No worker notification: the job is already done, so there is nothing to dequeue.
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+        _logger.LogInformation(
+            "Reused ready thumbnail {ThumbnailId} for model {ModelId} version {ModelVersionId} (hash {ModelHash}) instead of queueing a render",
+            reusedThumbnail.Id, modelId, modelVersionId, modelHash);
 
         return createdJob;
     }

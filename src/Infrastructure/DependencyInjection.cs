@@ -98,6 +98,13 @@ namespace Infrastructure
                 configuration.GetSection("Derivation").Get<Application.Extraction.Derivation.DerivationOptions>()
                 ?? new Application.Extraction.Derivation.DerivationOptions();
             services.AddSingleton(derivationOptions);
+
+            // Env fallbacks for stored settings whose precedence is "stored wins,
+            // env falls back" - see Application.Settings.SettingEnvironmentDefaults.
+            // Read here so Application code never touches the process environment.
+            services.AddSingleton(Application.Settings.SettingEnvironmentDefaults.FromValues(
+                configuration["SKIP_DUPLICATE_THUMBNAILS"],
+                configuration["BLENDER_OPERATION_TIMEOUT_MS"]));
             services.AddScoped<ITextureSetRepository, TextureSetRepository>();
             services.AddScoped<IMaterialRepository, MaterialRepository>();
             services.AddScoped<IVfxRepository, VfxRepository>();

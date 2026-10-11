@@ -31,6 +31,11 @@ The easiest way to upload models is to drag and drop files directly onto the Mod
 3. **Thumbnail Generated** - The worker service renders a preview image
 4. **Ready to View** - Click to open in the 3D viewer
 
+Thumbnail rendering has its own settings under **Settings → Thumbnail
+Generation**: resolution, frame count, a transparent or solid background, and
+whether an upload of a file that already has a rendered thumbnail reuses it
+instead of rendering again.
+
 :::tip Batch Upload
 You can drag multiple files at once. Each file becomes a separate model.
 :::
@@ -80,6 +85,10 @@ back only what the import applied, never a category or tag you have set since.
 The folder is known for imports that come from a path or an archive. A file
 dragged into the browser carries a name and nothing else, so those models are
 classified from their name alone.
+
+Auto-tagging can be turned off in **Settings → File Upload → Auto-tag on
+import**. Turning it off stops new imports from being classified; what was
+already applied stays.
 
 ## Organizing with Categories
 

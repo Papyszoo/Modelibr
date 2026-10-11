@@ -1,13 +1,48 @@
-import { fireEvent, screen, within } from '@testing-library/react'
+import { fireEvent, screen, waitFor, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 
 import * as mcpAgentsApi from '@/features/settings/api/mcpAgentsApi'
+import * as settingsApi from '@/features/settings/api/settingsApi'
 import { renderWithProviders } from '@/test/renderWithProviders'
 
 import { McpAgentsSection } from '../McpAgentsSection'
 
 jest.mock('@/features/settings/api/mcpAgentsApi')
+jest.mock('@/features/settings/api/settingsApi')
 
 const api = mcpAgentsApi as jest.Mocked<typeof mcpAgentsApi>
+const settings = settingsApi as jest.Mocked<typeof settingsApi>
+
+/** A complete GET /settings payload; tests override the fields they exercise. */
+function settingsSnapshot(
+  overrides: Partial<Awaited<ReturnType<typeof settingsApi.getSettings>>> = {}
+): Awaited<ReturnType<typeof settingsApi.getSettings>> {
+  return {
+    maxFileSizeBytes: 1073741824,
+    maxThumbnailSizeBytes: 10485760,
+    thumbnailFrameCount: 30,
+    thumbnailSize: 256,
+    generateThumbnailOnUpload: true,
+    generateAnimatedThumbnail: true,
+    textureProxySize: 512,
+    blenderPath: 'blender',
+    blenderEnabled: false,
+    duplicateNamePolicy: 'Allow',
+    autoAssignOnImport: true,
+    cleanRecycledFilesAfterDays: 0,
+    preMigrationBackupEnabled: true,
+    preMigrationBackupRetention: 3,
+    skipDuplicateThumbnails: false,
+    mcpEnabled: true,
+    mcpWriteEnabled: false,
+    mcpDestructiveEnabled: false,
+    thumbnailBackground: 'transparent',
+    blenderOperationTimeoutMinutes: 15,
+    createdAt: '2026-01-01T00:00:00Z',
+    updatedAt: '2026-01-01T00:00:00Z',
+    ...overrides,
+  }
+}
 
 function mockMcp(
   agents: mcpAgentsApi.McpAgent[],
@@ -25,6 +60,7 @@ function toolsList(): HTMLElement {
 describe('McpAgentsSection', () => {
   beforeEach(() => {
     jest.clearAllMocks()
+    settings.getSettings.mockResolvedValue(settingsSnapshot())
   })
 
   it('lists every agent with its family chips and tools', async () => {
@@ -211,5 +247,48 @@ describe('McpAgentsSection', () => {
     const list = toolsList()
     expect(within(list).getByText('render_scene')).toBeInTheDocument()
     expect(within(list).queryByText('search_assets')).not.toBeInTheDocument()
+  })
+
+  it('saves the MCP toggles through the settings endpoint', async () => {
+    settings.getSettings.mockResolvedValue(settingsSnapshot())
+    settings.updateSetting.mockResolvedValue({
+      key: 'McpWriteEnabled',
+      value: 'true',
+      updatedAt: '2026-01-01T00:00:00Z',
+    })
+    mockMcp([], [])
+
+    renderWithProviders(<McpAgentsSection />)
+
+    const writeTools = await screen.findByRole('checkbox', {
+      name: /Allow write tools/,
+    })
+    await waitFor(() => expect(writeTools).toBeEnabled())
+    expect(writeTools).not.toBeChecked()
+
+    await userEvent.click(writeTools)
+
+    await waitFor(() => {
+      expect(settings.updateSetting).toHaveBeenCalledWith(
+        'McpWriteEnabled',
+        'true'
+      )
+    })
+  })
+
+  it('keeps the MCP toggles visible when the agent list cannot load', async () => {
+    // Turning the server off makes /mcp-agents unreachable; if the error state
+    // replaced the whole section there would be no way to turn it back on.
+    settings.getSettings.mockResolvedValue(
+      settingsSnapshot({ mcpEnabled: false })
+    )
+    api.getMcpAgents.mockRejectedValue(new Error('Request failed (404)'))
+    api.getMcpTools.mockRejectedValue(new Error('Request failed (404)'))
+
+    renderWithProviders(<McpAgentsSection />)
+
+    const toggle = await screen.findByRole('checkbox', { name: /MCP server/ })
+    await waitFor(() => expect(toggle).toBeEnabled())
+    expect(toggle).not.toBeChecked()
   })
 })

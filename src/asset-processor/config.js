@@ -369,6 +369,14 @@ export async function refreshBlenderConfigFromApi(apiClient) {
     if (typeof data.enableBlender === 'boolean') {
       config.blender.enabled = data.enableBlender
     }
+    // Only sent when the user chose a timeout; absent keeps the env-derived
+    // BLENDER_OPERATION_TIMEOUT_MS value from boot.
+    if (
+      typeof data.operationTimeoutMs === 'number' &&
+      data.operationTimeoutMs > 0
+    ) {
+      config.blenderOperationTimeoutMs = data.operationTimeoutMs
+    }
   } catch {
     // Silently fall back to the current config values
   }
@@ -377,12 +385,15 @@ export async function refreshBlenderConfigFromApi(apiClient) {
 // Allowed values for the single square thumbnail-size setting.
 const ALLOWED_THUMBNAIL_SIZES = new Set([64, 128, 256, 512, 1024, 2048])
 
+// Thumbnail background: 'transparent' or a #RRGGBB colour (see the Settings UI).
+const BACKGROUND_COLOUR_PATTERN = /^#[0-9a-fA-F]{6}$/
+
 /**
  * Refresh thumbnail render configuration from the backend API settings.
- * Translates the user-facing settings (size, frameCount, isAnimated) into the
- * orbit/rendering knobs the renderer reads. Thumbnails are always square so a
- * single `size` drives both outputWidth and outputHeight. Falls back silently
- * to existing in-memory config on failure.
+ * Translates the user-facing settings (size, frameCount, isAnimated, background)
+ * into the orbit/rendering knobs the renderer reads. Thumbnails are always square
+ * so a single `size` drives both outputWidth and outputHeight. Falls back
+ * silently to existing in-memory config on failure.
  *
  * When isAnimated=false, frameCount collapses to 1 (single frame at start angle)
  * - the renderer still produces a webp, just a 1-frame one. This keeps the
@@ -401,6 +412,14 @@ export async function refreshThumbnailRenderConfigFromApi(apiClient) {
     ) {
       config.rendering.outputWidth = data.size
       config.rendering.outputHeight = data.size
+    }
+
+    if (
+      typeof data.backgroundColor === 'string' &&
+      (data.backgroundColor.toLowerCase() === 'transparent' ||
+        BACKGROUND_COLOUR_PATTERN.test(data.backgroundColor))
+    ) {
+      config.rendering.backgroundColor = data.backgroundColor
     }
 
     const isAnimated = data.isAnimated !== false

@@ -49,7 +49,10 @@ public class ApplicationSettings : AggregateRoot
             ThumbnailSize = 256,
             GenerateThumbnailOnUpload = true, // Generate thumbnails by default
             GenerateAnimatedThumbnail = true, // Generate animated (multi-frame orbit) thumbnails by default
-            CleanRecycledFilesAfterDays = 30, // Default: 30 days
+            // Never by default: nothing purges recycled items until the user
+            // chooses a retention in Settings. A non-zero default would start
+            // deleting user data on upgrade.
+            CleanRecycledFilesAfterDays = 0,
             TextureProxySize = 512, // Default: 512px square
             CreatedAt = createdAt,
             UpdatedAt = createdAt
@@ -117,12 +120,12 @@ public class ApplicationSettings : AggregateRoot
     }
 
     /// <summary>
-    /// Updates the recycled files cleanup setting.
+    /// Updates the recycled files cleanup setting. 0 means never.
     /// </summary>
     public void UpdateCleanRecycledFilesAfterDays(int days, DateTime updatedAt)
     {
-        if (days < 1)
-            throw new ArgumentException("Clean recycled files after days must be at least 1.", nameof(days));
+        if (days < 0)
+            throw new ArgumentException("Clean recycled files after days must be 0 (never) or a number of days.", nameof(days));
 
         if (days > 365)
             throw new ArgumentException("Clean recycled files after days cannot exceed 365.", nameof(days));

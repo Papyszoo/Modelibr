@@ -73,7 +73,10 @@ migrations on every startup and, if there are any, takes an automatic backup
 
 ### Configuration
 
-Set these in your `.env` file:
+You can change the on/off switch and the retention from **Settings → Backup &
+Restore**. The `.env` variables below are the deployment-level control: when one
+is explicitly set (as the Docker Compose file always does), it wins over the
+stored setting.
 
 | Variable                                 | Default | Purpose                                                                                                                                                                                  |
 | ---------------------------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

@@ -37,7 +37,15 @@ export function requireLocalClient(request, response, next) {
   })
 }
 
-export async function startEdgeServer({ runtimeDir, configPath, runtimeManager, log = console.log }) {
+export async function startEdgeServer({
+  runtimeDir,
+  configPath,
+  runtimeManager,
+  log = console.log,
+  // Applies the desktop-only options (login item, updater auto-download) when a
+  // PUT changes them; injected by main.js so this module stays Electron-free.
+  onRuntimeOptionsChanged,
+}) {
   const app = express()
   // Proxy to the API port the WebApi actually bound (a free fallback if the
   // configured one was taken), not the raw config.
@@ -74,6 +82,9 @@ export async function startEdgeServer({ runtimeDir, configPath, runtimeManager, 
 
     const savedConfig = await saveRuntimeConfig(configPath, nextConfig)
     runtimeManager.updateConfig(savedConfig)
+    // Desktop-only options (start on login, auto-download updates) are applied
+    // live through Electron APIs - they are not restart-required.
+    await onRuntimeOptionsChanged?.(savedConfig)
     // Queue a data-folder move for the next launch if it changed here too.
     await runtimeManager.scheduleDataMigrationIfNeeded()
 

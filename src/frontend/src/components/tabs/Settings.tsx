@@ -18,7 +18,10 @@ import { type z } from 'zod'
 import { PINNED_TAB_TYPES } from '@/components/layout/dock-panel/pinnedTabs'
 import { useModelsQuery } from '@/features/models/api/queries'
 import { ScriptTemplatesSection } from '@/features/scripts/components/ScriptTemplatesSection'
-import { useSettingsQuery } from '@/features/settings/api/queries'
+import {
+  useNativeRuntimeQuery,
+  useSettingsQuery,
+} from '@/features/settings/api/queries'
 import type {
   BlenderInstallStatus,
   BlenderVersionInfo,
@@ -37,6 +40,10 @@ import {
 } from '@/features/settings/api/settingsApi'
 import { BackupsSection } from '@/features/settings/BackupsSection'
 import { McpAgentsSection } from '@/features/settings/McpAgentsSection'
+import { NativeDesktopSection } from '@/features/settings/NativeDesktopSection'
+import { SettingNumberField } from '@/features/settings/SettingNumberField'
+import { SettingToggle } from '@/features/settings/SettingToggle'
+import { ThumbnailBackgroundField } from '@/features/settings/ThumbnailBackgroundField'
 import { useTabUiState } from '@/hooks/useTabUiState'
 import { useTheme } from '@/hooks/useTheme'
 import { settingsFormSchema } from '@/shared/validation/formSchemas'
@@ -63,6 +70,7 @@ type SectionKey =
   | 'scriptTemplates'
   | 'backup'
   | 'mcpAgents'
+  | 'desktop'
 
 interface SectionMeta {
   key: SectionKey
@@ -91,11 +99,12 @@ const SECTIONS: SectionMeta[] = [
     key: 'fileUpload',
     label: 'File Upload',
     icon: 'pi-upload',
-    desc: 'Size limits and duplicate-name policy',
+    desc: 'Size limits, duplicate names and import automation',
     fields: [
       'Maximum file size',
       'Maximum thumbnail size',
       'Duplicate name policy',
+      'Auto-tag on import',
     ],
     hasFormSave: true,
     demoLocked: false,
@@ -110,6 +119,8 @@ const SECTIONS: SectionMeta[] = [
       'Animated thumbnail',
       'Frame count',
       'Thumbnail size',
+      'Reuse duplicate thumbnails',
+      'Thumbnail background',
       'Regenerate all thumbnails',
     ],
     hasFormSave: true,
@@ -129,7 +140,7 @@ const SECTIONS: SectionMeta[] = [
     label: 'Blender',
     icon: 'pi-box',
     desc: 'Version management for .blend file support',
-    fields: ['Blender version', 'Install', 'Uninstall'],
+    fields: ['Blender version', 'Install', 'Uninstall', 'Operation timeout'],
     hasFormSave: false,
     demoLocked: true,
   },
@@ -165,7 +176,14 @@ const SECTIONS: SectionMeta[] = [
     label: 'Backup & Restore',
     icon: 'pi-history',
     desc: 'Database and uploads snapshots',
-    fields: ['Create backup', 'Download backup', 'Restore backup'],
+    fields: [
+      'Create backup',
+      'Download backup',
+      'Restore backup',
+      'Back up before updates',
+      'Pre-update backups to keep',
+      'Recycled file retention',
+    ],
     hasFormSave: false,
     demoLocked: true,
   },
@@ -175,6 +193,15 @@ const SECTIONS: SectionMeta[] = [
     icon: 'pi-microchip-ai',
     desc: 'Agents and every tool the server exposes',
     fields: ['MCP agents', 'MCP tools', 'Connect a client'],
+    hasFormSave: false,
+    demoLocked: false,
+  },
+  {
+    key: 'desktop',
+    label: 'Desktop',
+    icon: 'pi-desktop',
+    desc: 'Start on login and update downloads',
+    fields: ['Start on login', 'Download updates automatically'],
     hasFormSave: false,
     demoLocked: false,
   },
@@ -454,6 +481,39 @@ export function Settings({ tabId }: SettingsProps = {}): JSX.Element {
   const [duplicateNamePolicySaving, setDuplicateNamePolicySaving] =
     useState(false)
 
+  // ── Immediately-saved key-value settings ────────────────────────────
+  // These save on change/blur instead of through the form footer, and are
+  // hydrated from the settings snapshot below.
+  const nativeRuntimeQuery = useNativeRuntimeQuery()
+  const isNativeDesktop = nativeRuntimeQuery.isSuccess
+  const visibleSections = useMemo(
+    () =>
+      isNativeDesktop
+        ? SECTIONS
+        : SECTIONS.filter(section => section.key !== 'desktop'),
+    [isNativeDesktop]
+  )
+
+  const [savingKvKey, setSavingKvKey] = useState<string | null>(null)
+  const [autoAssignOnImport, setAutoAssignOnImport] = useState(true)
+  const [skipDuplicateThumbnails, setSkipDuplicateThumbnails] = useState(false)
+  const [thumbnailBackground, setThumbnailBackground] = useState('transparent')
+  const [blenderOperationTimeoutMinutes, setBlenderOperationTimeoutMinutes] =
+    useState(15)
+
+  const saveKvSetting = async (key: string, value: string): Promise<void> => {
+    setSavingKvKey(key)
+    setError(null)
+    try {
+      await updateSetting(key, value)
+      await queryClient.invalidateQueries({ queryKey: ['settings'] })
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save setting')
+    } finally {
+      setSavingKvKey(null)
+    }
+  }
+
   // ── Bulk thumbnail regenerate ───────────────────────────────────────
   const [isRegeneratingThumbnails, setIsRegeneratingThumbnails] =
     useState(false)
@@ -524,6 +584,10 @@ export function Settings({ tabId }: SettingsProps = {}): JSX.Element {
     }
     setOriginalValues(original)
     setDuplicateNamePolicy(data.duplicateNamePolicy ?? 'Allow')
+    setAutoAssignOnImport(data.autoAssignOnImport ?? true)
+    setSkipDuplicateThumbnails(data.skipDuplicateThumbnails ?? false)
+    setThumbnailBackground(data.thumbnailBackground ?? 'transparent')
+    setBlenderOperationTimeoutMinutes(data.blenderOperationTimeoutMinutes ?? 15)
 
     // First hydration after mount: prefer the persisted draft (typed but
     // not yet saved) over the server snapshot so a tab switch doesn't wipe
@@ -595,15 +659,23 @@ export function Settings({ tabId }: SettingsProps = {}): JSX.Element {
   // If we boot in demo mode but the persisted activeSection points at a
   // demo-locked section (Blender, SSL, WebDAV, Backup), bounce back to the
   // grid - otherwise the detail view renders with disabled actions and no
-  // clear path out.
+  // clear path out. Same for the desktop section when the native host is not
+  // the one serving this page (e.g. the tab state survived a move to Docker).
   useEffect(() => {
-    if (!isDemo || !activeSection) return
+    if (!activeSection) return
+    // Wait for the native probe to settle before deciding the section is gone.
+    if (nativeRuntimeQuery.isLoading) return
+    if (activeSection === 'desktop' && !isNativeDesktop) {
+      setActiveSection(null)
+      return
+    }
+    if (!isDemo) return
     const target = SECTIONS.find(s => s.key === activeSection)
     if (target?.demoLocked) {
       setActiveSection(null)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isDemo, activeSection])
+  }, [isDemo, isNativeDesktop, nativeRuntimeQuery.isLoading, activeSection])
 
   // ── Close search dropdown when focus or pointer leaves the wrapper ──
   // `mousedown` covers click-outside; `focusout` covers Tab/Shift+Tab. The
@@ -830,7 +902,7 @@ export function Settings({ tabId }: SettingsProps = {}): JSX.Element {
   // ── Search index ────────────────────────────────────────────────────
   const searchIndex = useMemo<SearchResult[]>(
     () =>
-      SECTIONS.flatMap(section => [
+      visibleSections.flatMap(section => [
         {
           sectionKey: section.key,
           sectionLabel: section.label,
@@ -847,7 +919,7 @@ export function Settings({ tabId }: SettingsProps = {}): JSX.Element {
           label: f,
         })),
       ]),
-    []
+    [visibleSections]
   )
 
   const searchResults = useMemo<SearchResult[]>(() => {
@@ -895,9 +967,9 @@ export function Settings({ tabId }: SettingsProps = {}): JSX.Element {
   }
 
   const matchingSectionKeys = useMemo<Set<SectionKey>>(() => {
-    if (!search.trim()) return new Set(SECTIONS.map(s => s.key))
+    if (!search.trim()) return new Set(visibleSections.map(s => s.key))
     return new Set(searchResults.map(r => r.sectionKey))
-  }, [search, searchResults])
+  }, [search, searchResults, visibleSections])
 
   const handleSelectSection = (key: SectionKey) => {
     clearSuccess()
@@ -917,7 +989,7 @@ export function Settings({ tabId }: SettingsProps = {}): JSX.Element {
   }
 
   const currentSection = activeSection
-    ? SECTIONS.find(s => s.key === activeSection)
+    ? visibleSections.find(s => s.key === activeSection)
     : null
 
   // ────────────────────────────────────────────────────────────────────
@@ -1140,6 +1212,17 @@ export function Settings({ tabId }: SettingsProps = {}): JSX.Element {
                     Default: Allow duplicates
                   </span>
                 </div>
+
+                <SettingToggle
+                  id="autoAssignOnImport"
+                  label="Auto-tag on import"
+                  help="Suggest a category and tags from the file name and folder when importing. Everything it suggests is reviewable."
+                  isOn={autoAssignOnImport}
+                  saving={savingKvKey === 'AutoAssignOnImport'}
+                  onChange={next =>
+                    void saveKvSetting('AutoAssignOnImport', String(next))
+                  }
+                />
               </div>
             )}
 
@@ -1234,6 +1317,25 @@ export function Settings({ tabId }: SettingsProps = {}): JSX.Element {
                   </span>
                   <span className="settings-default">Default: 256 px</span>
                 </div>
+
+                <SettingToggle
+                  id="skipDuplicateThumbnails"
+                  label="Reuse duplicate thumbnails"
+                  help="When the same model file is uploaded again, reuse its existing thumbnail instead of rendering a new one."
+                  isOn={skipDuplicateThumbnails}
+                  saving={savingKvKey === 'SkipDuplicateThumbnails'}
+                  onChange={next =>
+                    void saveKvSetting('SkipDuplicateThumbnails', String(next))
+                  }
+                />
+
+                <ThumbnailBackgroundField
+                  background={thumbnailBackground}
+                  saving={savingKvKey === 'ThumbnailBackground'}
+                  onChange={next =>
+                    void saveKvSetting('ThumbnailBackground', next)
+                  }
+                />
 
                 <div className="settings-field">
                   <label>Regenerate existing thumbnails</label>
@@ -1425,6 +1527,22 @@ export function Settings({ tabId }: SettingsProps = {}): JSX.Element {
                         Only one Blender version can be installed at a time.
                       </span>
                     </div>
+
+                    <SettingNumberField
+                      id="blenderOperationTimeout"
+                      label="Operation timeout (minutes)"
+                      help="Kill a Blender run that exceeds this. Protects the queue from a hung unwrap or bake."
+                      value={blenderOperationTimeoutMinutes}
+                      min={1}
+                      max={240}
+                      saving={savingKvKey === 'BlenderOperationTimeoutMinutes'}
+                      onCommit={next =>
+                        void saveKvSetting(
+                          'BlenderOperationTimeoutMinutes',
+                          String(next)
+                        )
+                      }
+                    />
                   </>
                 )}
               </div>
@@ -1468,6 +1586,12 @@ export function Settings({ tabId }: SettingsProps = {}): JSX.Element {
             {currentSection.key === 'mcpAgents' && (
               <div className="section-fields">
                 <McpAgentsSection />
+              </div>
+            )}
+
+            {currentSection.key === 'desktop' && (
+              <div className="section-fields">
+                <NativeDesktopSection />
               </div>
             )}
           </div>
@@ -1586,7 +1710,7 @@ export function Settings({ tabId }: SettingsProps = {}): JSX.Element {
 
       <div className="settings-grid-area">
         <div className="settings-grid">
-          {SECTIONS.map(section => {
+          {visibleSections.map(section => {
             const dimmed = !matchingSectionKeys.has(section.key)
             const locked = isDemo && section.demoLocked
             return (

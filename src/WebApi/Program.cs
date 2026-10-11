@@ -1,8 +1,10 @@
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using Application;
+using Application.Settings;
 using Infrastructure;
 using Infrastructure.Extensions;
+using Infrastructure.Startup;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
 using WebApi.Endpoints;
@@ -146,11 +148,65 @@ namespace WebApi
             // archive did not carry are re-queued through the ordinary job queue.
             builder.Services.AddHostedService<ThumbnailRequeueOnRestoreHostedService>();
 
+            // Permanently deletes recycled items once they are older than the
+            // retention chosen in Settings (absent/0 = never, so nothing is
+            // deleted until the user opts in).
+            builder.Services.AddScoped<RecycledFilePurgeService>();
+            builder.Services.AddHostedService<RecycledFilePurgeHostedService>();
+
             // Local MCP server (prompt 27) - a thin, read-only pass-through over the
             // asset-search / metadata / compute query handlers, hosted in-process over
             // HTTP (SSE) so there's one process and one auth posture. Enabled by default;
             // set MCP_ENABLED=false to turn it off.
-            var mcpEnabled = builder.Configuration["MCP_ENABLED"] != "false";
+            //
+            // The three flags also have stored settings (Settings page). Precedence:
+            // an explicitly set env var wins (Docker deployments keep behaving exactly
+            // as their .env says), otherwise the stored value, then the default. Read
+            // at builder time because tool registration is startup-static - a stored
+            // change applies on the next restart. The stored read is skipped entirely
+            // when every env var is already set.
+            var mcpEnvEnabled = builder.Configuration["MCP_ENABLED"];
+            var mcpEnvWrite = builder.Configuration["MCP_WRITE_ENABLED"];
+            var mcpEnvDestructive = builder.Configuration["MCP_DESTRUCTIVE_ENABLED"];
+
+            var storedMcpKeys = new List<string>();
+            if (!SettingResolution.IsEnvSet(mcpEnvEnabled)) storedMcpKeys.Add(SettingKeys.McpEnabled);
+            if (!SettingResolution.IsEnvSet(mcpEnvWrite)) storedMcpKeys.Add(SettingKeys.McpWriteEnabled);
+            if (!SettingResolution.IsEnvSet(mcpEnvDestructive)) storedMcpKeys.Add(SettingKeys.McpDestructiveEnabled);
+
+            var storedMcp = storedMcpKeys.Count == 0
+                ? new Dictionary<string, string>()
+                : StartupSettingReader.ReadSettings(
+                    builder.Configuration,
+                    LoggerFactory.Create(b => b.AddConsole()).CreateLogger("StartupSettings"),
+                    storedMcpKeys);
+
+            var mcpEnabled = SettingResolution.ResolveBoolEnvThenStored(
+                storedMcp.GetValueOrDefault(SettingKeys.McpEnabled),
+                SettingResolution.IsEnvSet(mcpEnvEnabled)
+                    ? !string.Equals(mcpEnvEnabled, "false", StringComparison.Ordinal)
+                    : null,
+                defaultValue: true);
+            var mcpWriteEnabled = SettingResolution.ResolveBoolEnvThenStored(
+                storedMcp.GetValueOrDefault(SettingKeys.McpWriteEnabled),
+                SettingResolution.IsEnvSet(mcpEnvWrite)
+                    ? string.Equals(mcpEnvWrite, "true", StringComparison.Ordinal)
+                    : null,
+                defaultValue: false);
+            var mcpDestructiveEnabled = SettingResolution.ResolveBoolEnvThenStored(
+                storedMcp.GetValueOrDefault(SettingKeys.McpDestructiveEnabled),
+                SettingResolution.IsEnvSet(mcpEnvDestructive)
+                    ? string.Equals(mcpEnvDestructive, "true", StringComparison.Ordinal)
+                    : null,
+                defaultValue: false);
+
+            // Keep the effective values visible in configuration: the destructive
+            // guard reads the flag per call, and diagnostics should see the same
+            // answer registration used.
+            builder.Configuration["MCP_ENABLED"] = mcpEnabled ? "true" : "false";
+            builder.Configuration["MCP_WRITE_ENABLED"] = mcpWriteEnabled ? "true" : "false";
+            builder.Configuration["MCP_DESTRUCTIVE_ENABLED"] = mcpDestructiveEnabled ? "true" : "false";
+
             if (mcpEnabled)
             {
                 // Access tokens are parsed once, at startup, and a malformed MCP_TOKENS
@@ -229,7 +285,6 @@ namespace WebApi
                 // Write tools (prompt 30) are opt-in: OFF by default keeps a stock server
                 // read-only so enabling agent writes on a LAN-reachable endpoint is a
                 // deliberate operator choice. Every write is idempotency-keyed + audited.
-                var mcpWriteEnabled = builder.Configuration["MCP_WRITE_ENABLED"] == "true";
                 if (mcpWriteEnabled)
                 {
                     mcpServer

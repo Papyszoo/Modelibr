@@ -124,14 +124,42 @@
       // page.evaluate that runs alongside the captured scene graph.
       window.modelibrAnimationKinds = clip => animationKindsOf(clip)
 
+      // The configured thumbnail background: 'transparent' or a #RRGGBB colour.
+      // Kept on the renderer state so clearScene() / applyDefaultSceneEnvironment()
+      // can restore it between jobs instead of resetting to transparency.
+      function normalizeBackgroundColor(value) {
+        if (typeof value !== 'string') return 'transparent'
+        const trimmed = value.trim().toLowerCase()
+        if (trimmed === 'transparent') return 'transparent'
+        return /^#[0-9a-f]{6}$/.test(trimmed) ? trimmed : 'transparent'
+      }
+
+      function applyBackground() {
+        const renderer = window.modelRenderer.renderer
+        const scene = window.modelRenderer.scene
+        if (!renderer || !scene) return
+
+        const background = window.modelRenderer.backgroundColor
+        if (!background || background === 'transparent') {
+          scene.background = null
+          renderer.setClearColor(0x000000, 0)
+        } else {
+          const colour = new THREE.Color(background)
+          scene.background = colour
+          renderer.setClearColor(colour, 1)
+        }
+      }
+
       // Initialize scene with WebGPU or WebGL
       async function initScene(width, height, backgroundColor) {
         const container = document.getElementById('canvas-container')
 
         // Create scene
         const scene = new THREE.Scene()
-        // Set background to null for transparency
+        // The configured background is applied once the renderer exists below.
         scene.background = null
+        window.modelRenderer.backgroundColor =
+          normalizeBackgroundColor(backgroundColor)
 
         // Create camera with tighter field of view for better framing
         const camera = new THREE.PerspectiveCamera(
@@ -233,6 +261,9 @@
           spot: lights.spot,
         }
 
+        // Apply the configured background now that the renderer and scene exist.
+        applyBackground()
+
         return true
       }
 
@@ -292,7 +323,9 @@
         const scene = window.modelRenderer.scene
         if (!scene) return
 
-        scene.background = null
+        // Restores transparency or the configured solid colour - not always
+        // transparency, which is what this used to hardcode.
+        applyBackground()
         scene.backgroundBlurriness = 0
         scene.environment = window.modelRenderer.defaultEnvironment
         scene.environmentIntensity =

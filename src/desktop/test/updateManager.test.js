@@ -47,6 +47,26 @@ test('check() opts out of background download and install-on-quit', async () => 
   assert.equal(au.calls.checkForUpdates, 1)
 })
 
+test('autoDownloadUpdates option enables background downloads, install-on-quit stays off', async () => {
+  const { mgr, au } = makeManager({ autoDownloadUpdates: true })
+  await mgr.check()
+  assert.equal(au.autoDownload, true, 'the desktop option enables autoDownload')
+  assert.equal(au.autoInstallOnAppQuit, false, 'installing on quit is never enabled')
+})
+
+test('setAutoDownload applies the option live, before or after wiring', async () => {
+  const { mgr, au } = makeManager()
+  mgr.setAutoDownload(true)
+  assert.equal(au.autoDownload, true, 'pre-wire changes reach the updater')
+
+  await mgr.check()
+  assert.equal(au.autoDownload, true, 'wiring keeps the chosen value')
+
+  mgr.setAutoDownload(false)
+  assert.equal(au.autoDownload, false)
+  assert.equal(au.autoInstallOnAppQuit, false)
+})
+
 test('check() is a no-op on an unpackaged (dev) build', async () => {
   const { mgr, au } = makeManager({ isPackaged: false })
   await mgr.check()

@@ -560,6 +560,22 @@
   left: 19px;
 }
 
+/* Thumbnail background: a transparent checkbox plus a colour swatch. */
+.thumbnail-background-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+.thumbnail-background-row input[type='color'] {
+  width: 44px;
+  height: 30px;
+  padding: 2px;
+  border: 1.5px solid var(--surface-border);
+  border-radius: 7px;
+  background: var(--surface-card);
+  cursor: pointer;
+}
+
 /* One checkbox per pinnable main dock page (Settings, Appearance). */
 .pinned-tabs-options {
   display: flex;
@@ -828,6 +844,19 @@
   border: none;
   background: transparent;
 }
+.backups-settings {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+.backups-settings-heading {
+  margin: 0;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-color-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
 .backups-toolbar {
   display: flex;
   align-items: center;
@@ -932,6 +961,11 @@
   padding: 0;
   border: none;
   background: transparent;
+}
+.mcp-settings-block {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
 }
 .mcp-agent-card {
   display: flex;

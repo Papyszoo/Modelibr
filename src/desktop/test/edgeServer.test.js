@@ -113,6 +113,56 @@ test('saving a new app port keeps the live server on the bound port', async () =
   }
 })
 
+test('saving desktop options applies them live through the injected hook', async () => {
+  const userData = await fs.mkdtemp(path.join(os.tmpdir(), 'modelibr-edge-'))
+  const runtimeDir = path.join(userData, 'runtime')
+  await fs.mkdir(path.join(runtimeDir, 'frontend'), { recursive: true })
+
+  const appPort = await freePort()
+  const internalApiPort = await freePort()
+
+  const { config, configPath } = await loadRuntimeConfig(userData)
+  const runtimeManager = new ProcessManager({
+    runtimeDir,
+    userDataDir: userData,
+    config: { ...config, appPort, internalApiPort },
+    log: () => {},
+  })
+  runtimeManager.markRunning()
+
+  // main.js injects this hook; in the real app it calls Electron's
+  // setLoginItemSettings and the update manager.
+  const applied = []
+  const edge = await startEdgeServer({
+    runtimeDir,
+    configPath,
+    runtimeManager,
+    log: () => {},
+    onRuntimeOptionsChanged: saved => {
+      applied.push(saved)
+    },
+  })
+  try {
+    const put = await request('PUT', `http://127.0.0.1:${appPort}/api/native/runtime`, {
+      startOnLogin: true,
+      autoDownloadUpdates: true,
+    })
+    assert.equal(put.status, 200)
+
+    assert.equal(applied.length, 1, 'the hook must run on every save')
+    assert.equal(applied[0].startOnLogin, true)
+    assert.equal(applied[0].autoDownloadUpdates, true)
+
+    const payload = JSON.parse(put.body)
+    assert.equal(payload.restartRequired, false, 'desktop options are not restart-required')
+    assert.equal(payload.config.startOnLogin, true)
+    assert.equal(payload.config.autoDownloadUpdates, true)
+  } finally {
+    await edge.close()
+    await fs.rm(userData, { recursive: true, force: true })
+  }
+})
+
 // Regression: with "Allow access from my network" on the edge server binds
 // 0.0.0.0, so any LAN device could rewrite ports and the data folder through
 // PUT /api/native/runtime. That endpoint must answer 403 to a non-local client.

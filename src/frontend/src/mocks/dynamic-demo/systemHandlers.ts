@@ -1252,9 +1252,25 @@ export const systemHandlers = [
       blenderPath: 'blender',
       blenderEnabled: false,
       duplicateNamePolicy: 'Allow',
+      autoAssignOnImport: true,
+      cleanRecycledFilesAfterDays: 0,
+      preMigrationBackupEnabled: true,
+      preMigrationBackupRetention: 3,
+      skipDuplicateThumbnails: false,
+      mcpEnabled: true,
+      mcpWriteEnabled: false,
+      mcpDestructiveEnabled: false,
+      thumbnailBackground: 'transparent',
+      blenderOperationTimeoutMinutes: 15,
       createdAt: '2025-01-15T10:00:00Z',
       updatedAt: '2025-01-15T10:00:00Z',
     })
+  }),
+
+  // The native desktop host's runtime endpoint. Demo mode is a browser, so the
+  // Desktop section stays hidden; answering 404 keeps MSW quiet about it.
+  http.get('*/native/runtime', async () => {
+    return new HttpResponse(null, { status: 404 })
   }),
 
   http.get('*/settings/blender-enabled', async () => {
