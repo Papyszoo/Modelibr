@@ -19,11 +19,19 @@ export interface UIPreferencesState {
    * not significant here: consumers render in catalogue order.
    */
   pinnedTabTypes: TabType[]
+  /**
+   * Section shown in the Settings page nav. Persisted so the last edited
+   * section is the one the page opens on. Stored as a plain string: the
+   * section catalogue lives in the Settings component and the store must not
+   * depend on it; Settings falls back to its first section for an unknown key.
+   */
+  settingsSection: string
 }
 
 interface UIPreferencesStore extends UIPreferencesState {
   setMobileBarPosition: (position: MobileBarPosition) => void
   setPinnedTabType: (type: TabType, pinned: boolean) => void
+  setSettingsSection: (section: string) => void
   reset: () => void
 }
 
@@ -32,6 +40,7 @@ const DEFAULTS: UIPreferencesState = {
   // Models and Projects are pinned out of the box; the other main pages behave
   // as ordinary tabs.
   pinnedTabTypes: ['modelList', 'projects'],
+  settingsSection: 'appearance',
 }
 
 export const useUIPreferencesStore = create<UIPreferencesStore>()(
@@ -47,8 +56,12 @@ export const useUIPreferencesStore = create<UIPreferencesStore>()(
               : [...state.pinnedTabTypes, type]
             : state.pinnedTabTypes.filter(t => t !== type),
         })),
+      setSettingsSection: section => set({ settingsSection: section }),
       reset: () =>
-        set({ ...DEFAULTS, pinnedTabTypes: [...DEFAULTS.pinnedTabTypes] }),
+        set({
+          ...DEFAULTS,
+          pinnedTabTypes: [...DEFAULTS.pinnedTabTypes],
+        }),
     }),
     {
       name: 'modelibr_ui_preferences',

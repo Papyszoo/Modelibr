@@ -58,7 +58,7 @@ When(
     "I open the {string} settings section",
     async ({ page }, label: string) => {
         await page
-            .locator(`.setting-card:has-text("${label}")`)
+            .locator(`.settings-nav-item:has-text("${label}")`)
             .first()
             .click();
         await expect(

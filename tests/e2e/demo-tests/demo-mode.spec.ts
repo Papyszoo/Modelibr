@@ -500,9 +500,9 @@ test.describe("demo mode e2e", () => {
         await settingsPage.navigateToSettings();
         await settingsPage.waitForLoaded();
 
-        // The new grid uses .setting-card.locked for demo-disabled sections.
-        const lockedCards = page.locator(".setting-card.locked");
-        await expect(lockedCards).toHaveCount(4);
+        // Demo-disabled sections render as disabled nav items.
+        const lockedItems = page.locator(".settings-nav-item.is-locked");
+        await expect(lockedItems).toHaveCount(4);
 
         for (const name of [
             "Blender",
@@ -510,20 +510,22 @@ test.describe("demo mode e2e", () => {
             "WebDAV",
             "Backup & Restore",
         ]) {
-            const card = page.locator(".setting-card.locked", {
+            const item = page.locator(".settings-nav-item.is-locked", {
                 hasText: name,
             });
-            await expect(card).toBeVisible();
-            await expect(card).toContainText("Disabled in demo mode");
+            await expect(item).toBeVisible();
+            await expect(item).toHaveAttribute("title", /disabled in demo mode/i);
         }
 
-        // Clicking a locked card must not navigate into the detail view -
-        // the grid stays visible.
+        // Clicking a locked nav item must not switch the content away from the
+        // default Appearance section.
         await page
-            .locator(".setting-card.locked", { hasText: "Blender" })
+            .locator(".settings-nav-item.is-locked", { hasText: "Blender" })
             .click({ force: true });
-        await expect(page.locator(".settings-grid")).toBeVisible();
-        await expect(page.locator(".section-detail")).toHaveCount(0);
+        await expect(page.locator(".settings-nav")).toBeVisible();
+        await expect(page.locator(".section-detail-title")).toContainText(
+            "Appearance",
+        );
     });
 
     test("shows the demo mode banner with reset and info buttons", async ({ page }) => {
