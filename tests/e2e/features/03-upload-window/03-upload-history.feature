@@ -25,11 +25,14 @@ Feature: Upload History Page
     And the item should display an "Uploaded to" location
 
   @history-open-model @slow
-  # @slow: UI-timing flake on `locator.waitFor` for the model viewer tab - the open-model
-  # action lands but the tab doesn't reliably appear within 25s on shared CI runners.
+  # @slow: mounts the model viewer (software WebGL on shared runners), so it
+  # stays on the local lane. The item is anchored on the Background's live
+  # provisioned model: history also lists uploads whose model was permanently
+  # deleted since, and their "Open Model" button no-ops (the model load 404s),
+  # so opening an arbitrary item at hand was a coin toss.
   Scenario: History navigation opens model in viewer
     When I navigate to the Upload History page
-    And I find a history item with a model
+    And I find the history item for the model "single-version-model"
     When I click the "Open Model" button for that item
     Then a model viewer tab should be opened
     And the model viewer should be visible

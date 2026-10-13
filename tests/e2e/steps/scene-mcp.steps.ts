@@ -127,15 +127,31 @@ async function uploadModel(page: Page): Promise<McpModel> {
     await expectOk(versions, "The model versions could not be read");
     const versionId = Number((await versions.json())[0].id);
 
-    // Scene geometry checks (contact, containment, budget fit) are skipped for an
-    // asset with no derived bounds, so the scenarios that exercise them must wait
-    // for the processor to finish deriving this fresh upload. Nothing here renders;
-    // this is the cheap bounds lookup the editor itself uses before a placement.
+    return {
+        id: uploaded.id,
+        name: String((await detail.json()).name),
+        versionId,
+    };
+}
+
+/**
+ * Wait for the processor to finish deriving the scenario's freshly uploaded model.
+ *
+ * Only the scenarios that exercise the geometry checks (contact, containment, budget fit)
+ * need this: those are skipped for an asset with no derived bounds, so a scenario that
+ * asserts one must not run before the bounds land. The rest place, move and remove nodes
+ * without ever reading a size, and waiting on every one of them turned each scenario in
+ * the file into a wait for the asset processor - which is what starved them on the
+ * parallel lane.
+ */
+async function expectDerivedBounds(page: Page): Promise<void> {
+    const current = model(page);
+
     await expect
         .poll(
             async () => {
                 const response = await page.request.get(
-                    `${API_BASE}/scenes/asset-facts?assetType=Model&assetId=${uploaded.id}&versionId=${versionId}`,
+                    `${API_BASE}/scenes/asset-facts?assetType=Model&assetId=${current.id}&versionId=${current.versionId}`,
                 );
                 if (!response.ok()) {
                     return false;
@@ -143,18 +159,12 @@ async function uploadModel(page: Page): Promise<McpModel> {
                 return Boolean((await response.json()).sourceDimensions);
             },
             {
-                message: `Waiting for model ${uploaded.id} to be derived`,
-                timeout: 90000,
+                message: `Waiting for model ${current.id} to be derived`,
+                timeout: 120000,
                 intervals: [1000, 2000],
             },
         )
         .toBe(true);
-
-    return {
-        id: uploaded.id,
-        name: String((await detail.json()).name),
-        versionId,
-    };
 }
 
 async function createScene(page: Page, prefix: string): Promise<McpScene> {
@@ -214,6 +224,12 @@ async function proposeTwo(page: Page, slotId: string): Promise<any> {
 
 Given("a scene MCP model exists", async ({ page }) => {
     getScenarioState(page).setCustom(MODEL_KEY, await uploadModel(page));
+});
+
+// For the scenarios that assert a geometry check: the model is uploaded with the rest of
+// the file, and only this step waits for its derived bounds.
+Given("the scene MCP model has derived bounds", async ({ page }) => {
+    await expectDerivedBounds(page);
 });
 
 // ---- create_scene / list_scenes / get_scene -----------------------------------

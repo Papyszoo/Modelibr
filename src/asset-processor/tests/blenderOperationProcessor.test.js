@@ -683,9 +683,11 @@ describe('BlenderOperationProcessor - convert-format', () => {
     expect(args).toContain('--format')
     expect(args[args.indexOf('--format') + 1]).toBe('glb')
     // With its siblings: a loose glTF without its .bin converts to a valid file of nothing.
+    // And from the AUTHORED file: a .blend's auto-converted .glb is not what a conversion
+    // is for, and reading it was a race with the conversion.
     expect(
       processor.modelFileService.fetchModelFileWithAuxiliaries
-    ).toHaveBeenCalledWith(42, 7)
+    ).toHaveBeenCalledWith(42, 7, { preferSource: true })
   })
 
   it('reports both formats and the new version id back on the job', async () => {

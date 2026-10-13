@@ -1,6 +1,9 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
 namespace WebApi.Tests.Integration;
@@ -19,14 +22,32 @@ namespace WebApi.Tests.Integration;
 /// </summary>
 [Trait("Category", "Integration")]
 [Collection(PostgresIntegrationCollection.Name)]
-public class SearchEndpointBindingIntegrationTests : IClassFixture<ModelibrWebFactory>
+public class SearchEndpointBindingIntegrationTests : IClassFixture<ModelibrWebFactory>, IAsyncLifetime
 {
+    private readonly ModelibrWebFactory _factory;
     private readonly HttpClient _client;
 
     public SearchEndpointBindingIntegrationTests(ModelibrWebFactory factory)
     {
+        _factory = factory;
         _client = factory.CreateClient();
     }
+
+    // Idempotent re-migrate before any fact runs - the same defence every other class in
+    // this collection carries (see the note in ConcurrencyTests). Each class's
+    // ModelibrWebFactory constructor drops and recreates the shared
+    // "Modelibr_IntegrationTests" database, and a sibling's drop can still land while this
+    // class's host is starting; Program.cs deliberately swallows a startup migration that
+    // hits that window so the app can boot without a database. Both facts below then read
+    // repositories that need the schema, and failed with Npgsql 42P01 ("relation Projects
+    // does not exist") - a 500 instead of the 400 under test.
+    public async Task InitializeAsync()
+    {
+        using var scope = _factory.Services.CreateScope();
+        await scope.ServiceProvider.GetRequiredService<ApplicationDbContext>().Database.MigrateAsync();
+    }
+
+    public Task DisposeAsync() => Task.CompletedTask;
 
     [Fact]
     public async Task ApplyProfile_Is_Bound_And_Rejects_An_Unknown_Mode()

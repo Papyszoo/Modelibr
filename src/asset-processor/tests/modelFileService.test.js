@@ -546,3 +546,118 @@ describe('ModelFileService.cleanupOldFiles', () => {
     })
   })
 })
+
+describe('ModelFileService source-file preference', () => {
+  let service
+  let tempDir
+
+  beforeEach(() => {
+    tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'modelibr-source-'))
+    service = new ModelFileService()
+    service.tempDir = tempDir
+    // No real sleeping between retries.
+    vi.spyOn(service, 'sleep').mockResolvedValue(undefined)
+  })
+
+  /** A response shaped like the API's file downloads: a stream plus a filename header. */
+  function fileResponse(name, body) {
+    return {
+      data: Readable.from([Buffer.from(body)]),
+      headers: {
+        'content-disposition': `attachment; filename="${name}"`,
+      },
+    }
+  }
+
+  it("fetches the version's authored file, not the converted derivative", async () => {
+    // A .blend upload gets a renderable .glb added to its version by the automatic
+    // conversion, and the version's file endpoint prefers that derivative. A bake that
+    // runs on it bakes a rig the conversion already dropped - and whether it exists yet
+    // is a race with the conversion.
+    service.jobService = {
+      getModelVersion: vi.fn().mockResolvedValue({
+        files: [
+          { id: 44, originalFileName: 'rig.blend', isRenderable: false },
+          { id: 45, originalFileName: 'rig.glb', isRenderable: true },
+        ],
+      }),
+      getFile: vi
+        .fn()
+        .mockResolvedValue(fileResponse('rig.blend', 'BLENDFILE')),
+      getModelFile: vi.fn(),
+    }
+
+    const result = await service.fetchModelFile(7, 1, { preferSource: true })
+
+    expect(service.jobService.getFile).toHaveBeenCalledWith(44)
+    expect(service.jobService.getModelFile).not.toHaveBeenCalled()
+    expect(result.originalFileName).toBe('rig.blend')
+    expect(result.fileType).toBe('blend')
+  })
+
+  it('asks the version file endpoint when every file is renderable', async () => {
+    // A native .glb upload has no separate source; the renderable file IS the source.
+    service.jobService = {
+      getModelVersion: vi.fn().mockResolvedValue({
+        files: [{ id: 45, originalFileName: 'chair.glb', isRenderable: true }],
+      }),
+      getFile: vi.fn(),
+      getModelFile: vi
+        .fn()
+        .mockResolvedValue(fileResponse('chair.glb', 'GLBDATA')),
+    }
+
+    await service.fetchModelFile(7, 1, { preferSource: true })
+
+    expect(service.jobService.getFile).not.toHaveBeenCalled()
+    expect(service.jobService.getModelFile).toHaveBeenCalledWith(7, 1)
+  })
+
+  it('asks the version file endpoint when the version cannot be read', async () => {
+    // The preference must never be the reason an operation cannot start.
+    service.jobService = {
+      getModelVersion: vi
+        .fn()
+        .mockRejectedValue(new Error('500 Internal Server Error')),
+      getFile: vi.fn(),
+      getModelFile: vi
+        .fn()
+        .mockResolvedValue(fileResponse('chair.glb', 'GLBDATA')),
+    }
+
+    await service.fetchModelFile(7, 1, { preferSource: true })
+
+    expect(service.jobService.getFile).not.toHaveBeenCalled()
+    expect(service.jobService.getModelFile).toHaveBeenCalledWith(7, 1)
+  })
+
+  it('does not read the version when there is no version id to read', async () => {
+    service.jobService = {
+      getModelVersion: vi.fn(),
+      getFile: vi.fn(),
+      getModelFile: vi
+        .fn()
+        .mockResolvedValue(fileResponse('chair.glb', 'GLBDATA')),
+    }
+
+    await service.fetchModelFile(7, null, { preferSource: true })
+
+    expect(service.jobService.getModelVersion).not.toHaveBeenCalled()
+    expect(service.jobService.getModelFile).toHaveBeenCalledWith(7, null)
+  })
+
+  it('keeps asking the version file endpoint when the preference is off', async () => {
+    service.jobService = {
+      getModelVersion: vi.fn(),
+      getFile: vi.fn(),
+      getModelFile: vi
+        .fn()
+        .mockResolvedValue(fileResponse('chair.glb', 'GLBDATA')),
+    }
+
+    await service.fetchModelFile(7, 1)
+
+    expect(service.jobService.getModelVersion).not.toHaveBeenCalled()
+    expect(service.jobService.getModelFile).toHaveBeenCalledWith(7, 1)
+  })
+})

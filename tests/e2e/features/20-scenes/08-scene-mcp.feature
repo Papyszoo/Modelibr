@@ -86,8 +86,16 @@ Feature: Scene tools for agents
         Then the scene should hold a blockout box over REST
         And the MCP document update should be reflected
 
+    # @serial: this scenario waits for the asset processor to derive a freshly uploaded
+    # model. One render slot is shared worker-wide, so on the untagged parallel lane that
+    # derivation queues behind every render job in flight and the wait can outlast the
+    # test's whole budget - the scenario failed on load alone, not on behavior. The serial
+    # lane's queue is shallow, and the wait's budget covers the rest. Drop @serial if
+    # derivation ever stops going through that render slot.
+    @serial @timeout:240000
     Scenario: An agent validates a scene with a floating node
         Given an agent-created scene exists
+        And the scene MCP model has derived bounds
         When an agent places the scene MCP model in the scene
         And an agent lifts the placed node 5 m into the air
         And an agent validates the scene over MCP
@@ -130,10 +138,15 @@ Feature: Scene tools for agents
         Then the MCP slot "streetlight" should recommend "B" with the summary "matches the brief best"
         And the MCP slot "streetlight" should remain open
 
+    # @serial: same asset-processor wait as the floating-node scenario above - the measured
+    # candidate cards need the model's derived facts, and the parallel lane can starve that
+    # derivation behind renders.
+    @serial @timeout:240000
     Scenario: Candidate cards are measured against the project profile
         Given a batch2 project with a per-asset budget exists
         And an agent-created scene exists
         And the scene is linked to the batch2 project
+        And the scene MCP model has derived bounds
         And the scene MCP model is placed for the slot "streetlight"
         When an agent proposes two candidates for the slot "streetlight"
         Then the MCP slot candidates should be measured against the project

@@ -481,23 +481,41 @@ Then('the item should display an "Uploaded to" location', async ({ page }) => {
     console.log(`[UI] Item displays "Uploaded to": "${uploadedTo}" ✓`);
 });
 
-When("I find a history item with a model", async ({ page }) => {
-    const historyPage = new UploadHistoryPage(page);
-    const totalItems = await historyPage.getTotalItemCount();
-    let found = false;
-    for (let i = 0; i < totalItems; i++) {
-        const isModel = await historyPage.isOpenModelButtonVisible(i);
-        if (isModel) {
-            foundModelItemIndex = i;
-            found = true;
-            break;
+When(
+    "I find the history item for the model {string}",
+    async ({ page }, stateName: string) => {
+        const model = getScenarioState(page).getModel(stateName);
+        if (!model) {
+            throw new Error(
+                `No model "${stateName}" in shared state - an upload Given is missing.`,
+            );
         }
-    }
-    expect(found).toBe(true);
-    console.log(
-        `[UI] Found history item with model at index ${foundModelItemIndex} ✓`,
-    );
-});
+        // The history lists every upload of the run, including models that were
+        // permanently deleted afterwards - their "Open Model" button reads the
+        // model at click time and silently no-ops on a 404. Opening the first
+        // item that merely has a button is therefore a coin toss; pin the item
+        // to the provisioned model the scenario knows is still live.
+        const historyPage = new UploadHistoryPage(page);
+        let index = -1;
+        await expect
+            .poll(
+                async () => {
+                    index = await historyPage.findItemByFilename(model.name);
+                    return index;
+                },
+                {
+                    message: `Waiting for "${model.name}" to appear in the upload history`,
+                    timeout: 15000,
+                    intervals: [500, 1000, 2000],
+                },
+            )
+            .toBeGreaterThanOrEqual(0);
+        foundModelItemIndex = index;
+        console.log(
+            `[UI] Found history item for "${model.name}" at index ${index} ✓`,
+        );
+    },
+);
 
 When('I click the "Open Model" button for that item', async ({ page }) => {
     const historyPage = new UploadHistoryPage(page);

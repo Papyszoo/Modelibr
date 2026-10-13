@@ -172,11 +172,17 @@ export class ScenesPage {
       .count();
   }
 
-  /** Brings the editor tab of the named scene back into view. */
+  /**
+   * Brings the editor tab of the named scene back into view.
+   *
+   * Switching only: the tab CONTENT is not necessarily an editor. A scene deleted while
+   * its tab was open keeps the tab and shows the missing-scene notice in its place, so
+   * asserting the editor here failed the one scenario that switch exists for. Scenarios
+   * that need the editor assert it themselves ("the scene editor should be visible").
+   */
   async switchToSceneTab(name: string): Promise<void> {
     const { clickTabByTooltip } = await import("../helpers/navigation-helper");
     await clickTabByTooltip(this.page, `Scene: ${name}`, "left");
-    await expect(this.page.locator(this.editor)).toBeVisible();
   }
 
   /** The scene whose name the open editor tab is labelled with. */

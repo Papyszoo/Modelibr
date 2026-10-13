@@ -178,9 +178,13 @@ export class BlenderOperationProcessor {
     // With its siblings, not alone: Blender follows the references inside the file
     // itself, so a loose glTF without its .bin has no geometry and an OBJ without
     // its .mtl has no materials.
+    // The authored file, not a converted derivative: a bake or an unwrap is about what
+    // the user made, and the renderable .glb an upload auto-generates is a lossy stand-in
+    // whose presence on the version is a race with the conversion.
     const source = await this.modelFileService.fetchModelFileWithAuxiliaries(
       job.assetId,
-      job.versionId
+      job.versionId,
+      { preferSource: true }
     )
 
     const outputPath = path.join(
@@ -287,7 +291,8 @@ export class BlenderOperationProcessor {
     // and converting either of those would produce a valid file of nothing.
     const source = await this.modelFileService.fetchModelFileWithAuxiliaries(
       job.assetId,
-      job.versionId
+      job.versionId,
+      { preferSource: true }
     )
 
     const outputPath = path.join(
@@ -377,7 +382,8 @@ export class BlenderOperationProcessor {
     // its .mtl has no materials.
     const source = await this.modelFileService.fetchModelFileWithAuxiliaries(
       job.assetId,
-      job.versionId
+      job.versionId,
+      { preferSource: true }
     )
 
     const outputDir = path.join(os.tmpdir(), `bake-${job.id}-${Date.now()}`)
@@ -583,7 +589,8 @@ export class BlenderOperationProcessor {
     // its .mtl has no materials.
     const source = await this.modelFileService.fetchModelFileWithAuxiliaries(
       job.assetId,
-      job.versionId
+      job.versionId,
+      { preferSource: true }
     )
 
     try {

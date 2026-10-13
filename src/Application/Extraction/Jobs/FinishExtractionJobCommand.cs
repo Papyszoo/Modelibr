@@ -71,14 +71,37 @@ internal sealed class FinishExtractionJobCommandHandler
         }
         else
         {
-            job.MarkAsFailed(
-                string.IsNullOrWhiteSpace(command.ErrorMessage) ? "Extraction failed." : command.ErrorMessage,
-                now);
+            job.MarkAsFailed(FailureReason(command.ErrorMessage), now);
         }
 
         await _repository.UpdateAsync(job, cancellationToken);
         await _unitOfWork.SaveChangesAsync(cancellationToken);
         return Result.Success();
+    }
+
+    /// <summary>
+    /// The reason a worker reported, cut down to what the job accepts.
+    ///
+    /// A Blender traceback routinely runs past the entity's 2000-character limit, and
+    /// handing it through made the entity THROW - a reported failure came back to the
+    /// worker as an unhandled 500, so the job was never marked failed and sat Processing
+    /// until its lease expired and it was re-queued. A truncated reason is still a usable
+    /// one; a rejected report is a lost failure.
+    /// </summary>
+    private static string FailureReason(string? errorMessage)
+    {
+        const int limit = 2000;
+        const string ellipsis = "...";
+
+        if (string.IsNullOrWhiteSpace(errorMessage))
+        {
+            return "Extraction failed.";
+        }
+
+        var trimmed = errorMessage.Trim();
+        return trimmed.Length <= limit
+            ? trimmed
+            : string.Concat(trimmed.AsSpan(0, limit - ellipsis.Length), ellipsis);
     }
 }
 
