@@ -26,6 +26,7 @@ import { useUploadProgress } from '@/hooks/useUploadProgress'
 import { CategoryTreePanel } from '@/shared/components/categories/CategoryTreePanel'
 import { LoadingState } from '@/shared/components/feedback'
 import {
+  ListSelectionBar,
   ListToolbar,
   ListToolbarActions,
   ListToolbarButton,
@@ -33,11 +34,9 @@ import {
   ListToolbarPanel,
   ListToolbarRow,
   ListToolbarSearchInput,
-  ListToolbarSelectionActions,
-  ListToolbarSelectionBar,
-  ListToolbarSelectionSummary,
   OptionsButton,
 } from '@/shared/components/list-toolbar'
+import { useGridAreaSelection, useListSelection } from '@/shared/hooks'
 import { useDragAndDrop } from '@/shared/hooks/useFileUpload'
 import {
   ALL_CATEGORIES_ID,
@@ -69,20 +68,12 @@ export function SpriteList() {
   const [selectedSpriteIds, setSelectedSpriteIds] = useState<Set<number>>(
     new Set()
   )
-  const [isAreaSelecting, setIsAreaSelecting] = useState(false)
-  const [selectionBox, setSelectionBox] = useState<{
-    startX: number
-    startY: number
-    currentX: number
-    currentY: number
-  } | null>(null)
   const [contextMenuTarget, setContextMenuTarget] = useState<SpriteDto | null>(
     null
   )
   const [isSearchOpen, setIsSearchOpen] = useState(false)
 
   // ── Refs ────────────────────────────────────────────────────────────
-  const spriteGridRef = useRef<HTMLDivElement>(null)
   const toast = useRef<Toast>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const contextMenuRef = useRef<ContextMenu>(null)
@@ -120,6 +111,32 @@ export function SpriteList() {
     invalidateSprites,
     loadCategories,
   } = useSpriteListData()
+
+  // ── Selection (shared model: click / Ctrl+click / Shift range / Ctrl+A) ──
+  const orderedSpriteIds = useMemo(
+    () => filteredSprites.map(sprite => sprite.id),
+    [filteredSprites]
+  )
+  const selection = useListSelection({
+    orderedIds: orderedSpriteIds,
+    selectedIds: selectedSpriteIds,
+    onChange: setSelectedSpriteIds,
+  })
+  const {
+    surfaceRef: spriteGridRef,
+    isAreaSelecting,
+    selectionBox,
+    surfaceProps: spriteGridSurfaceProps,
+  } = useGridAreaSelection<number>({
+    cardSelector: '.sprite-card[data-sprite-id]',
+    getCardId: card => {
+      const raw = card.getAttribute('data-sprite-id')
+      if (!raw) return null
+      const id = Number(raw)
+      return Number.isNaN(id) ? null : id
+    },
+    onSelect: setSelectedSpriteIds,
+  })
 
   // ── Mutations Hook ──────────────────────────────────────────────────
   const {
@@ -205,96 +222,14 @@ export function SpriteList() {
   }
 
   // ── Selection & Drag ───────────────────────────────────────────────
-  const toggleSpriteSelection = (spriteId: number, e: MouseEvent) => {
-    e.stopPropagation()
-    setSelectedSpriteIds(prev => {
-      const next = new Set(prev)
-      if (next.has(spriteId)) next.delete(spriteId)
-      else next.add(spriteId)
-      return next
-    })
+  const toggleSpriteSelection = (spriteId: number, event: MouseEvent) => {
+    event.stopPropagation()
+    selection.toggle(spriteId, event)
   }
 
-  const clearSelection = () => setSelectedSpriteIds(new Set())
-
-  const handleGridMouseDown = (e: MouseEvent<HTMLDivElement>) => {
-    const target = e.target as HTMLElement
-    if (target.closest('.sprite-card')) return
-    if (spriteGridRef.current) {
-      // NOTE: spriteGridRef IS the scroll container (.sprite-grid-container has
-      // overflow: auto), so its bounding rect stays fixed while the content
-      // scrolls - the scrollLeft/scrollTop term below is REQUIRED to map the
-      // cursor into the scrolled content. This differs from the model /
-      // texture-set / environment-map grids, where the rect comes from a
-      // non-scrolling selection-surface child and adding scroll would
-      // double-count it. Don't "simplify" this by removing the scroll terms.
-      const rect = spriteGridRef.current.getBoundingClientRect()
-      setIsAreaSelecting(true)
-      setSelectionBox({
-        startX: e.clientX - rect.left + spriteGridRef.current.scrollLeft,
-        startY: e.clientY - rect.top + spriteGridRef.current.scrollTop,
-        currentX: e.clientX - rect.left + spriteGridRef.current.scrollLeft,
-        currentY: e.clientY - rect.top + spriteGridRef.current.scrollTop,
-      })
-    }
-  }
-
-  const handleGridMouseMove = (e: MouseEvent<HTMLDivElement>) => {
-    if (!isAreaSelecting || !selectionBox || !spriteGridRef.current) return
-    const gridRef = spriteGridRef.current
-    const rect = gridRef.getBoundingClientRect()
-    setSelectionBox(prev =>
-      prev
-        ? {
-            ...prev,
-            currentX: e.clientX - rect.left + gridRef.scrollLeft,
-            currentY: e.clientY - rect.top + gridRef.scrollTop,
-          }
-        : null
-    )
-  }
-
-  const handleGridMouseUp = () => {
-    if (isAreaSelecting && selectionBox && spriteGridRef.current) {
-      const rect = spriteGridRef.current.getBoundingClientRect()
-      const selectionLeft = Math.min(selectionBox.startX, selectionBox.currentX)
-      const selectionTop = Math.min(selectionBox.startY, selectionBox.currentY)
-      const selectionRight = Math.max(
-        selectionBox.startX,
-        selectionBox.currentX
-      )
-      const selectionBottom = Math.max(
-        selectionBox.startY,
-        selectionBox.currentY
-      )
-
-      const cards = spriteGridRef.current.querySelectorAll('.sprite-card')
-      const newSelected = new Set<number>()
-
-      cards.forEach(card => {
-        const cardRect = card.getBoundingClientRect()
-        const cardLeft =
-          cardRect.left - rect.left + spriteGridRef.current!.scrollLeft
-        const cardTop =
-          cardRect.top - rect.top + spriteGridRef.current!.scrollTop
-        const cardRight = cardLeft + cardRect.width
-        const cardBottom = cardTop + cardRect.height
-
-        if (
-          cardRight >= selectionLeft &&
-          cardLeft <= selectionRight &&
-          cardBottom >= selectionTop &&
-          cardTop <= selectionBottom
-        ) {
-          const spriteId = card.getAttribute('data-sprite-id')
-          if (spriteId) newSelected.add(parseInt(spriteId, 10))
-        }
-      })
-
-      if (newSelected.size > 0) setSelectedSpriteIds(newSelected)
-    }
-    setIsAreaSelecting(false)
-    setSelectionBox(null)
+  // Open the same bulk menu a card right-click shows, anchored at the bar.
+  const handleBulkActionsClick = (event: MouseEvent<HTMLElement>) => {
+    contextMenuRef.current?.show(event)
   }
 
   const handleSpriteDragStart = (
@@ -460,6 +395,7 @@ export function SpriteList() {
   // ── Render ─────────────────────────────────────────────────────────
   return (
     <div
+      ref={selection.containerRef}
       className="sprite-list"
       onDrop={onDrop}
       onDragOver={onDragOver}
@@ -504,27 +440,21 @@ export function SpriteList() {
           />
         </ListToolbarRow>
 
-        {selectedSpriteIds.size > 0 ? (
-          <ListToolbarSelectionBar>
-            <ListToolbarSelectionSummary>
-              {selectedSpriteIds.size} sprite
-              {selectedSpriteIds.size === 1 ? '' : 's'} selected.
-            </ListToolbarSelectionSummary>
-            <ListToolbarSelectionActions>
-              <ListToolbarButton
-                icon="pi pi-times"
-                label="Clear"
-                onClick={clearSelection}
-              />
-            </ListToolbarSelectionActions>
-          </ListToolbarSelectionBar>
-        ) : null}
+        <ListSelectionBar
+          count={selectedSpriteIds.size}
+          visibleCount={filteredSprites.length}
+          unitLabel="sprite"
+          onBulkActionsClick={handleBulkActionsClick}
+          onSelectAllClick={selection.selectAll}
+          onDeselectAllClick={selection.deselectAll}
+        />
 
         <ListToolbarPanel id="sprite-list-search-panel" open={isSearchOpen}>
           <ListToolbarSearchInput
             value={searchQuery}
             onChange={setSearchQuery}
             placeholder="Search sprites..."
+            autoFocus={isSearchOpen}
           />
         </ListToolbarPanel>
       </ListToolbar>
@@ -582,9 +512,9 @@ export function SpriteList() {
               onContextMenu={handleSpriteContextMenu}
               onSpriteDragStart={handleSpriteDragStart}
               onSpriteDragEnd={handleSpriteDragEnd}
-              onGridMouseDown={handleGridMouseDown}
-              onGridMouseMove={handleGridMouseMove}
-              onGridMouseUp={handleGridMouseUp}
+              onGridMouseDown={spriteGridSurfaceProps.onMouseDown}
+              onGridMouseMove={spriteGridSurfaceProps.onMouseMove}
+              onGridMouseUp={spriteGridSurfaceProps.onMouseUp}
               onLoadMore={() => fetchNextPage()}
             />
           )}

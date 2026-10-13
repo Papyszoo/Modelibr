@@ -172,7 +172,7 @@ export function ContainerSpritesTab({
           <ListToolbarSearchInput
             value={localSearch}
             onChange={setLocalSearch}
-            placeholder="Search sprites…"
+            placeholder="Search sprites..."
           />
         </ListToolbarPanel>
       </ListToolbar>

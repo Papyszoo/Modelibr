@@ -131,8 +131,8 @@ export function useScriptMutations({
         content: () =>
           recycleToastContent(
             scriptIds.length > 1
-              ? `${scriptIds.length} scripts moved to recycle bin`
-              : 'Script moved to recycle bin',
+              ? `${scriptIds.length} scripts moved to recycled files`
+              : 'Script moved to recycled files',
             () => void handleUndoRecycle(scriptIds)
           ),
       })

@@ -101,7 +101,11 @@ export function ListToolbarCount({
 /** Sub-toolbar that appears when items are selected (bulk-action context). */
 export function ListToolbarSelectionBar({ children }: { children: ReactNode }) {
   return (
-    <div className="list-toolbar-selection-bar" aria-live="polite">
+    <div
+      className="list-toolbar-selection-bar"
+      aria-live="polite"
+      data-testid="selection-bar"
+    >
       {children}
     </div>
   )
@@ -112,7 +116,14 @@ export function ListToolbarSelectionSummary({
 }: {
   children: ReactNode
 }) {
-  return <span className="list-toolbar-selection-summary">{children}</span>
+  return (
+    <span
+      className="list-toolbar-selection-summary"
+      data-testid="selection-count"
+    >
+      {children}
+    </span>
+  )
 }
 
 export function ListToolbarSelectionActions({
@@ -121,6 +132,65 @@ export function ListToolbarSelectionActions({
   children: ReactNode
 }) {
   return <div className="list-toolbar-selection-actions">{children}</div>
+}
+
+interface ListSelectionBarProps {
+  /** Number of selected items; the bar renders only when this is > 0. */
+  count: number
+  /** Number of selectable (visible/filtered) items - bounds Select All. */
+  visibleCount: number
+  /** Singular noun, e.g. "model"; the summary pluralizes it. */
+  unitLabel: string
+  /**
+   * Opens the list's bulk-action menu. Omit only when the list has no bulk
+   * actions at all.
+   */
+  onBulkActionsClick?: (event: ReactMouseEvent<HTMLElement>) => void
+  onSelectAllClick: () => void
+  onDeselectAllClick: () => void
+}
+
+/**
+ * The one selection bar composition for every list: count summary, Bulk
+ * actions, Select All, Deselect All. Renders nothing when nothing is
+ * selected. Pages pass counts + handlers, never their own bar layout.
+ */
+export function ListSelectionBar({
+  count,
+  visibleCount,
+  unitLabel,
+  onBulkActionsClick,
+  onSelectAllClick,
+  onDeselectAllClick,
+}: ListSelectionBarProps) {
+  if (count === 0) return null
+
+  const countLabel = `${count} ${unitLabel}${count === 1 ? '' : 's'}`
+
+  return (
+    <ListToolbarSelectionBar>
+      <ListToolbarSelectionSummary>
+        {countLabel} selected.
+      </ListToolbarSelectionSummary>
+      <ListToolbarSelectionActions>
+        {onBulkActionsClick ? (
+          <ListToolbarButton
+            icon="pi pi-list-check"
+            label="Bulk actions"
+            active
+            onClick={onBulkActionsClick}
+            ariaLabel={`Bulk actions for ${countLabel}`}
+          />
+        ) : null}
+        <ListToolbarButton
+          label="Select All"
+          onClick={onSelectAllClick}
+          disabled={visibleCount === 0 || count >= visibleCount}
+        />
+        <ListToolbarButton label="Deselect All" onClick={onDeselectAllClick} />
+      </ListToolbarSelectionActions>
+    </ListToolbarSelectionBar>
+  )
 }
 
 /**

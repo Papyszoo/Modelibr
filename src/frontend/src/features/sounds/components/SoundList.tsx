@@ -4,7 +4,6 @@ import '@/shared/components/FilterPanel.css'
 import { Button } from 'primereact/button'
 import { type ContextMenu } from 'primereact/contextmenu'
 import { Dialog } from 'primereact/dialog'
-import { InputNumber } from 'primereact/inputnumber'
 import { Toast } from 'primereact/toast'
 import {
   type DragEvent,
@@ -20,9 +19,11 @@ import { getFileUrl } from '@/features/models/api/modelApi'
 import { useSoundListData } from '@/features/sounds/hooks/useSoundListData'
 import { useSoundMutations } from '@/features/sounds/hooks/useSoundMutations'
 import { useSoundUpload } from '@/features/sounds/hooks/useSoundUpload'
+import { NumberInput } from '@/shared/components'
 import { CategoryTreePanel } from '@/shared/components/categories/CategoryTreePanel'
 import { LoadingState } from '@/shared/components/feedback'
 import {
+  ListSelectionBar,
   ListToolbar,
   ListToolbarActions,
   ListToolbarButton,
@@ -30,11 +31,9 @@ import {
   ListToolbarPanel,
   ListToolbarRow,
   ListToolbarSearchInput,
-  ListToolbarSelectionActions,
-  ListToolbarSelectionBar,
-  ListToolbarSelectionSummary,
   OptionsButton,
 } from '@/shared/components/list-toolbar'
+import { useGridAreaSelection, useListSelection } from '@/shared/hooks'
 import {
   ALL_CATEGORIES_ID,
   UNASSIGNED_CATEGORY_ID,
@@ -54,7 +53,6 @@ import { SoundGridContent } from './SoundGridContent'
 export function SoundList() {
   const toast = useRef<Toast>(null)
   const contextMenuRef = useRef<ContextMenu>(null)
-  const soundGridRef = useRef<HTMLDivElement>(null)
 
   const showToast = useCallback(
     (opts: {
@@ -100,13 +98,30 @@ export function SoundList() {
   const [selectedSoundIds, setSelectedSoundIds] = useState<Set<number>>(
     new Set()
   )
-  const [isAreaSelecting, setIsAreaSelecting] = useState(false)
-  const [selectionBox, setSelectionBox] = useState<{
-    startX: number
-    startY: number
-    currentX: number
-    currentY: number
-  } | null>(null)
+  const orderedSoundIds = useMemo(
+    () => filteredSounds.map(sound => sound.id),
+    [filteredSounds]
+  )
+  const selection = useListSelection({
+    orderedIds: orderedSoundIds,
+    selectedIds: selectedSoundIds,
+    onChange: setSelectedSoundIds,
+  })
+  const {
+    surfaceRef: soundGridRef,
+    isAreaSelecting,
+    selectionBox,
+    surfaceProps: soundGridSurfaceProps,
+  } = useGridAreaSelection<number>({
+    cardSelector: '.sound-card[data-sound-id]',
+    getCardId: card => {
+      const raw = card.getAttribute('data-sound-id')
+      if (!raw) return null
+      const id = Number(raw)
+      return Number.isNaN(id) ? null : id
+    },
+    onSelect: setSelectedSoundIds,
+  })
   const [contextMenuTarget, setContextMenuTarget] = useState<SoundDto | null>(
     null
   )
@@ -179,107 +194,9 @@ export function SoundList() {
     }
   }
 
-  const toggleSoundSelection = (soundId: number, e: MouseEvent) => {
-    e.stopPropagation()
-    setSelectedSoundIds(prev => {
-      const next = new Set(prev)
-      if (next.has(soundId)) {
-        next.delete(soundId)
-      } else {
-        next.add(soundId)
-      }
-      return next
-    })
-  }
-
-  const clearSelection = () => {
-    setSelectedSoundIds(new Set())
-  }
-
-  const handleGridMouseDown = (e: MouseEvent<HTMLDivElement>) => {
-    const target = e.target as HTMLElement
-    if (target.closest('.sound-card')) {
-      return
-    }
-    if (soundGridRef.current) {
-      // NOTE: soundGridRef IS the scroll container (.sound-grid-container has
-      // overflow: auto), so its bounding rect stays fixed while the content
-      // scrolls - the scrollLeft/scrollTop term below is REQUIRED to map the
-      // cursor into the scrolled content. This differs from the model /
-      // texture-set / environment-map grids, where the rect comes from a
-      // non-scrolling selection-surface child and adding scroll would
-      // double-count it. Don't "simplify" this by removing the scroll terms.
-      const rect = soundGridRef.current.getBoundingClientRect()
-      setIsAreaSelecting(true)
-      setSelectionBox({
-        startX: e.clientX - rect.left + soundGridRef.current.scrollLeft,
-        startY: e.clientY - rect.top + soundGridRef.current.scrollTop,
-        currentX: e.clientX - rect.left + soundGridRef.current.scrollLeft,
-        currentY: e.clientY - rect.top + soundGridRef.current.scrollTop,
-      })
-    }
-  }
-
-  const handleGridMouseMove = (e: MouseEvent<HTMLDivElement>) => {
-    if (!isAreaSelecting || !selectionBox || !soundGridRef.current) return
-    const gridRef = soundGridRef.current
-    const rect = gridRef.getBoundingClientRect()
-    setSelectionBox(prev =>
-      prev
-        ? {
-            ...prev,
-            currentX: e.clientX - rect.left + gridRef.scrollLeft,
-            currentY: e.clientY - rect.top + gridRef.scrollTop,
-          }
-        : null
-    )
-  }
-
-  const handleGridMouseUp = () => {
-    if (isAreaSelecting && selectionBox && soundGridRef.current) {
-      const rect = soundGridRef.current.getBoundingClientRect()
-      const selectionLeft = Math.min(selectionBox.startX, selectionBox.currentX)
-      const selectionTop = Math.min(selectionBox.startY, selectionBox.currentY)
-      const selectionRight = Math.max(
-        selectionBox.startX,
-        selectionBox.currentX
-      )
-      const selectionBottom = Math.max(
-        selectionBox.startY,
-        selectionBox.currentY
-      )
-
-      const cards = soundGridRef.current.querySelectorAll('.sound-card')
-      const newSelected = new Set<number>()
-
-      cards.forEach(card => {
-        const cardRect = card.getBoundingClientRect()
-        const cardLeft =
-          cardRect.left - rect.left + soundGridRef.current!.scrollLeft
-        const cardTop =
-          cardRect.top - rect.top + soundGridRef.current!.scrollTop
-        const cardRight = cardLeft + cardRect.width
-        const cardBottom = cardTop + cardRect.height
-
-        if (
-          cardRight >= selectionLeft &&
-          cardLeft <= selectionRight &&
-          cardBottom >= selectionTop &&
-          cardTop <= selectionBottom
-        ) {
-          const soundId = card.getAttribute('data-sound-id')
-          if (soundId) {
-            newSelected.add(parseInt(soundId, 10))
-          }
-        }
-      })
-
-      if (newSelected.size > 0) {
-        setSelectedSoundIds(newSelected)
-      }
-    }
-    setIsAreaSelecting(false)
-    setSelectionBox(null)
+  const toggleSoundSelection = (soundId: number, event: MouseEvent) => {
+    event.stopPropagation()
+    selection.toggle(soundId, event)
   }
 
   const handleSoundDragStart = (
@@ -357,6 +274,11 @@ export function SoundList() {
     })
 
     setDraggedSoundId(null)
+  }
+
+  // Open the same bulk menu a card right-click shows, anchored at the bar.
+  const handleBulkActionsClick = (event: MouseEvent<HTMLElement>) => {
+    contextMenuRef.current?.show(event)
   }
 
   // Handle recycling sounds via context menu
@@ -454,6 +376,7 @@ export function SoundList() {
 
   return (
     <div
+      ref={selection.containerRef}
       className="sound-list"
       onDrop={onDrop}
       onDragOver={onDragOver}
@@ -514,27 +437,21 @@ export function SoundList() {
           />
         </ListToolbarRow>
 
-        {selectedSoundIds.size > 0 ? (
-          <ListToolbarSelectionBar>
-            <ListToolbarSelectionSummary>
-              {selectedSoundIds.size} sound
-              {selectedSoundIds.size === 1 ? '' : 's'} selected.
-            </ListToolbarSelectionSummary>
-            <ListToolbarSelectionActions>
-              <ListToolbarButton
-                icon="pi pi-times"
-                label="Clear"
-                onClick={clearSelection}
-              />
-            </ListToolbarSelectionActions>
-          </ListToolbarSelectionBar>
-        ) : null}
+        <ListSelectionBar
+          count={selectedSoundIds.size}
+          visibleCount={filteredSounds.length}
+          unitLabel="sound"
+          onBulkActionsClick={handleBulkActionsClick}
+          onSelectAllClick={selection.selectAll}
+          onDeselectAllClick={selection.deselectAll}
+        />
 
         <ListToolbarPanel id="sound-list-search-panel" open={isSearchOpen}>
           <ListToolbarSearchInput
             value={searchQuery}
             onChange={setSearchQuery}
             placeholder="Search sounds..."
+            autoFocus={isSearchOpen}
           />
         </ListToolbarPanel>
 
@@ -545,19 +462,21 @@ export function SoundList() {
               data-testid="sound-duration-filter"
             >
               <span>Duration (s)</span>
-              <InputNumber
+              <NumberInput
                 value={minDuration}
-                onValueChange={e => setMinDuration(e.value ?? null)}
+                onChange={setMinDuration}
                 placeholder="Min"
                 min={0}
+                allowEmpty
                 data-testid="min-duration-filter"
               />
               <span>–</span>
-              <InputNumber
+              <NumberInput
                 value={maxDuration}
-                onValueChange={e => setMaxDuration(e.value ?? null)}
+                onChange={setMaxDuration}
                 placeholder="Max"
                 min={0}
+                allowEmpty
                 data-testid="max-duration-filter"
               />
             </div>
@@ -631,9 +550,9 @@ export function SoundList() {
               onContextMenu={handleSoundContextMenu}
               onSoundDragStart={handleSoundDragStart}
               onSoundDragEnd={handleSoundDragEnd}
-              onGridMouseDown={handleGridMouseDown}
-              onGridMouseMove={handleGridMouseMove}
-              onGridMouseUp={handleGridMouseUp}
+              onGridMouseDown={soundGridSurfaceProps.onMouseDown}
+              onGridMouseMove={soundGridSurfaceProps.onMouseMove}
+              onGridMouseUp={soundGridSurfaceProps.onMouseUp}
               onLoadMore={() => fetchNextPage()}
             />
           )}

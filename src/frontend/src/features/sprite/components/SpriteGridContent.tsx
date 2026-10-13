@@ -1,9 +1,9 @@
 import { Button } from 'primereact/button'
-import { Checkbox } from 'primereact/checkbox'
 import { type DragEvent, type MouseEvent, type RefObject } from 'react'
 
 import { getFilePreviewUrl } from '@/features/models/api/modelApi'
 import { EmptyState } from '@/shared/components/feedback'
+import { AreaSelectionBox } from '@/shared/components/selection'
 import { type SpriteDto } from '@/types'
 import { formatFileSize } from '@/utils/fileUtils'
 
@@ -116,12 +116,17 @@ export function SpriteGridContent({
               onDragStart={e => onSpriteDragStart(e, sprite)}
               onDragEnd={onSpriteDragEnd}
             >
-              <div
+              <button
+                type="button"
                 className="sprite-select-checkbox"
                 onClick={e => onToggleSelection(sprite.id, e)}
+                aria-label={`${selectedSpriteIds.has(sprite.id) ? 'Deselect' : 'Select'} ${sprite.name}`}
+                aria-pressed={selectedSpriteIds.has(sprite.id)}
               >
-                <Checkbox checked={selectedSpriteIds.has(sprite.id)} readOnly />
-              </div>
+                <i
+                  className={`pi ${selectedSpriteIds.has(sprite.id) ? 'pi-check-square' : 'pi-stop'}`}
+                />
+              </button>
               <div className="sprite-preview">
                 <img
                   src={getFilePreviewUrl(sprite.fileId.toString())}
@@ -147,15 +152,7 @@ export function SpriteGridContent({
           ))}
         </div>
         {isAreaSelecting && selectionBox && (
-          <div
-            className="selection-box"
-            style={{
-              left: Math.min(selectionBox.startX, selectionBox.currentX),
-              top: Math.min(selectionBox.startY, selectionBox.currentY),
-              width: Math.abs(selectionBox.currentX - selectionBox.startX),
-              height: Math.abs(selectionBox.currentY - selectionBox.startY),
-            }}
-          />
+          <AreaSelectionBox box={selectionBox} className="selection-box" />
         )}
       </div>
 

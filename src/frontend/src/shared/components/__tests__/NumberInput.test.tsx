@@ -105,6 +105,71 @@ describe('NumberInput', () => {
       expect(screen.getByLabelText('Amount')).toHaveValue('1.5')
     })
   })
+
+  describe('optional (allowEmpty) fields', () => {
+    /** Optional min/max filter, like the list toolbars use. */
+    function OptionalHarness() {
+      const [value, setValue] = useState<number | null>(null)
+      return (
+        <>
+          <NumberInput
+            aria-label="Minimum"
+            value={value}
+            onChange={setValue}
+            min={0}
+            placeholder="Min"
+            allowEmpty
+          />
+          <output data-testid="optional-value">{String(value)}</output>
+        </>
+      )
+    }
+
+    // Regression: optional numeric filters (triangle count, duration) were
+    // PrimeReact InputNumbers; an emptied field must clear the filter (null),
+    // not snap back to the previous number.
+    it('commits null when the field is emptied and renders null as empty', () => {
+      render(<OptionalHarness />)
+      const input = screen.getByLabelText('Minimum')
+      expect(input).toHaveValue('')
+
+      fireEvent.change(input, { target: { value: '12' } })
+      expect(screen.getByTestId('optional-value')).toHaveTextContent('12')
+
+      fireEvent.change(input, { target: { value: '' } })
+      expect(screen.getByTestId('optional-value')).toHaveTextContent('null')
+      expect(input).toHaveValue('')
+    })
+
+    it('restores the old value when unparseable text is left on blur', () => {
+      render(<OptionalHarness />)
+      const input = screen.getByLabelText('Minimum')
+
+      fireEvent.change(input, { target: { value: '5' } })
+      fireEvent.change(input, { target: { value: 'abc' } })
+      fireEvent.blur(input)
+
+      expect(input).toHaveValue('5')
+      expect(screen.getByTestId('optional-value')).toHaveTextContent('5')
+    })
+  })
+
+  it('passes placeholder and disabled through to the input', () => {
+    render(
+      <NumberInput
+        aria-label="Amount"
+        value={3}
+        onChange={() => {}}
+        placeholder="Min"
+        disabled
+      />
+    )
+    expect(screen.getByLabelText('Amount')).toHaveAttribute(
+      'placeholder',
+      'Min'
+    )
+    expect(screen.getByLabelText('Amount')).toBeDisabled()
+  })
 })
 
 /** Forces `navigator.language` for the duration of `run`. */

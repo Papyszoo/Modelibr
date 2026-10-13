@@ -2,13 +2,14 @@ import '@/shared/components/FilterPanel.css'
 
 import { Button } from 'primereact/button'
 import { Dropdown } from 'primereact/dropdown'
-import { InputNumber } from 'primereact/inputnumber'
 import { InputSwitch } from 'primereact/inputswitch'
 import { MultiSelect } from 'primereact/multiselect'
 import { type MouseEvent as ReactMouseEvent } from 'react'
 
 import { isTriangleRangeInverted } from '@/features/models/utils/triangleRange'
+import { NumberInput } from '@/shared/components'
 import {
+  ListSelectionBar,
   ListToolbar,
   ListToolbarActions,
   ListToolbarButton,
@@ -16,9 +17,6 @@ import {
   ListToolbarPanel,
   ListToolbarRow,
   ListToolbarSearchInput,
-  ListToolbarSelectionActions,
-  ListToolbarSelectionBar,
-  ListToolbarSelectionSummary,
   OptionsButton,
 } from '@/shared/components/list-toolbar'
 import { UV_STATUS_OPTIONS, type UvStatus } from '@/shared/types/uvStatus'
@@ -152,7 +150,6 @@ export function ModelsFilters({
     hasTriangleRange,
     uvStatus != null,
   ].filter(Boolean).length
-  const selectedCountLabel = `${selectedModelCount} model${selectedModelCount === 1 ? '' : 's'}`
 
   return (
     <ListToolbar>
@@ -232,40 +229,21 @@ export function ModelsFilters({
         <ListToolbarCount count={modelCount} unitLabel="model" />
       </ListToolbarRow>
 
-      {selectedModelCount > 0 ? (
-        <ListToolbarSelectionBar>
-          <ListToolbarSelectionSummary>
-            {selectedCountLabel} selected.
-          </ListToolbarSelectionSummary>
-          <ListToolbarSelectionActions>
-            <ListToolbarButton
-              icon="pi pi-list-check"
-              label="Bulk actions"
-              active
-              onClick={onBulkActionsClick}
-              ariaLabel={`Bulk actions for ${selectedCountLabel}`}
-            />
-            <ListToolbarButton
-              label="Select All"
-              onClick={onSelectAllClick}
-              disabled={
-                visibleModelCount === 0 ||
-                selectedModelCount >= visibleModelCount
-              }
-            />
-            <ListToolbarButton
-              label="Deselect All"
-              onClick={onDeselectAllClick}
-            />
-          </ListToolbarSelectionActions>
-        </ListToolbarSelectionBar>
-      ) : null}
+      <ListSelectionBar
+        count={selectedModelCount}
+        visibleCount={visibleModelCount}
+        unitLabel="model"
+        onBulkActionsClick={onBulkActionsClick}
+        onSelectAllClick={onSelectAllClick}
+        onDeselectAllClick={onDeselectAllClick}
+      />
 
       <ListToolbarPanel id="model-grid-search-panel" open={isSearchOpen}>
         <ListToolbarSearchInput
           value={searchQuery}
           onChange={onSearchChange}
           placeholder="Search models..."
+          autoFocus={isSearchOpen}
         />
       </ListToolbarPanel>
 
@@ -332,23 +310,23 @@ export function ModelsFilters({
           </div>
           <div className="list-filters-switch models-filter-switch">
             <span>Triangles</span>
-            <InputNumber
+            <NumberInput
               value={minTriangleCount}
-              onValueChange={e => onMinTriangleCountChange(e.value ?? null)}
+              onChange={onMinTriangleCountChange}
               placeholder="Min"
               min={0}
-              useGrouping
-              inputClassName={`models-filter-triangle-input${triangleRangeInvalid ? ' p-invalid' : ''}`}
+              allowEmpty
+              className={`models-filter-triangle-input${triangleRangeInvalid ? ' p-invalid' : ''}`}
               data-testid="min-triangle-filter"
             />
             <span>–</span>
-            <InputNumber
+            <NumberInput
               value={maxTriangleCount}
-              onValueChange={e => onMaxTriangleCountChange(e.value ?? null)}
+              onChange={onMaxTriangleCountChange}
               placeholder="Max"
               min={0}
-              useGrouping
-              inputClassName={`models-filter-triangle-input${triangleRangeInvalid ? ' p-invalid' : ''}`}
+              allowEmpty
+              className={`models-filter-triangle-input${triangleRangeInvalid ? ' p-invalid' : ''}`}
               data-testid="max-triangle-filter"
             />
             {triangleRangeInvalid ? (

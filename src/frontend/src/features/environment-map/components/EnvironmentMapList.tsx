@@ -2,7 +2,7 @@ import './EnvironmentMapList.css'
 
 import { useQueryClient } from '@tanstack/react-query'
 import { Toast } from 'primereact/toast'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 
 import {
   useCreateEnvironmentMapWithFileMutation,
@@ -12,10 +12,7 @@ import {
   EnvironmentMapContextMenu,
   type EnvironmentMapContextMenuHandle,
 } from '@/features/environment-map/components/EnvironmentMapContextMenu'
-import {
-  EnvironmentMapGrid,
-  type SelectionBox,
-} from '@/features/environment-map/components/EnvironmentMapGrid'
+import { EnvironmentMapGrid } from '@/features/environment-map/components/EnvironmentMapGrid'
 import { EnvironmentMapToolbar } from '@/features/environment-map/components/EnvironmentMapToolbar'
 import {
   EnvironmentMapUploadDialog,
@@ -35,6 +32,7 @@ import { useTabContext } from '@/hooks/useTabContext'
 import { useUploadProgress } from '@/hooks/useUploadProgress'
 import { CategoryTreePanel } from '@/shared/components/categories/CategoryTreePanel'
 import { EmptyState, LoadingState } from '@/shared/components/feedback'
+import { useGridAreaSelection, useListSelection } from '@/shared/hooks'
 import { useDragAndDrop } from '@/shared/hooks/useFileUpload'
 import {
   ALL_CATEGORIES_ID,
@@ -49,7 +47,6 @@ import {
 export function EnvironmentMapList() {
   const toast = useRef<Toast>(null)
   const contextMenuRef = useRef<EnvironmentMapContextMenuHandle>(null)
-  const selectionSurfaceRef = useRef<HTMLDivElement | null>(null)
   const listScrollRef = useRef<HTMLDivElement | null>(null)
 
   const viewState = useEnvironmentMapListViewStore(
@@ -76,8 +73,6 @@ export function EnvironmentMapList() {
   const [selectedEnvironmentMapIds, setSelectedEnvironmentMapIds] = useState<
     Set<string>
   >(new Set())
-  const [isAreaSelecting, setIsAreaSelecting] = useState(false)
-  const [selectionBox, setSelectionBox] = useState<SelectionBox | null>(null)
   const [draggedId, setDraggedId] = useState<number | null>(null)
   const [dragOverCategoryId, setDragOverCategoryId] = useState<number | null>(
     null
@@ -222,21 +217,27 @@ export function EnvironmentMapList() {
     [filteredEnvironmentMaps, selectedEnvironmentMapIds]
   )
 
-  useEffect(() => {
-    const visibleIds = new Set(
-      filteredEnvironmentMaps.map(environmentMap => String(environmentMap.id))
-    )
-
-    setSelectedEnvironmentMapIds(previous => {
-      const next = new Set(
-        [...previous].filter(environmentMapId =>
-          visibleIds.has(environmentMapId)
-        )
-      )
-
-      return next.size === previous.size ? previous : next
-    })
-  }, [filteredEnvironmentMaps])
+  // --- Selection (shared model: click / Ctrl+click / Shift range / Ctrl+A) ---
+  const orderedEnvironmentMapIds = useMemo(
+    () =>
+      filteredEnvironmentMaps.map(environmentMap => String(environmentMap.id)),
+    [filteredEnvironmentMaps]
+  )
+  const selection = useListSelection({
+    orderedIds: orderedEnvironmentMapIds,
+    selectedIds: selectedEnvironmentMapIds,
+    onChange: setSelectedEnvironmentMapIds,
+  })
+  const {
+    surfaceRef: selectionSurfaceRef,
+    isAreaSelecting,
+    selectionBox,
+    surfaceProps: selectionSurfaceProps,
+  } = useGridAreaSelection<string>({
+    cardSelector: '.environment-map-card[data-environment-map-id]',
+    getCardId: card => card.getAttribute('data-environment-map-id'),
+    onSelect: setSelectedEnvironmentMapIds,
+  })
 
   const uploadItems = async (items: EnvironmentMapUploadItem[]) => {
     if (items.length === 0) {
@@ -373,141 +374,10 @@ export function EnvironmentMapList() {
     (environmentMapId: string, event: React.MouseEvent) => {
       event.preventDefault()
       event.stopPropagation()
-
-      setSelectedEnvironmentMapIds(previous => {
-        const next = new Set(previous)
-        if (next.has(environmentMapId)) {
-          next.delete(environmentMapId)
-        } else {
-          next.add(environmentMapId)
-        }
-
-        return next
-      })
+      selection.toggle(environmentMapId, event)
     },
-    []
+    [selection]
   )
-
-  const handleGridMouseDown = useCallback(
-    (event: React.MouseEvent<HTMLDivElement>) => {
-      if (!selectionSurfaceRef.current || !listScrollRef.current) {
-        return
-      }
-
-      const target = event.target as HTMLElement
-      if (target.closest('.environment-map-card')) {
-        return
-      }
-
-      // Coordinates are relative to the selection surface's live bounding
-      // rect, which already shifts with the scroll position - so no
-      // scrollTop/scrollLeft offset is added here (doing so double-counts the
-      // scroll and the box would start away from the cursor). The selection
-      // box is absolutely positioned inside the surface, so these surface-
-      // relative coords map directly to its left/top.
-      const rect = selectionSurfaceRef.current.getBoundingClientRect()
-
-      setIsAreaSelecting(true)
-      setSelectionBox({
-        startX: event.clientX - rect.left,
-        startY: event.clientY - rect.top,
-        currentX: event.clientX - rect.left,
-        currentY: event.clientY - rect.top,
-      })
-    },
-    []
-  )
-
-  const handleGridMouseMove = useCallback(
-    (event: React.MouseEvent<HTMLDivElement>) => {
-      if (
-        !isAreaSelecting ||
-        !selectionBox ||
-        !selectionSurfaceRef.current ||
-        !listScrollRef.current
-      ) {
-        return
-      }
-
-      const rect = selectionSurfaceRef.current.getBoundingClientRect()
-
-      setSelectionBox(previous =>
-        previous
-          ? {
-              ...previous,
-              currentX: event.clientX - rect.left,
-              currentY: event.clientY - rect.top,
-            }
-          : null
-      )
-    },
-    [isAreaSelecting, selectionBox]
-  )
-
-  const handleGridMouseUp = useCallback(() => {
-    if (
-      isAreaSelecting &&
-      selectionBox &&
-      selectionSurfaceRef.current &&
-      listScrollRef.current
-    ) {
-      const rect = selectionSurfaceRef.current.getBoundingClientRect()
-      const selectionLeft = Math.min(selectionBox.startX, selectionBox.currentX)
-      const selectionTop = Math.min(selectionBox.startY, selectionBox.currentY)
-      const selectionRight = Math.max(
-        selectionBox.startX,
-        selectionBox.currentX
-      )
-      const selectionBottom = Math.max(
-        selectionBox.startY,
-        selectionBox.currentY
-      )
-
-      const cards = selectionSurfaceRef.current.querySelectorAll<HTMLElement>(
-        '.environment-map-card[data-environment-map-id]'
-      )
-      const nextSelected = new Set<string>()
-
-      cards.forEach(card => {
-        const cardRect = card.getBoundingClientRect()
-        const cardLeft = cardRect.left - rect.left
-        const cardTop = cardRect.top - rect.top
-        const cardRight = cardLeft + cardRect.width
-        const cardBottom = cardTop + cardRect.height
-
-        if (
-          cardRight >= selectionLeft &&
-          cardLeft <= selectionRight &&
-          cardBottom >= selectionTop &&
-          cardTop <= selectionBottom
-        ) {
-          const environmentMapId = card.getAttribute('data-environment-map-id')
-          if (environmentMapId) {
-            nextSelected.add(environmentMapId)
-          }
-        }
-      })
-
-      if (nextSelected.size > 0) {
-        setSelectedEnvironmentMapIds(nextSelected)
-      }
-    }
-
-    setIsAreaSelecting(false)
-    setSelectionBox(null)
-  }, [isAreaSelecting, selectionBox])
-
-  const handleSelectAll = useCallback(() => {
-    setSelectedEnvironmentMapIds(
-      new Set(
-        filteredEnvironmentMaps.map(environmentMap => String(environmentMap.id))
-      )
-    )
-  }, [filteredEnvironmentMaps])
-
-  const handleDeselectAll = useCallback(() => {
-    setSelectedEnvironmentMapIds(new Set())
-  }, [])
 
   // --- Drag a card onto a category to (re)assign it ---
   const handleCardDragStart = useCallback(
@@ -628,7 +498,11 @@ export function EnvironmentMapList() {
   )
 
   return (
-    <div className="environment-map-list" {...pageDragAndDropHandlers}>
+    <div
+      ref={selection.containerRef}
+      className="environment-map-list"
+      {...pageDragAndDropHandlers}
+    >
       <Toast ref={toast} />
       <EnvironmentMapContextMenu
         ref={contextMenuRef}
@@ -681,8 +555,8 @@ export function EnvironmentMapList() {
         onUploadClick={() => setShowUploadDialog(true)}
         onRefreshClick={() => void fetchEnvironmentMaps()}
         onBulkActionsClick={handleBulkActionsClick}
-        onSelectAllClick={handleSelectAll}
-        onDeselectAllClick={handleDeselectAll}
+        onSelectAllClick={selection.selectAll}
+        onDeselectAllClick={selection.deselectAll}
         isCategoryPanelOpen={isCategoryPanelOpen}
         onCategoryPanelToggle={() => setIsCategoryPanelOpen(open => !open)}
         categoryFilterActive={
@@ -753,9 +627,9 @@ export function EnvironmentMapList() {
               onCardClick={openEnvironmentMapDetailsTab}
               onCardContextMenu={handleCardContextMenu}
               onToggleSelection={toggleSelection}
-              onMouseDown={handleGridMouseDown}
-              onMouseMove={handleGridMouseMove}
-              onMouseUp={handleGridMouseUp}
+              onMouseDown={selectionSurfaceProps.onMouseDown}
+              onMouseMove={selectionSurfaceProps.onMouseMove}
+              onMouseUp={selectionSurfaceProps.onMouseUp}
               onEndReached={() => {
                 if (pagination.hasMore && !isLoadingMore) {
                   void fetchEnvironmentMaps(true)

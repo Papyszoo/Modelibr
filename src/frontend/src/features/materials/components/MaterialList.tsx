@@ -19,6 +19,9 @@ import { AddTile, AssetGrid, AssetTile } from '@/shared/components/asset-tile'
 import { UNDO_TOAST_LIFE_MS } from '@/shared/components/feedback/RecycleToastContent'
 import {
   ListToolbar,
+  ListToolbarActions,
+  ListToolbarButton,
+  ListToolbarPanel,
   ListToolbarRow,
   ListToolbarSearchInput,
 } from '@/shared/components/list-toolbar'
@@ -46,6 +49,7 @@ import { MaterialSwatch } from './MaterialSwatch'
  */
 export function MaterialList(): JSX.Element {
   const [search, setSearch] = useState('')
+  const [isSearchOpen, setIsSearchOpen] = useState(false)
   const [editing, setEditing] = useState<MaterialDto | null | undefined>(
     undefined
   )
@@ -233,12 +237,27 @@ export function MaterialList(): JSX.Element {
 
       <ListToolbar>
         <ListToolbarRow>
+          <ListToolbarActions>
+            <ListToolbarButton
+              icon="pi pi-search"
+              label="Search"
+              active={isSearchOpen || search.trim().length > 0}
+              onClick={() => setIsSearchOpen(open => !open)}
+              ariaLabel="Search"
+              ariaExpanded={isSearchOpen}
+              ariaControls="material-list-search-panel"
+            />
+          </ListToolbarActions>
+        </ListToolbarRow>
+
+        <ListToolbarPanel id="material-list-search-panel" open={isSearchOpen}>
           <ListToolbarSearchInput
             value={search}
             onChange={setSearch}
             placeholder="Search materials..."
+            autoFocus={isSearchOpen}
           />
-        </ListToolbarRow>
+        </ListToolbarPanel>
       </ListToolbar>
 
       {/* The header and toolbar above stay mounted through every state. An

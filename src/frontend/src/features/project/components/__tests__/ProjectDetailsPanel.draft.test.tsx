@@ -324,8 +324,11 @@ describe('ProjectDetailsPanel draft ownership', () => {
     expect(await screen.findByLabelText('Description')).toHaveValue(
       'Unsaved description'
     )
+    // The shared NumberInput is locale-proof and renders the canonical
+    // ungrouped digits (a comma group would read as a decimal point in
+    // comma-decimal locales).
     expect(await screen.findByLabelText('Triangles per asset')).toHaveValue(
-      '3,210'
+      '3210'
     )
   })
 })

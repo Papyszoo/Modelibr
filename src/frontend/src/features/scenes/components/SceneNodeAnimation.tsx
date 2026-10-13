@@ -1,12 +1,12 @@
 import './SceneNodeAnimation.css'
 
 import { Dropdown } from 'primereact/dropdown'
-import { InputNumber } from 'primereact/inputnumber'
 import { InputSwitch } from 'primereact/inputswitch'
 import { Slider } from 'primereact/slider'
 import { type JSX, useMemo } from 'react'
 
 import { useModelByIdQuery } from '@/features/models/api/queries'
+import { NumberInput } from '@/shared/components'
 
 import { SCENE_LIMITS } from '../api/sceneContract.generated'
 import type { SceneAnimation, SceneNode } from '../types'
@@ -141,44 +141,37 @@ export function SceneNodeAnimation({
 
             <label className="scene-node-animation-option">
               <span>Speed</span>
-              <InputNumber
+              <NumberInput
                 value={animation?.speed ?? 1}
                 min={SCENE_LIMITS.minAnimationSpeed}
                 max={SCENE_LIMITS.maxAnimationSpeed}
                 step={0.1}
-                minFractionDigits={0}
-                maxFractionDigits={2}
                 disabled={animation === null}
-                onValueChange={event => {
-                  if (typeof event.value === 'number') {
-                    updateAnimation({
-                      speed: clamp(
-                        event.value,
-                        SCENE_LIMITS.minAnimationSpeed,
-                        SCENE_LIMITS.maxAnimationSpeed
-                      ),
-                    })
-                  }
-                }}
+                onChange={value =>
+                  updateAnimation({
+                    speed: clamp(
+                      value,
+                      SCENE_LIMITS.minAnimationSpeed,
+                      SCENE_LIMITS.maxAnimationSpeed
+                    ),
+                  })
+                }
+                className="scene-node-animation-number"
                 data-testid="scene-node-animation-speed"
               />
             </label>
 
             <label className="scene-node-animation-option">
-              <span>Start offset</span>
-              <InputNumber
+              <span>Start offset (s)</span>
+              <NumberInput
                 value={animation?.timeOffset ?? 0}
                 min={0}
                 step={0.1}
-                suffix=" s"
-                minFractionDigits={0}
-                maxFractionDigits={2}
                 disabled={animation === null}
-                onValueChange={event => {
-                  if (typeof event.value === 'number') {
-                    updateAnimation({ timeOffset: Math.max(event.value, 0) })
-                  }
-                }}
+                onChange={value =>
+                  updateAnimation({ timeOffset: Math.max(value, 0) })
+                }
+                className="scene-node-animation-number"
                 data-testid="scene-node-animation-offset"
               />
             </label>

@@ -2,6 +2,7 @@ import { forwardRef } from 'react'
 import { type GridComponents, VirtuosoGrid } from 'react-virtuoso'
 
 import { type EnvironmentMapDto } from '@/features/environment-map/types'
+import { AreaSelectionBox } from '@/shared/components/selection'
 
 import { EnvironmentMapThumbnailDisplay } from './EnvironmentMapThumbnailDisplay'
 
@@ -148,14 +149,9 @@ export function EnvironmentMapGrid({
       />
 
       {isAreaSelecting && selectionBox ? (
-        <div
+        <AreaSelectionBox
+          box={selectionBox}
           className="environment-map-selection-box"
-          style={{
-            left: Math.min(selectionBox.startX, selectionBox.currentX),
-            top: Math.min(selectionBox.startY, selectionBox.currentY),
-            width: Math.abs(selectionBox.currentX - selectionBox.startX),
-            height: Math.abs(selectionBox.currentY - selectionBox.startY),
-          }}
         />
       ) : null}
     </div>

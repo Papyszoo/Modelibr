@@ -148,7 +148,7 @@ export function ContainerSoundsTab({
           <ListToolbarSearchInput
             value={localSearch}
             onChange={setLocalSearch}
-            placeholder="Search sounds…"
+            placeholder="Search sounds..."
           />
         </ListToolbarPanel>
       </ListToolbar>

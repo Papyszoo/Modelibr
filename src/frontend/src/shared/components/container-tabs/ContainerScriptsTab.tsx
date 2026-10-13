@@ -148,7 +148,7 @@ export function ContainerScriptsTab({
           <ListToolbarSearchInput
             value={localSearch}
             onChange={setLocalSearch}
-            placeholder="Search scripts…"
+            placeholder="Search scripts..."
           />
         </ListToolbarPanel>
       </ListToolbar>

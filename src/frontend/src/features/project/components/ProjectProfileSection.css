@@ -70,6 +70,24 @@
   min-width: 12rem;
 }
 
+/* The shared NumberInput renders a bare input; give it the same chrome the
+   neighbouring themed fields get. */
+.project-profile-budget-field .project-profile-budget-input {
+  width: 100%;
+  padding: var(--mod-space-2xs) var(--mod-space-xs);
+  font: inherit;
+  font-size: var(--mod-text-sm);
+  color: var(--mod-color-text);
+  background: var(--mod-color-surface);
+  border: 1px solid var(--mod-color-border);
+  border-radius: var(--mod-radius-sm);
+}
+
+.project-profile-budget-field .project-profile-budget-input:focus {
+  border-color: var(--mod-color-primary);
+  outline: none;
+}
+
 .project-profile-budget-field label {
   font-size: var(--mod-text-xs);
   color: var(--mod-color-text-muted);

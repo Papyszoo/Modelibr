@@ -5,7 +5,7 @@ import {
   useQueryClient,
 } from '@tanstack/react-query'
 import { type Toast } from 'primereact/toast'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 
 import { usePacksQuery } from '@/features/pack/api/queries'
 import { useProjectsQuery } from '@/features/project/api/queries'
@@ -259,21 +259,8 @@ export function useTextureSetGrid({
 
   // --- Selection management ---
 
-  // Re-prune the persisted selection set when the visible set changes
-  // (e.g. after a recycle or kind change). Keeps stale ids from lingering.
-  useEffect(() => {
-    if (viewState.selectedTextureSetIds.length === 0) return
-    const visibleIds = new Set(textureSets.map(s => s.id))
-    const pruned = viewState.selectedTextureSetIds.filter(id =>
-      visibleIds.has(id)
-    )
-    if (pruned.length !== viewState.selectedTextureSetIds.length) {
-      setSelectedTextureSetIds(pruned)
-    }
-    // We intentionally depend on the source list only; viewState writes
-    // would re-trigger and oscillate.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [textureSets])
+  // Selection pruning lives in the shared `useListSelection` hook the grid
+  // uses - the store only persists whatever the hook reports.
 
   // --- Invalidation / refresh ---
 

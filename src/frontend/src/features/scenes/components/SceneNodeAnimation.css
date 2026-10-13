@@ -56,8 +56,20 @@
   color: var(--mod-color-text-muted);
 }
 
-.scene-node-animation-option .p-inputnumber {
+.scene-node-animation-option .scene-node-animation-number {
   max-width: 7rem;
+  padding: var(--mod-space-2xs) var(--mod-space-xs);
+  font: inherit;
+  font-size: var(--mod-text-sm);
+  color: var(--mod-color-text);
+  background: var(--mod-color-surface);
+  border: 1px solid var(--mod-color-border);
+  border-radius: var(--mod-radius-sm);
+}
+
+.scene-node-animation-option .scene-node-animation-number:focus {
+  border-color: var(--mod-color-primary);
+  outline: none;
 }
 
 .scene-node-animation-shapekey {

@@ -131,8 +131,8 @@ export function useSoundMutations({
         content: () =>
           recycleToastContent(
             soundIds.length > 1
-              ? `${soundIds.length} sounds moved to recycle bin`
-              : 'Sound moved to recycle bin',
+              ? `${soundIds.length} sounds moved to recycled files`
+              : 'Sound moved to recycled files',
             () => void handleUndoRecycle(soundIds)
           ),
       })

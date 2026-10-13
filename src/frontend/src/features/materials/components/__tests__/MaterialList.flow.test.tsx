@@ -120,6 +120,8 @@ describe('MaterialList', () => {
     renderWithProviders(<MaterialList />)
     await screen.findByText('Brushed Brass')
 
+    // The search lives in the shared collapsible panel like every other list.
+    await user.click(screen.getByRole('button', { name: 'Search' }))
     await user.type(screen.getByPlaceholderText('Search materials...'), 'brass')
 
     await waitFor(() => {

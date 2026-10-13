@@ -2,7 +2,6 @@ import './ProjectProfileSection.css'
 
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Button } from 'primereact/button'
-import { InputNumber } from 'primereact/inputnumber'
 import { type JSX, useEffect, useMemo, useRef, useState } from 'react'
 
 import {
@@ -19,6 +18,7 @@ import {
   type ProjectProfileDraft,
 } from '@/features/project/projectProfilePatch'
 import { useTabUiState } from '@/hooks/useTabUiState'
+import { NumberInput } from '@/shared/components'
 import { ErrorState } from '@/shared/components/feedback'
 import { TagInput } from '@/shared/components/tags/TagInput'
 import type { ProjectBriefDto, ProjectProfileOptionDto } from '@/types'
@@ -451,13 +451,14 @@ function BudgetField({
   return (
     <div className="project-profile-budget-field">
       <label htmlFor={id}>{label}</label>
-      <InputNumber
-        inputId={id}
+      <NumberInput
+        id={id}
+        className="project-profile-budget-input"
         value={value}
         min={0}
-        useGrouping
+        allowEmpty
         placeholder="unconstrained"
-        onValueChange={event => onChange(event.value ?? null)}
+        onChange={onChange}
       />
     </div>
   )

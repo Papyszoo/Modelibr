@@ -155,11 +155,6 @@ export function PackList() {
     new Set(packs.map(pack => pack.licenseType).filter(Boolean))
   ).map(license => ({ label: license, value: license }))
 
-  const activeFilterCount = [
-    searchQuery.trim().length > 0,
-    selectedLicense !== null,
-  ].filter(Boolean).length
-
   const filteredPacks = packs.filter(pack => {
     const matchesSearch =
       searchQuery.trim().length === 0 ||
@@ -224,6 +219,7 @@ export function PackList() {
             value={searchQuery}
             onChange={setSearchQuery}
             placeholder="Search packs..."
+            autoFocus={isSearchOpen}
           />
         </ListToolbarPanel>
 
@@ -237,16 +233,14 @@ export function PackList() {
               showClear
               className="list-filters-control"
             />
-            {activeFilterCount > 0 ? (
+            {selectedLicense !== null ? (
               <Button
                 icon="pi pi-times"
                 className="p-button-text p-button-sm list-filters-clear"
-                tooltip="Clear pack filters"
+                aria-label="Clear all filters"
+                tooltip="Clear all filters"
                 tooltipOptions={{ position: 'bottom' }}
-                onClick={() => {
-                  setSearchQuery('')
-                  setSelectedLicense(null)
-                }}
+                onClick={() => setSelectedLicense(null)}
               />
             ) : null}
           </div>

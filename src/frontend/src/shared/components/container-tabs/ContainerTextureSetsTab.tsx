@@ -189,7 +189,7 @@ export function ContainerTextureSetsTab({
           <ListToolbarSearchInput
             value={localSearch}
             onChange={setLocalSearch}
-            placeholder={`Search ${assetLabel}s…`}
+            placeholder={`Search ${assetLabel}s...`}
           />
         </ListToolbarPanel>
       </ListToolbar>

@@ -168,11 +168,6 @@ export function ProjectList() {
     return matchesSearch && matchesConcept
   })
 
-  const activeFilterCount = [
-    searchQuery.trim().length > 0,
-    onlyWithConceptArt,
-  ].filter(Boolean).length
-
   return (
     <div className="project-list">
       <Toast ref={toast} />
@@ -226,6 +221,7 @@ export function ProjectList() {
             value={searchQuery}
             onChange={setSearchQuery}
             placeholder="Search projects..."
+            autoFocus={isSearchOpen}
           />
         </ListToolbarPanel>
 
@@ -238,16 +234,14 @@ export function ProjectList() {
               />
               <span>Concept art</span>
             </div>
-            {activeFilterCount > 0 ? (
+            {onlyWithConceptArt ? (
               <Button
                 icon="pi pi-times"
                 className="p-button-text p-button-sm list-filters-clear"
-                tooltip="Clear project filters"
+                aria-label="Clear all filters"
+                tooltip="Clear all filters"
                 tooltipOptions={{ position: 'bottom' }}
-                onClick={() => {
-                  setSearchQuery('')
-                  setOnlyWithConceptArt(false)
-                }}
+                onClick={() => setOnlyWithConceptArt(false)}
               />
             ) : null}
           </div>

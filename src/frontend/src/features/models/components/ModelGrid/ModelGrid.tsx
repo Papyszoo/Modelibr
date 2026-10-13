@@ -17,6 +17,8 @@ import { ImportSuggestionsBanner } from '@/features/metadata'
 import { useTabContext } from '@/hooks/useTabContext'
 import { CategoryTreePanel } from '@/shared/components/categories/CategoryTreePanel'
 import { EmptyState } from '@/shared/components/feedback'
+import { AreaSelectionBox } from '@/shared/components/selection'
+import { useGridAreaSelection, useListSelection } from '@/shared/hooks'
 import { ThumbnailDisplay } from '@/shared/thumbnail'
 import {
   ALL_CATEGORIES_ID,
@@ -91,7 +93,6 @@ export function ModelGrid({
   const fileInputRef = useRef<HTMLInputElement>(null)
   const folderInputRef = useRef<HTMLInputElement>(null)
   const zipInputRef = useRef<HTMLInputElement>(null)
-  const selectionSurfaceRef = useRef<HTMLDivElement | null>(null)
   const { openModelDetailsTab } = useTabContext()
   const [showAddModelDialog, setShowAddModelDialog] = useState(false)
   const persistedViewState = useModelListViewStore(state =>
@@ -105,13 +106,6 @@ export function ModelGrid({
   const [selectedModelIds, setSelectedModelIds] = useState<Set<string>>(
     () => new Set(persistedViewState?.selectedModelIds ?? [])
   )
-  const [isAreaSelecting, setIsAreaSelecting] = useState(false)
-  const [selectionBox, setSelectionBox] = useState<{
-    startX: number
-    startY: number
-    currentX: number
-    currentY: number
-  } | null>(null)
   const [draggedModelId, setDraggedModelId] = useState<string | null>(null)
   const [dragOverCategoryId, setDragOverCategoryId] = useState<number | null>(
     null
@@ -242,6 +236,29 @@ export function ModelGrid({
     [filteredModels, selectedModelIds]
   )
 
+  // --- Selection (shared model: click / Ctrl+click / Shift range / Ctrl+A) ---
+  const orderedModelIds = useMemo(
+    () => filteredModels.map(model => String(model.id)),
+    [filteredModels]
+  )
+  const selection = useListSelection({
+    orderedIds: orderedModelIds,
+    selectedIds: selectedModelIds,
+    onChange: setSelectedModelIdsState,
+    enabled: isSelectionEnabled,
+  })
+  const {
+    surfaceRef: selectionSurfaceRef,
+    isAreaSelecting,
+    selectionBox,
+    surfaceProps: selectionSurfaceProps,
+  } = useGridAreaSelection<string>({
+    enabled: isSelectionEnabled,
+    cardSelector: '.model-card[data-model-id]',
+    getCardId: card => card.getAttribute('data-model-id'),
+    onSelect: setSelectedModelIdsState,
+  })
+
   const {
     createCategoryMutation,
     renameCategoryMutation,
@@ -344,21 +361,6 @@ export function ModelGrid({
     setSelectedModelIdsState(new Set())
   }, [isSelectionEnabled])
 
-  useEffect(() => {
-    if (!isSelectionEnabled) {
-      return
-    }
-
-    const visibleIds = new Set(filteredModels.map(model => String(model.id)))
-    setSelectedModelIdsState(previous => {
-      const next = new Set(
-        [...previous].filter(modelId => visibleIds.has(modelId))
-      )
-
-      return next.size === previous.size ? previous : next
-    })
-  }, [filteredModels, isSelectionEnabled, setSelectedModelIdsState])
-
   const handleModelSelect = (model: { id: string; name: string }) => {
     openModelDetailsTab(model.id, model.name)
   }
@@ -367,148 +369,10 @@ export function ModelGrid({
     (modelId: string, event: React.MouseEvent) => {
       event.preventDefault()
       event.stopPropagation()
-
-      setSelectedModelIdsState(previous => {
-        const next = new Set(previous)
-        if (next.has(modelId)) {
-          next.delete(modelId)
-        } else {
-          next.add(modelId)
-        }
-        return next
-      })
+      selection.toggle(modelId, event)
     },
-    [setSelectedModelIdsState]
+    [selection]
   )
-
-  const handleGridMouseDown = useCallback(
-    (event: React.MouseEvent<HTMLDivElement>) => {
-      if (
-        !isSelectionEnabled ||
-        !selectionSurfaceRef.current ||
-        !scrollParent
-      ) {
-        return
-      }
-
-      const target = event.target as HTMLElement
-      if (target.closest('.model-card')) {
-        return
-      }
-
-      // Coordinates are relative to the selection surface's live bounding
-      // rect, which already shifts with the scroll position - so no
-      // scrollTop/scrollLeft offset is added here (doing so double-counts the
-      // scroll and the box would start away from the cursor). The selection
-      // box is absolutely positioned inside the surface, so these surface-
-      // relative coords map directly to its left/top.
-      const rect = selectionSurfaceRef.current.getBoundingClientRect()
-      setIsAreaSelecting(true)
-      setSelectionBox({
-        startX: event.clientX - rect.left,
-        startY: event.clientY - rect.top,
-        currentX: event.clientX - rect.left,
-        currentY: event.clientY - rect.top,
-      })
-    },
-    [isSelectionEnabled, scrollParent]
-  )
-
-  const handleGridMouseMove = useCallback(
-    (event: React.MouseEvent<HTMLDivElement>) => {
-      if (
-        !isSelectionEnabled ||
-        !isAreaSelecting ||
-        !selectionBox ||
-        !selectionSurfaceRef.current ||
-        !scrollParent
-      ) {
-        return
-      }
-
-      const rect = selectionSurfaceRef.current.getBoundingClientRect()
-      setSelectionBox(previous =>
-        previous
-          ? {
-              ...previous,
-              currentX: event.clientX - rect.left,
-              currentY: event.clientY - rect.top,
-            }
-          : null
-      )
-    },
-    [isAreaSelecting, isSelectionEnabled, scrollParent, selectionBox]
-  )
-
-  const handleGridMouseUp = useCallback(() => {
-    if (
-      isSelectionEnabled &&
-      isAreaSelecting &&
-      selectionBox &&
-      selectionSurfaceRef.current &&
-      scrollParent
-    ) {
-      const rect = selectionSurfaceRef.current.getBoundingClientRect()
-      const selectionLeft = Math.min(selectionBox.startX, selectionBox.currentX)
-      const selectionTop = Math.min(selectionBox.startY, selectionBox.currentY)
-      const selectionRight = Math.max(
-        selectionBox.startX,
-        selectionBox.currentX
-      )
-      const selectionBottom = Math.max(
-        selectionBox.startY,
-        selectionBox.currentY
-      )
-
-      const cards = selectionSurfaceRef.current.querySelectorAll<HTMLElement>(
-        '.model-card[data-model-id]'
-      )
-      const nextSelected = new Set<string>()
-
-      cards.forEach(card => {
-        const cardRect = card.getBoundingClientRect()
-        const cardLeft = cardRect.left - rect.left
-        const cardTop = cardRect.top - rect.top
-        const cardRight = cardLeft + cardRect.width
-        const cardBottom = cardTop + cardRect.height
-
-        if (
-          cardRight >= selectionLeft &&
-          cardLeft <= selectionRight &&
-          cardBottom >= selectionTop &&
-          cardTop <= selectionBottom
-        ) {
-          const modelId = card.getAttribute('data-model-id')
-          if (modelId) {
-            nextSelected.add(modelId)
-          }
-        }
-      })
-
-      if (nextSelected.size > 0) {
-        setSelectedModelIdsState(nextSelected)
-      }
-    }
-
-    setIsAreaSelecting(false)
-    setSelectionBox(null)
-  }, [
-    isAreaSelecting,
-    isSelectionEnabled,
-    scrollParent,
-    selectionBox,
-    setSelectedModelIdsState,
-  ])
-
-  const handleSelectAll = useCallback(() => {
-    setSelectedModelIdsState(
-      new Set(filteredModels.map(model => String(model.id)))
-    )
-  }, [filteredModels, setSelectedModelIdsState])
-
-  const handleDeselectAll = useCallback(() => {
-    setSelectedModelIdsState(new Set())
-  }, [setSelectedModelIdsState])
 
   const handleBulkActionsClick = useCallback(
     (event: React.MouseEvent<HTMLElement>) => {
@@ -587,6 +451,7 @@ export function ModelGrid({
 
   return (
     <div
+      ref={selection.containerRef}
       className="model-grid-container"
       onDrop={onDrop}
       onDragOver={onDragOver}
@@ -677,8 +542,8 @@ export function ModelGrid({
         onUploadZipClick={() => zipInputRef.current?.click()}
         onRefreshClick={handleRefresh}
         onBulkActionsClick={handleBulkActionsClick}
-        onSelectAllClick={handleSelectAll}
-        onDeselectAllClick={handleDeselectAll}
+        onSelectAllClick={selection.selectAll}
+        onDeselectAllClick={selection.deselectAll}
         visibleModelCount={filteredModels.length}
         showCategoryToggle={showCategorySidebar}
         isCategoryPanelOpen={isCategoryPanelOpen}
@@ -748,10 +613,10 @@ export function ModelGrid({
             <div
               ref={selectionSurfaceRef}
               className={`model-grid-selection-surface${isAreaSelecting ? ' is-selecting' : ''}`}
-              onMouseDown={handleGridMouseDown}
-              onMouseMove={handleGridMouseMove}
-              onMouseUp={handleGridMouseUp}
-              onMouseLeave={handleGridMouseUp}
+              onMouseDown={selectionSurfaceProps.onMouseDown}
+              onMouseMove={selectionSurfaceProps.onMouseMove}
+              onMouseUp={selectionSurfaceProps.onMouseUp}
+              onMouseLeave={selectionSurfaceProps.onMouseUp}
             >
               <div className="model-grid-selection-content">
                 <VirtuosoGrid
@@ -877,18 +742,9 @@ export function ModelGrid({
               </div>
 
               {isSelectionEnabled && isAreaSelecting && selectionBox ? (
-                <div
+                <AreaSelectionBox
+                  box={selectionBox}
                   className="model-grid-selection-box"
-                  style={{
-                    left: Math.min(selectionBox.startX, selectionBox.currentX),
-                    top: Math.min(selectionBox.startY, selectionBox.currentY),
-                    width: Math.abs(
-                      selectionBox.currentX - selectionBox.startX
-                    ),
-                    height: Math.abs(
-                      selectionBox.currentY - selectionBox.startY
-                    ),
-                  }}
                 />
               ) : null}
             </div>

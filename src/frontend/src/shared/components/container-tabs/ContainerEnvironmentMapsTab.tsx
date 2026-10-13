@@ -153,7 +153,7 @@ export function ContainerEnvironmentMapsTab({
           <ListToolbarSearchInput
             value={localSearch}
             onChange={setLocalSearch}
-            placeholder="Search environment maps…"
+            placeholder="Search environment maps..."
           />
         </ListToolbarPanel>
       </ListToolbar>

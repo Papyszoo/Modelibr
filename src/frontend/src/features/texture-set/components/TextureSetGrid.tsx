@@ -41,6 +41,8 @@ import {
   recycleToastContent,
   UNDO_TOAST_LIFE_MS,
 } from '@/shared/components/feedback/RecycleToastContent'
+import { AreaSelectionBox } from '@/shared/components/selection'
+import { useGridAreaSelection, useListSelection } from '@/shared/hooks'
 import { useTagVocabulary } from '@/shared/hooks/useTagVocabulary'
 import {
   ALL_CATEGORIES_ID,
@@ -144,18 +146,9 @@ export function TextureSetGrid({ kind, viewStateScope }: TextureSetGridProps) {
   // Area-drag (lasso) selection state. Card-drag-to-merge uses HTML5 native
   // drag (a separate event stream) so the two don't conflict - we only
   // start the lasso when the mousedown originates *outside* a card.
-  const [isAreaSelecting, setIsAreaSelecting] = useState(false)
-  const [selectionBox, setSelectionBox] = useState<{
-    startX: number
-    startY: number
-    currentX: number
-    currentY: number
-  } | null>(null)
-
   const fileInputRef = useRef<HTMLInputElement>(null)
   const contextMenu = useRef<ContextMenu>(null)
   const isShowingMergeDialog = useRef(false)
-  const selectionSurfaceRef = useRef<HTMLDivElement | null>(null)
 
   const { openTextureSetDetailsTab } = useTabContext()
   const queryClient = useQueryClient()
@@ -213,6 +206,32 @@ export function TextureSetGrid({ kind, viewStateScope }: TextureSetGridProps) {
     () => new Set(selectedTextureSetIds),
     [selectedTextureSetIds]
   )
+
+  // --- Selection (shared model: click / Ctrl+click / Shift range / Ctrl+A) ---
+  const orderedTextureSetIds = useMemo(
+    () => filteredTextureSets.map(textureSet => textureSet.id),
+    [filteredTextureSets]
+  )
+  const selection = useListSelection({
+    orderedIds: orderedTextureSetIds,
+    selectedIds: selectedIdSet,
+    onChange: next => setSelectedTextureSetIds([...next]),
+  })
+  const {
+    surfaceRef: selectionSurfaceRef,
+    isAreaSelecting,
+    selectionBox,
+    surfaceProps: selectionSurfaceProps,
+  } = useGridAreaSelection<number>({
+    cardSelector: '.texture-set-card[data-texture-set-id]',
+    getCardId: card => {
+      const raw = card.getAttribute('data-texture-set-id')
+      if (!raw) return null
+      const id = Number(raw)
+      return Number.isNaN(id) ? null : id
+    },
+    onSelect: next => setSelectedTextureSetIds([...next]),
+  })
 
   const selectedTextureSets = useMemo(
     () => filteredTextureSets.filter(set => selectedIdSet.has(set.id)),
@@ -292,120 +311,6 @@ export function TextureSetGrid({ kind, viewStateScope }: TextureSetGridProps) {
       : kind === TextureSetKind.ModelSpecific
         ? 'texture'
         : 'set'
-
-  // --- Selection helpers ---
-  const toggleSelection = useCallback(
-    (id: number) => {
-      const next = new Set(selectedTextureSetIds)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
-      setSelectedTextureSetIds([...next])
-    },
-    [selectedTextureSetIds, setSelectedTextureSetIds]
-  )
-
-  const handleSelectAll = useCallback(() => {
-    setSelectedTextureSetIds(filteredTextureSets.map(s => s.id))
-  }, [filteredTextureSets, setSelectedTextureSetIds])
-
-  const handleDeselectAll = useCallback(() => {
-    setSelectedTextureSetIds([])
-  }, [setSelectedTextureSetIds])
-
-  // --- Area-drag (lasso) selection ---
-  const handleGridMouseDown = useCallback(
-    (event: React.MouseEvent<HTMLDivElement>) => {
-      if (!selectionSurfaceRef.current || !scrollParent) return
-      // Card-drag-to-merge starts on the card itself; ignore those so we
-      // don't fight HTML5 drag.
-      const target = event.target as HTMLElement
-      if (target.closest('.texture-set-card')) return
-      // Only react to primary-button drags.
-      if (event.button !== 0) return
-
-      // Coordinates are relative to the selection surface's live bounding
-      // rect, which already shifts with the scroll position - so no
-      // scrollTop/scrollLeft offset is added here (doing so double-counts the
-      // scroll and the box would start away from the cursor). The selection
-      // box is absolutely positioned inside the surface, so these surface-
-      // relative coords map directly to its left/top.
-      const rect = selectionSurfaceRef.current.getBoundingClientRect()
-      setIsAreaSelecting(true)
-      setSelectionBox({
-        startX: event.clientX - rect.left,
-        startY: event.clientY - rect.top,
-        currentX: event.clientX - rect.left,
-        currentY: event.clientY - rect.top,
-      })
-    },
-    [scrollParent]
-  )
-
-  const handleGridMouseMove = useCallback(
-    (event: React.MouseEvent<HTMLDivElement>) => {
-      if (
-        !isAreaSelecting ||
-        !selectionBox ||
-        !selectionSurfaceRef.current ||
-        !scrollParent
-      ) {
-        return
-      }
-      const rect = selectionSurfaceRef.current.getBoundingClientRect()
-      setSelectionBox(prev =>
-        prev
-          ? {
-              ...prev,
-              currentX: event.clientX - rect.left,
-              currentY: event.clientY - rect.top,
-            }
-          : null
-      )
-    },
-    [isAreaSelecting, scrollParent, selectionBox]
-  )
-
-  const handleGridMouseUp = useCallback(() => {
-    if (
-      isAreaSelecting &&
-      selectionBox &&
-      selectionSurfaceRef.current &&
-      scrollParent
-    ) {
-      const rect = selectionSurfaceRef.current.getBoundingClientRect()
-      const left = Math.min(selectionBox.startX, selectionBox.currentX)
-      const top = Math.min(selectionBox.startY, selectionBox.currentY)
-      const right = Math.max(selectionBox.startX, selectionBox.currentX)
-      const bottom = Math.max(selectionBox.startY, selectionBox.currentY)
-
-      const cards = selectionSurfaceRef.current.querySelectorAll<HTMLElement>(
-        '.texture-set-card[data-texture-set-id]'
-      )
-      const next = new Set<number>()
-      cards.forEach(card => {
-        const cardRect = card.getBoundingClientRect()
-        const cardLeft = cardRect.left - rect.left
-        const cardTop = cardRect.top - rect.top
-        const cardRight = cardLeft + cardRect.width
-        const cardBottom = cardTop + cardRect.height
-        if (
-          cardRight >= left &&
-          cardLeft <= right &&
-          cardBottom >= top &&
-          cardTop <= bottom
-        ) {
-          const id = Number(card.getAttribute('data-texture-set-id'))
-          if (!Number.isNaN(id)) next.add(id)
-        }
-      })
-
-      if (next.size > 0) {
-        setSelectedTextureSetIds([...next])
-      }
-    }
-    setIsAreaSelecting(false)
-    setSelectionBox(null)
-  }, [isAreaSelecting, scrollParent, selectionBox, setSelectedTextureSetIds])
 
   // --- File upload (toolbar button) ---
   const handleUploadClick = useCallback(() => {
@@ -944,6 +849,7 @@ export function TextureSetGrid({ kind, viewStateScope }: TextureSetGridProps) {
 
   return (
     <div
+      ref={selection.containerRef}
       className="texture-set-grid-container"
       onDrop={dragHandlers.onDrop}
       onDragOver={dragHandlers.onDragOver}
@@ -993,8 +899,8 @@ export function TextureSetGrid({ kind, viewStateScope }: TextureSetGridProps) {
         onCreateClick={() => setShowCreateDialog(true)}
         onRefreshClick={handleRefresh}
         onBulkActionsClick={handleBulkActionsClick}
-        onSelectAllClick={handleSelectAll}
-        onDeselectAllClick={handleDeselectAll}
+        onSelectAllClick={selection.selectAll}
+        onDeselectAllClick={selection.deselectAll}
         isCategoryPanelOpen={isCategoryPanelOpen}
         onCategoryPanelToggle={() => setIsCategoryPanelOpen(open => !open)}
         categoryFilterActive={
@@ -1109,10 +1015,10 @@ export function TextureSetGrid({ kind, viewStateScope }: TextureSetGridProps) {
             <div
               ref={selectionSurfaceRef}
               className={`texture-set-grid-selection-surface${isAreaSelecting ? ' is-selecting' : ''}`}
-              onMouseDown={handleGridMouseDown}
-              onMouseMove={handleGridMouseMove}
-              onMouseUp={handleGridMouseUp}
-              onMouseLeave={handleGridMouseUp}
+              onMouseDown={selectionSurfaceProps.onMouseDown}
+              onMouseMove={selectionSurfaceProps.onMouseMove}
+              onMouseUp={selectionSurfaceProps.onMouseUp}
+              onMouseLeave={selectionSurfaceProps.onMouseUp}
             >
               <VirtuosoGrid
                 customScrollParent={scrollParent ?? undefined}
@@ -1164,7 +1070,7 @@ export function TextureSetGrid({ kind, viewStateScope }: TextureSetGridProps) {
                           onClick={e => {
                             e.preventDefault()
                             e.stopPropagation()
-                            toggleSelection(textureSet.id)
+                            selection.toggle(textureSet.id, e)
                           }}
                           aria-label={`${isSelected ? 'Deselect' : 'Select'} ${textureSet.name}`}
                           aria-pressed={isSelected}
@@ -1228,18 +1134,9 @@ export function TextureSetGrid({ kind, viewStateScope }: TextureSetGridProps) {
               />
 
               {isAreaSelecting && selectionBox ? (
-                <div
+                <AreaSelectionBox
+                  box={selectionBox}
                   className="texture-set-grid-selection-box"
-                  style={{
-                    left: Math.min(selectionBox.startX, selectionBox.currentX),
-                    top: Math.min(selectionBox.startY, selectionBox.currentY),
-                    width: Math.abs(
-                      selectionBox.currentX - selectionBox.startX
-                    ),
-                    height: Math.abs(
-                      selectionBox.currentY - selectionBox.startY
-                    ),
-                  }}
                 />
               ) : null}
             </div>

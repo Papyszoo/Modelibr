@@ -3,12 +3,12 @@ import './AssetMetadataPanel.css'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Button } from 'primereact/button'
 import { Checkbox } from 'primereact/checkbox'
-import { InputNumber } from 'primereact/inputnumber'
 import { InputText } from 'primereact/inputtext'
 import { InputTextarea } from 'primereact/inputtextarea'
 import { type JSX, useEffect, useMemo, useState } from 'react'
 
 import { TextureSetKind } from '@/features/texture-set/types'
+import { NumberInput } from '@/shared/components'
 import { TagInput } from '@/shared/components/tags/TagInput'
 
 import { setAssetMetadata } from '../api/metadataApi'
@@ -343,12 +343,19 @@ function Editor({
     case 'integer':
     case 'number':
       return (
-        <InputNumber
-          inputId={id}
+        <NumberInput
+          id={id}
+          className="asset-metadata-number"
           disabled={disabled}
           value={typeof value === 'number' ? value : null}
-          maxFractionDigits={field.type === 'integer' ? 0 : 3}
-          onValueChange={event => onChange(event.value ?? null)}
+          allowEmpty
+          onChange={next =>
+            onChange(
+              next !== null && field.type === 'integer'
+                ? Math.round(next)
+                : next
+            )
+          }
         />
       )
 

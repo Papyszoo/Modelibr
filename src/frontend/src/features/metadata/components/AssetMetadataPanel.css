@@ -85,3 +85,15 @@
   color: inherit;
   font-size: var(--mod-text-sm);
 }
+
+/* The shared NumberInput renders a bare input, so the panel styles it here -
+   same chrome as the select beside it. */
+.asset-metadata-number {
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid var(--mod-color-border);
+  border-radius: var(--mod-radius-sm);
+  background: var(--mod-color-surface);
+  color: inherit;
+  font-size: var(--mod-text-sm);
+}

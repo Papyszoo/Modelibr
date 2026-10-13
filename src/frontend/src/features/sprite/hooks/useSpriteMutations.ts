@@ -149,8 +149,8 @@ export function useSpriteMutations({
         content: () =>
           recycleToastContent(
             spriteIds.length > 1
-              ? `${spriteIds.length} sprites moved to recycle bin`
-              : 'Sprite moved to recycle bin',
+              ? `${spriteIds.length} sprites moved to recycled files`
+              : 'Sprite moved to recycled files',
             () => void handleUndoRecycle(spriteIds)
           ),
       })
