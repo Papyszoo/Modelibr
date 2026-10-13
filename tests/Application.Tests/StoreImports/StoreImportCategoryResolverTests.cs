@@ -185,6 +185,32 @@ public class StoreImportCategoryResolverTests
         Assert.Equal(12, await h.Resolver.ResolveAsync(StoreManifestMapping.ImportTarget.TextureSet, "Wood", CancellationToken.None));
     }
 
+    [Fact]
+    public async Task ClearCache_AfterAResolution_ReReadsAndRecreatesInsteadOfReusingTheId()
+    {
+        // A category created inside an item's transaction is rolled back when that
+        // item fails. The cached id then points at a row that no longer exists, so
+        // every later item failed with CategoryNotFound - the processor clears the
+        // cache and the resolver must resolve from scratch, not answer from memory.
+        var h = new Harness();
+        h.SetSoundCategories();
+        h.CreateSound
+            .Setup(c => c.Handle(It.IsAny<CreateSoundCategoryCommand>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result.Success(new SoundCategorySummaryDto { Id = 9, Name = "UI" }));
+
+        Assert.Equal(9, await h.Resolver.ResolveAsync(StoreManifestMapping.ImportTarget.Sound, "UI", CancellationToken.None));
+
+        h.Resolver.ClearCache();
+        h.CreateSound
+            .Setup(c => c.Handle(It.IsAny<CreateSoundCategoryCommand>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result.Success(new SoundCategorySummaryDto { Id = 13, Name = "UI" }));
+
+        Assert.Equal(13, await h.Resolver.ResolveAsync(StoreManifestMapping.ImportTarget.Sound, "UI", CancellationToken.None));
+
+        h.GetSound.Verify(q => q.Handle(It.IsAny<GetAllSoundCategoriesQuery>(), It.IsAny<CancellationToken>()), Times.Exactly(2));
+        h.CreateSound.Verify(c => c.Handle(It.IsAny<CreateSoundCategoryCommand>(), It.IsAny<CancellationToken>()), Times.Exactly(2));
+    }
+
     private sealed class Harness
     {
         public readonly Mock<IQueryHandler<GetAllModelCategoriesQuery, GetAllModelCategoriesResponse>> GetModel = new();

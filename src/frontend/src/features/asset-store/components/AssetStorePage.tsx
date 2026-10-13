@@ -11,7 +11,7 @@ import {
 } from '@/shared/components'
 import { useAssetStoreAuthStore } from '@/stores/assetStoreAuthStore'
 
-import { useStoreLibraryQuery } from '../api/queries'
+import { useStoreCatalogQuery, useStoreLibraryQuery } from '../api/queries'
 import { logoutOfStoreSession } from '../lib/session'
 import { STORE_URL } from '../lib/storeConfig'
 import type { StoreLibraryItem } from '../types'
@@ -20,11 +20,13 @@ import { StoreLoginForm } from './StoreLoginForm'
 import { StorePackDetail } from './StorePackDetail'
 
 /**
- * Asset Store tab - the user signs into the companion store, sees their
- * library, and imports packs into this Modelibr instance with one click.
- * Browsing/purchasing happens on the store site; this page is library +
- * import only. It is an online surface: offline or store-down degrade to one
- * quiet feedback state.
+ * Asset Store tab. Anyone can browse the store's public catalog and import
+ * FREE packs without an account - the same anonymous path the MCP agent import
+ * uses. Signing in switches to your store library and unlocks paid packs and
+ * account features; the login form is only surfaced where an account is
+ * actually needed. Browsing/purchasing happens on the store site; this page is
+ * catalog + library + import only. It is an online surface: offline or
+ * store-down degrade to one quiet feedback state.
  */
 export function AssetStorePage() {
   const storeUrl = STORE_URL
@@ -34,16 +36,22 @@ export function AssetStorePage() {
 
   const [page, setPage] = useState(1)
   const [openPack, setOpenPack] = useState<StoreLibraryItem | null>(null)
-  const library = useStoreLibraryQuery({ page })
+  // Signed-out only: the page browses the public catalog by default and swaps
+  // to the sign-in form when a store account is asked for (header action, a
+  // paid pack's detail, or account features).
+  const [showLogin, setShowLogin] = useState(false)
 
-  // A new session (possibly a different account) starts from page 1 - a
-  // stale page index could point past the new library's last page. Signing out
-  // also closes any open pack detail.
+  const library = useStoreLibraryQuery({ page })
+  const catalog = useStoreCatalogQuery({ page })
+  const active = isLoggedIn ? library : catalog
+
+  // Any session change starts from page 1 - a stale page index could point
+  // past the new list's last page - and closes both the pack detail and the
+  // sign-in view.
   useEffect(() => {
-    if (!isLoggedIn) {
-      setPage(1)
-      setOpenPack(null)
-    }
+    setPage(1)
+    setOpenPack(null)
+    setShowLogin(false)
   }, [isLoggedIn])
 
   const headerActions = isLoggedIn ? (
@@ -60,40 +68,73 @@ export function AssetStorePage() {
         data-testid="asset-store-logout"
       />
     </>
-  ) : undefined
+  ) : showLogin ? undefined : (
+    <Button
+      label="Sign in"
+      size="small"
+      text
+      onClick={() => setShowLogin(true)}
+      data-testid="asset-store-sign-in"
+    />
+  )
 
   const renderContent = () => {
-    if (!isLoggedIn) {
+    if (!isLoggedIn && showLogin) {
       return (
         <div className="asset-store-login-center">
-          <StoreLoginForm />
+          <div className="asset-store-login-stack">
+            <StoreLoginForm />
+            <Button
+              label="Back to browsing"
+              size="small"
+              text
+              onClick={() => setShowLogin(false)}
+              data-testid="asset-store-login-back"
+            />
+          </div>
         </div>
       )
     }
 
     if (openPack) {
       return (
-        <StorePackDetail item={openPack} onBack={() => setOpenPack(null)} />
-      )
-    }
-
-    if (library.isPending) {
-      return <LoadingState message="Loading your store library…" />
-    }
-
-    if (library.isError) {
-      return (
-        <ErrorState
-          title="Store unavailable"
-          message="Could not load your store library. The store may be down, or you may be offline - your local assets are unaffected."
-          onRetry={() => void library.refetch()}
+        <StorePackDetail
+          item={openPack}
+          onBack={() => setOpenPack(null)}
+          onRequestSignIn={() => setShowLogin(true)}
         />
       )
     }
 
-    const data = library.data
-    if (!data || data.items.length === 0) {
+    if (active.isPending) {
       return (
+        <LoadingState
+          message={
+            isLoggedIn
+              ? 'Loading your store library…'
+              : 'Loading the store catalog…'
+          }
+        />
+      )
+    }
+
+    if (active.isError) {
+      return (
+        <ErrorState
+          title="Store unavailable"
+          message={
+            isLoggedIn
+              ? 'Could not load your store library. The store may be down, or you may be offline - your local assets are unaffected.'
+              : 'Could not load the store catalog. The store may be down, or you may be offline - your local assets are unaffected.'
+          }
+          onRetry={() => void active.refetch()}
+        />
+      )
+    }
+
+    const data = active.data
+    if (!data || data.items.length === 0) {
+      return isLoggedIn ? (
         <EmptyState
           icon="pi-shopping-bag"
           title="Your store library is empty"
@@ -107,15 +148,29 @@ export function AssetStorePage() {
             </>
           }
         />
+      ) : (
+        <EmptyState
+          icon="pi-shopping-bag"
+          title="No packs to show"
+          message={
+            <>
+              The store catalog has no packs right now. Browse the store to find
+              more.{' '}
+              <a href={storeUrl} target="_blank" rel="noreferrer">
+                Open the store
+              </a>
+            </>
+          }
+        />
       )
     }
 
     return <StoreLibraryGrid items={data.items} onOpenPack={setOpenPack} />
   }
 
-  const totalPages = library.data?.totalPages ?? 0
-  // The pager belongs to the library grid, not the pack detail.
-  const showPager = isLoggedIn && !openPack && (totalPages > 1 || page > 1)
+  const totalPages = active.data?.totalPages ?? 0
+  // The pager belongs to the listing surface, not the pack detail or sign-in.
+  const showPager = !showLogin && !openPack && (totalPages > 1 || page > 1)
 
   return (
     <div className="asset-store-page" data-testid="asset-store-page">
@@ -137,7 +192,7 @@ export function AssetStorePage() {
             icon="pi pi-chevron-left"
             size="small"
             text
-            disabled={page <= 1 || library.isFetching}
+            disabled={page <= 1 || active.isFetching}
             onClick={() => setPage(p => Math.max(1, p - 1))}
             aria-label="Previous page"
             data-testid="asset-store-prev-page"
@@ -149,7 +204,7 @@ export function AssetStorePage() {
             icon="pi pi-chevron-right"
             size="small"
             text
-            disabled={page >= totalPages || library.isFetching}
+            disabled={page >= totalPages || active.isFetching}
             onClick={() => setPage(p => p + 1)}
             aria-label="Next page"
             data-testid="asset-store-next-page"

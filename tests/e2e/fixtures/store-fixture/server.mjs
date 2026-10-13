@@ -39,6 +39,22 @@ const CATALOG_ASSET_ID = "3b1a2c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d";
 const CATALOG_ITEM_ID = "7c8d9e0f-1a2b-4c3d-9e4f-5a6b7c8d9e0f";
 const CATALOG_PREVIEW_ID = "9e0f1a2b-3c4d-4e5f-8a6b-7c8d9e0f1a2b";
 const CATALOG_TITLE = "E2E Catalog Cube";
+// A second anonymous Guid asset for the signed-out UI import scenario. It is
+// kept SEPARATE from the MCP catalog asset and the texture pack so no two
+// scenarios race the same pack (they run in parallel): different ids,
+// different bytes.
+const FREE_ASSET_ID = "2d3c4b5a-6e7f-4890-9a1b-2c3d4e5f6a7b";
+const FREE_ITEM_ID = "8a9b0c1d-2e3f-4a5b-8c7d-6e5f4a3b2c1d";
+const FREE_PACK_TITLE = "E2E Free Props Pack";
+const FREE_TITLE = "E2E Free Cube";
+// The free TEXTURE pack: a second anonymous Guid asset whose items are
+// TextureSets. Its maps are the formats real store texture packs ship -
+// KTX2, WebP and PNG - which the importer must accept as textures.
+const TEXTURE_ASSET_ID = "6f1e2d3c-4b5a-6978-8c9d-0e1f2a3b4c5d";
+const TEXTURE_ITEM_ID = "1a2b3c4d-5e6f-4a7b-9c8d-7e6f5a4b3c2d";
+const TEXTURE_PACK_TITLE = "E2E Texture Pack";
+const TEXTURE_SET_TITLE = "E2E Brick Material";
+const TEXTURE_CATEGORY = "E2E Store Textures";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 
@@ -105,6 +121,39 @@ const files = {
         bytes: retagGlb(
             readFileSync(path.join(here, "assets/test-cube.glb")),
             "e2e-store-catalog",
+        ),
+    },
+    // The texture pack's maps. Freshly generated files (not shared with other
+    // scenarios' uploads), one per shipped container format.
+    4: {
+        name: "brick_albedo.ktx2",
+        contentType: "image/ktx2",
+        bytes: readFileSync(
+            path.join(here, "assets/store-texture-brick_albedo.ktx2"),
+        ),
+    },
+    5: {
+        name: "brick_normal.webp",
+        contentType: "image/webp",
+        bytes: readFileSync(
+            path.join(here, "assets/store-texture-brick_normal.webp"),
+        ),
+    },
+    6: {
+        name: "brick_roughness.png",
+        contentType: "image/png",
+        bytes: readFileSync(
+            path.join(here, "assets/store-texture-brick_roughness.png"),
+        ),
+    },
+    // The signed-out UI scenario's mesh - re-tagged with its own marker so its
+    // SHA-256 is unique to this asset (see the catalog file's comment).
+    7: {
+        name: "test-cube.glb",
+        contentType: "model/gltf-binary",
+        bytes: retagGlb(
+            readFileSync(path.join(here, "assets/test-cube.glb")),
+            "e2e-store-free-props",
         ),
     },
 };
@@ -273,24 +322,173 @@ const catalogManifest = {
     ],
 };
 
+// The free TEXTURE pack's catalog detail (GET /api/assets/{guid}), anonymous.
+// One TextureSet item carrying the maps a real PBR material ships - a KTX2
+// albedo, a WebP normal and a PNG roughness.
+const texturePackDetail = {
+    id: TEXTURE_ASSET_ID,
+    title: TEXTURE_PACK_TITLE,
+    description: "Fixture texture pack for the free texture-set import path.",
+    author: "E2E Fixture",
+    thumbnailUrl: `${PUBLIC_BASE}/api/files/2/download`,
+    itemTypes: ["TextureSet"],
+    formats: ["ktx2", "webp", "png"],
+    fileSize:
+        files[4].bytes.length + files[5].bytes.length + files[6].bytes.length,
+    isPack: true,
+    itemCount: 1,
+    downloadCount: 0,
+    tags: ["e2e", "textures"],
+    price: 0,
+    currency: "USD",
+    creditName: "E2E Fixture",
+    creditUrl: `${PUBLIC_BASE}/credits/e2e-fixture`,
+    license: "CC0",
+    items: [
+        {
+            id: TEXTURE_ITEM_ID,
+            itemType: "TextureSet",
+            name: TEXTURE_SET_TITLE,
+            isPreviewable: false,
+            category: TEXTURE_CATEGORY,
+            subcategory: null,
+        },
+    ],
+    previews: [],
+};
+
+// The texture pack's manifest (GET /api/assets/{guid}/manifest), anonymous.
+const texturePackManifest = {
+    schemaVersion: 1,
+    title: TEXTURE_PACK_TITLE,
+    description: "Fixture texture pack for the free texture-set import path.",
+    license: "CC0",
+    author: "E2E Fixture",
+    creditName: "E2E Fixture",
+    creditUrl: `${PUBLIC_BASE}/credits/e2e-fixture`,
+    tags: ["e2e", "textures"],
+    items: [
+        {
+            id: TEXTURE_ITEM_ID,
+            itemType: "TextureSet",
+            name: TEXTURE_SET_TITLE,
+            metadataJson: JSON.stringify({ category: TEXTURE_CATEGORY }),
+            files: [
+                {
+                    fileName: files[4].name,
+                    fileSize: files[4].bytes.length,
+                    sha256: sha256(files[4].bytes),
+                    role: "Texture:Albedo",
+                    downloadUrl: `${PUBLIC_BASE}/api/files/4/download`,
+                },
+                {
+                    fileName: files[5].name,
+                    fileSize: files[5].bytes.length,
+                    sha256: sha256(files[5].bytes),
+                    role: "Texture:Normal",
+                    downloadUrl: `${PUBLIC_BASE}/api/files/5/download`,
+                },
+                {
+                    fileName: files[6].name,
+                    fileSize: files[6].bytes.length,
+                    sha256: sha256(files[6].bytes),
+                    role: "Texture:Roughness:R",
+                    downloadUrl: `${PUBLIC_BASE}/api/files/6/download`,
+                },
+            ],
+            previews: [],
+        },
+    ],
+    previews: [],
+};
+
+// The signed-out UI import scenario's asset - anonymous Guid id, free, and its
+// own bytes so nothing else dedupes against it.
+const freePackDetail = {
+    id: FREE_ASSET_ID,
+    title: FREE_PACK_TITLE,
+    description: "Fixture pack for the signed-out UI import path.",
+    author: "E2E Fixture",
+    thumbnailUrl: `${PUBLIC_BASE}/api/files/2/download`,
+    itemTypes: ["Model"],
+    formats: ["glb"],
+    fileSize: files[7].bytes.length,
+    isPack: true,
+    itemCount: 1,
+    downloadCount: 0,
+    tags: ["e2e", "free"],
+    price: 0,
+    currency: "USD",
+    creditName: "E2E Fixture",
+    creditUrl: `${PUBLIC_BASE}/credits/e2e-fixture`,
+    license: "CC0",
+    items: [
+        {
+            id: FREE_ITEM_ID,
+            itemType: "Model",
+            name: FREE_TITLE,
+            isPreviewable: true,
+            category: "Free Props",
+            subcategory: null,
+        },
+    ],
+    previews: [],
+};
+
+const freePackManifest = {
+    schemaVersion: 1,
+    title: FREE_PACK_TITLE,
+    description: "Fixture pack for the signed-out UI import path.",
+    license: "CC0",
+    author: "E2E Fixture",
+    creditName: "E2E Fixture",
+    creditUrl: `${PUBLIC_BASE}/credits/e2e-fixture`,
+    tags: ["e2e", "free"],
+    items: [
+        {
+            id: FREE_ITEM_ID,
+            itemType: "Model",
+            name: FREE_TITLE,
+            metadataJson: JSON.stringify({ category: "Free Props" }),
+            files: [
+                {
+                    fileName: files[7].name,
+                    fileSize: files[7].bytes.length,
+                    sha256: sha256(files[7].bytes),
+                    role: "Mesh",
+                    downloadUrl: `${PUBLIC_BASE}/api/files/7/download`,
+                },
+            ],
+            previews: [],
+        },
+    ],
+    previews: [],
+};
+
+const catalogAssets = [catalogAssetDetail, freePackDetail, texturePackDetail];
+
+const catalogAssetById = (id) =>
+    catalogAssets.find((asset) => asset.id.toLowerCase() === id.toLowerCase());
+
 // GET /api/assets - the public catalog search. The backend's StoreCatalogClient
-// calls this anonymously with page/pageSize and the optional filters.
+// calls this anonymously with page/pageSize and the optional filters; the
+// browser's signed-out tab uses it as a plain list.
 function catalogSearchResults(url) {
     const search = (url.searchParams.get("search") || "").trim().toLowerCase();
     const itemType = url.searchParams.get("itemType");
     const tag = url.searchParams.get("tag");
     const format = url.searchParams.get("format");
 
-    const haystack =
-        `${catalogAssetDetail.title} ${catalogAssetDetail.author} ${catalogAssetDetail.description}`.toLowerCase();
-
-    const matches =
-        (!search || haystack.includes(search)) &&
-        (!itemType || catalogAssetDetail.itemTypes.includes(itemType)) &&
-        (!tag || catalogAssetDetail.tags.includes(tag)) &&
-        (!format || catalogAssetDetail.formats.includes(format));
-
-    const items = matches ? [catalogAssetDetail] : [];
+    const items = catalogAssets.filter((asset) => {
+        const haystack =
+            `${asset.title} ${asset.author} ${asset.description}`.toLowerCase();
+        return (
+            (!search || haystack.includes(search)) &&
+            (!itemType || asset.itemTypes.includes(itemType)) &&
+            (!tag || asset.tags.includes(tag)) &&
+            (!format || asset.formats.includes(format))
+        );
+    });
     return {
         items,
         page: 1,
@@ -416,9 +614,8 @@ const handleRequest = async (req, res) => {
         /^\/api\/assets\/([0-9a-fA-F-]{36})$/,
     );
     if (req.method === "GET" && catalogDetail) {
-        if (catalogDetail[1].toLowerCase() === CATALOG_ASSET_ID) {
-            return json(res, 200, catalogAssetDetail);
-        }
+        const asset = catalogAssetById(catalogDetail[1]);
+        if (asset) return json(res, 200, asset);
         return json(res, 404, { message: "No such asset." });
     }
 
@@ -426,8 +623,15 @@ const handleRequest = async (req, res) => {
         /^\/api\/assets\/([0-9a-fA-F-]{36})\/manifest$/,
     );
     if (req.method === "GET" && catalogManifestRoute) {
-        if (catalogManifestRoute[1].toLowerCase() === CATALOG_ASSET_ID) {
+        const id = catalogManifestRoute[1].toLowerCase();
+        if (id === CATALOG_ASSET_ID) {
             return json(res, 200, catalogManifest);
+        }
+        if (id === FREE_ASSET_ID) {
+            return json(res, 200, freePackManifest);
+        }
+        if (id === TEXTURE_ASSET_ID) {
+            return json(res, 200, texturePackManifest);
         }
         return json(res, 404, { message: "No such asset." });
     }

@@ -98,6 +98,8 @@ internal sealed class StoreImportCategoryResolver : IStoreImportCategoryResolver
         return resolved;
     }
 
+    public void ClearCache() => _cache.Clear();
+
     private async Task<int?> FindOrCreateAsync(
         StoreManifestMapping.ImportTarget target, string categoryName, string? subcategoryName, CancellationToken ct)
     {

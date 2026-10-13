@@ -25,11 +25,42 @@ export interface StoreLibraryItem {
   fileCount: number
   totalSize: number
   previewThumbnailUrl: string | null
-  addedAt: string
+  addedAt?: string
+  /**
+   * Public-catalog entries only (signed-out browsing): whether the pack can be
+   * imported without a store account. Undefined for library entries, where the
+   * store itself already gates the list.
+   */
+  isFree?: boolean
 }
 
 export interface StoreLibraryPage {
   items: StoreLibraryItem[]
+  page: number
+  pageSize: number
+  totalCount: number
+  totalPages: number
+}
+
+// Public catalog (GET {storeUrl}/api/assets) - the anonymous browse read.
+// A deliberately narrow subset of the store's asset DTO: only what the grid
+// and the free/paid split need. Ids are the store's asset ids.
+
+export interface StoreCatalogAsset {
+  id: string
+  title: string
+  author?: string | null
+  thumbnailUrl?: string | null
+  itemTypes?: string[]
+  isPack?: boolean
+  itemCount?: number
+  fileSize?: number
+  license?: string | null
+  price?: number
+}
+
+export interface StoreCatalogPage {
+  items: StoreCatalogAsset[]
   page: number
   pageSize: number
   totalCount: number
@@ -52,7 +83,12 @@ export interface StoreAssetItem {
   itemType: string
   name: string
   isPreviewable: boolean
-  fileIds: string[]
+  /**
+   * The item's backing file ids. Present on the store's library detail; the
+   * PUBLIC catalog detail omits them, so signed-out pack browsing has no
+   * per-item sizes (the code that sums them must tolerate that).
+   */
+  fileIds?: string[]
 }
 
 export interface StoreAssetPreview {

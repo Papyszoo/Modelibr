@@ -3,6 +3,7 @@ import { Checkbox } from 'primereact/checkbox'
 import { useMemo, useState } from 'react'
 
 import { EmptyState, ErrorState, LoadingState } from '@/shared/components'
+import { useAssetStoreAuthStore } from '@/stores/assetStoreAuthStore'
 import { useAssetStoreImportStore } from '@/stores/assetStoreImportStore'
 import { formatFileSize } from '@/utils/fileUtils'
 import { openTabInPanel } from '@/utils/tabNavigation'
@@ -16,6 +17,11 @@ import type { StoreAssetItem, StoreLibraryItem } from '../types'
 interface StorePackDetailProps {
   item: StoreLibraryItem
   onBack: () => void
+  /**
+   * Signed-out only: asks the page to surface the sign-in form. Called for a
+   * paid pack's import action, where a store account is required.
+   */
+  onRequestSignIn?: () => void
 }
 
 /** Friendly label for a manifest item type ("EnvironmentMap" → "Environment Map"). */
@@ -27,15 +33,30 @@ function sumItemSize(
   item: StoreAssetItem,
   fileSizeById: Map<string, number>
 ): number {
-  return item.fileIds.reduce((sum, id) => sum + (fileSizeById.get(id) ?? 0), 0)
+  // The public catalog detail has no per-item file ids, so sizes are simply
+  // unknown there - the caller hides the size cell in that case.
+  return (item.fileIds ?? []).reduce(
+    (sum, id) => sum + (fileSizeById.get(id) ?? 0),
+    0
+  )
 }
 
 /**
  * A store pack's contents: the user ticks the items they want, then imports just
  * those (or the whole pack). Reached by clicking a library tile. Import progress
  * is shared with the grid via useAssetStoreImportStore (keyed by pack asset id).
+ *
+ * Signed out this still works for a FREE pack (imported anonymously); a paid
+ * pack's import action asks for a store account instead.
  */
-export function StorePackDetail({ item, onBack }: StorePackDetailProps) {
+export function StorePackDetail({
+  item,
+  onBack,
+  onRequestSignIn,
+}: StorePackDetailProps) {
+  const isLoggedIn = useAssetStoreAuthStore(
+    state => state.status === 'loggedIn'
+  )
   const detail = useStoreAssetQuery(item.assetId)
   const entry = useAssetStoreImportStore(state => state.imports[item.assetId])
   const importedPackId = useImportedPackIdResolver()(item.assetId)
@@ -78,6 +99,9 @@ export function StorePackDetail({ item, onBack }: StorePackDetailProps) {
 
   const isImporting =
     !!entry && entry.phase !== 'completed' && entry.phase !== 'failed'
+  // Paid packs cannot be pulled anonymously: the import action becomes the
+  // place a store account is asked for (the store owns the entitlement rule).
+  const needsStoreAccount = !isLoggedIn && item.isFree === false
   const openInLibrary = () => {
     const packId = entry?.packId ?? importedPackId
     if (packId !== null && packId !== undefined) {
@@ -183,9 +207,11 @@ export function StorePackDetail({ item, onBack }: StorePackDetailProps) {
               <span className="asset-store-item-type">
                 {itemTypeLabel(assetItem.itemType)}
               </span>
-              <span className="asset-store-item-size">
-                {formatFileSize(sumItemSize(assetItem, fileSizeById))}
-              </span>
+              {assetItem.fileIds?.length ? (
+                <span className="asset-store-item-size">
+                  {formatFileSize(sumItemSize(assetItem, fileSizeById))}
+                </span>
+              ) : null}
             </li>
           )
         })}
@@ -226,6 +252,19 @@ export function StorePackDetail({ item, onBack }: StorePackDetailProps) {
               <i className="pi pi-spin pi-spinner" aria-hidden="true" />
               {progressText}
             </span>
+          ) : needsStoreAccount ? (
+            <>
+              <span className="asset-store-login-hint">
+                This pack needs a store account.
+              </span>
+              <Button
+                label="Sign in to import"
+                icon="pi pi-sign-in"
+                size="small"
+                onClick={onRequestSignIn}
+                data-testid="asset-store-detail-sign-in"
+              />
+            </>
           ) : (
             <>
               {entry?.phase === 'failed' && (

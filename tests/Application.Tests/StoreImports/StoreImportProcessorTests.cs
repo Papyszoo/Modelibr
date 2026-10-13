@@ -313,6 +313,42 @@ public class StoreImportProcessorTests
     }
 
     [Fact]
+    public async Task Process_WhenAnItemFails_ClearsTheCategoryResolutionCache()
+    {
+        // Regression: an item whose creation failed had its transaction rolled
+        // back - including any category it created. The resolver cache kept the
+        // now-dangling id, so every later item in the pack failed with
+        // CategoryNotFound. A failure must drop the cache; the next item
+        // resolves (and, if needed, recreates) its category from scratch.
+        var h = new Harness();
+        var badAlbedo = h.MakeFile("u/bad", RandomBytes(), "Texture:Albedo", "brick_albedo.ktx2");
+        var goodAlbedo = h.MakeFile("u/good", RandomBytes(), "Texture:Albedo", "wood_albedo.png");
+        h.SetManifest(new[]
+        {
+            new StoreManifestItem("TextureSet", "Brick", new[] { badAlbedo }, null, "item-brick", """{"category": "Textures"}"""),
+            new StoreManifestItem("TextureSet", "Wood", new[] { goodAlbedo }, null, "item-wood", """{"category": "Textures"}"""),
+        });
+        h.CategoryResolver
+            .Setup(r => r.ResolveAsync(StoreManifestMapping.ImportTarget.TextureSet, "Textures", null, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(77);
+        h.Sink
+            .Setup(s => s.CreateTextureSetAsync(It.IsAny<IFileUpload>(), "Brick", It.IsAny<TextureType>(), It.IsAny<string?>(), It.IsAny<int?>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new StoreImportException("File type 'Other file type' is not a texture."));
+        h.Sink
+            .Setup(s => s.CreateTextureSetAsync(It.IsAny<IFileUpload>(), "Wood", It.IsAny<TextureType>(), It.IsAny<string?>(), It.IsAny<int?>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(202);
+
+        await h.Run();
+
+        Assert.Equal(1, h.Job.ItemsFailed);
+        Assert.Equal(1, h.Job.ItemsCreated);
+        h.CategoryResolver.Verify(r => r.ClearCache(), Times.Once);
+        h.Sink.Verify(
+            s => s.CreateTextureSetAsync(It.IsAny<IFileUpload>(), "Wood", TextureType.Albedo, It.IsAny<string?>(), 77, It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
     public async Task Process_StampsOneSharedBatchIdAcrossAllItems()
     {
         var h = new Harness();

@@ -119,6 +119,11 @@ When(
     "I sign in to the store with the wrong password",
     async ({ page }) => {
         const store = new AssetStorePage(page);
+        // The tab browses the public catalog when signed out; the form is
+        // reached through the header's Sign in action.
+        await expect(store.signInButton).toBeVisible({ timeout: 15000 });
+        await store.signInButton.click();
+        await expect(store.loginForm).toBeVisible({ timeout: 15000 });
         await store.emailInput.fill(STORE_FIXTURE_EMAIL);
         await store.passwordInput.fill("definitely-not-the-password");
         const loginResponse = page.waitForResponse(

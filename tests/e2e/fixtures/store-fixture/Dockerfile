@@ -5,6 +5,7 @@ FROM node:20-alpine
 WORKDIR /app
 COPY fixtures/store-fixture/server.mjs ./
 COPY assets/test-cube.glb assets/blue_color.png ./assets/
+COPY assets/store-texture-brick_albedo.ktx2 assets/store-texture-brick_normal.webp assets/store-texture-brick_roughness.png ./assets/
 
 # The frontend talks to the store's real https origin, so the browser path needs
 # the fixture served over TLS. A throwaway self-signed cert for the store host;

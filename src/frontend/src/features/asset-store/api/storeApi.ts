@@ -9,6 +9,8 @@ import type {
   MintImportTokenResponse,
   StoreAssetDetail,
   StoreAuthResponse,
+  StoreCatalogPage,
+  StoreLibraryItem,
   StoreLibraryPage,
 } from '../types'
 
@@ -190,6 +192,51 @@ export async function getStoreLibrary(
     params: { page, pageSize },
   })
   return response.data
+}
+
+/**
+ * One public-catalog entry, in the shape the grid/detail consume. The store
+ * sends no `isFree` flag; the backend's catalog client derives it the same way
+ * (price 0 = free), and a pack without a price counts as free.
+ */
+export function toLibraryItemFromCatalog(
+  asset: StoreCatalogAsset
+): StoreLibraryItem {
+  return {
+    assetId: asset.id,
+    title: asset.title,
+    author: asset.author ?? '',
+    itemTypes: asset.itemTypes ?? [],
+    license: asset.license ?? '',
+    isPack: asset.isPack ?? false,
+    fileCount: asset.itemCount ?? 0,
+    totalSize: asset.fileSize ?? 0,
+    previewThumbnailUrl: asset.thumbnailUrl ?? null,
+    isFree: (asset.price ?? 0) === 0,
+  }
+}
+
+/**
+ * The store's PUBLIC catalog (GET /api/assets) - the anonymous browse read
+ * behind the signed-out Asset Store tab. Normalized to the library page shape
+ * so the grid, pager and "already imported" resolution are shared, not
+ * forked.
+ */
+export async function getStoreCatalog(
+  page: number,
+  pageSize: number
+): Promise<StoreLibraryPage> {
+  const response = await storeClient.get<StoreCatalogPage>('/api/assets', {
+    params: { page, pageSize },
+  })
+  const data = response.data
+  return {
+    items: (data.items ?? []).map(toLibraryItemFromCatalog),
+    page: data.page || page,
+    pageSize: data.pageSize || pageSize,
+    totalCount: data.totalCount ?? 0,
+    totalPages: data.totalPages ?? 0,
+  }
 }
 
 /**

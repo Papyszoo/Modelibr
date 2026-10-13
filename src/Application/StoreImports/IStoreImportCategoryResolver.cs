@@ -15,4 +15,12 @@ public interface IStoreImportCategoryResolver
         => ResolveAsync(target, categoryName, null, ct);
 
     Task<int?> ResolveAsync(StoreManifestMapping.ImportTarget target, string? categoryName, string? subcategoryName, CancellationToken ct);
+
+    /// <summary>
+    /// Drops every cached resolution. Called after an item's transaction rolled back:
+    /// a category created inside that transaction is gone with it, so the cached id
+    /// would make every later item reference a row that does not exist
+    /// (CategoryNotFound). Re-resolution is safe - find-or-create is idempotent.
+    /// </summary>
+    void ClearCache();
 }

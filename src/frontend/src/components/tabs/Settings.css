@@ -398,6 +398,10 @@
 .theme-card {
   display: flex;
   flex-direction: column;
+  /* Buttons get an anonymous `align-items: center` from the UA stylesheet,
+     which collapses the swatch div (no intrinsic width) into a hairline.
+     Stretch it back to full width. */
+  align-items: stretch;
   gap: 0.5rem;
   padding: 0.75rem;
   border: 1.5px solid var(--surface-border);

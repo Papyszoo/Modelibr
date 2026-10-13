@@ -1,4 +1,5 @@
 import { queryClient } from '@/lib/react-query'
+import { useAssetStoreAuthStore } from '@/stores/assetStoreAuthStore'
 import { useAssetStoreImportStore } from '@/stores/assetStoreImportStore'
 
 import { getStoreImportJob, startStoreImport } from '../api/importApi'
@@ -108,6 +109,11 @@ async function pollUntilDone(assetId: string, jobId: number): Promise<void> {
  * Starts (or re-runs) the import of a store library item. Pass `selectedItemIds`
  * to import only specific pack items; omit to import the whole pack. Errors
  * surface in the import store, not as a rejection.
+ *
+ * Signed in: mint the store's short-lived import token and hand it to the local
+ * backend. Signed out: free packs import anonymously - no token is minted or
+ * sent, and the store refuses anything that is not free. Paid packs are gated in
+ * the UI before this is ever called.
  */
 export async function startImport(
   item: StoreLibraryItem,
@@ -120,12 +126,16 @@ export async function startImport(
 
   let jobId: number
   try {
-    const minted = await mintImportToken(item.assetId)
+    let importToken: string | undefined
+    if (useAssetStoreAuthStore.getState().status === 'loggedIn') {
+      const minted = await mintImportToken(item.assetId)
+      importToken = minted.token
+    }
     useAssetStoreImportStore.getState().markStarting(item.assetId)
     const started = await startStoreImport({
       storeUrl,
       assetId: item.assetId,
-      importToken: minted.token,
+      importToken,
       selectedItemIds,
     })
     jobId = started.jobId

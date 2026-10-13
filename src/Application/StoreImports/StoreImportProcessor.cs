@@ -179,12 +179,17 @@ internal sealed class StoreImportProcessor : IStoreImportProcessor
                     // leaves poisoned entities in the shared change tracker that would make
                     // every later save in this scope re-fail - reset before the next item.
                     _trackerReset.Clear();
+                    // The failed item's transaction rolled back, taking any category it
+                    // created with it. A cached id would then be a dangling reference for
+                    // every later item (CategoryNotFound), so resolution starts fresh.
+                    _categoryResolver.ClearCache();
                     outcome = new StoreImportItemResult(item.ItemType, item.Name, OutcomeFailed, ex.Message);
                 }
                 catch (Exception ex)
                 {
                     _logger.LogWarning(ex, "Store import: item '{Item}' ({ItemType}) failed", item.Name, item.ItemType);
                     _trackerReset.Clear();
+                    _categoryResolver.ClearCache();
                     outcome = new StoreImportItemResult(item.ItemType, item.Name, OutcomeFailed, ex.Message);
                 }
 
