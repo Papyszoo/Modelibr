@@ -151,6 +151,23 @@ interface ListSelectionBarProps {
 }
 
 /**
+ * PrimeReact's ContextMenu positions itself from the pointer coordinates of the
+ * event it is handed (`pageX`/`pageY`). Activating the button from the keyboard
+ * (Enter/Space) fires a click at 0,0, which dropped the bulk menu in the
+ * window's top-left corner instead of under the button. Anchor such events on
+ * the button's own rect.
+ */
+function anchorMenuEvent(event: ReactMouseEvent<HTMLElement>): void {
+  if (event.pageX !== 0 || event.pageY !== 0) return
+
+  const rect = event.currentTarget?.getBoundingClientRect()
+  if (!rect) return
+
+  event.pageX = rect.left
+  event.pageY = rect.bottom
+}
+
+/**
  * The one selection bar composition for every list: count summary, Bulk
  * actions, Select All, Deselect All. Renders nothing when nothing is
  * selected. Pages pass counts + handlers, never their own bar layout.
@@ -178,7 +195,10 @@ export function ListSelectionBar({
             icon="pi pi-list-check"
             label="Bulk actions"
             active
-            onClick={onBulkActionsClick}
+            onClick={event => {
+              anchorMenuEvent(event)
+              onBulkActionsClick(event)
+            }}
             ariaLabel={`Bulk actions for ${countLabel}`}
           />
         ) : null}

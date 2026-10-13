@@ -305,12 +305,11 @@ export function TextureSetGrid({ kind, viewStateScope }: TextureSetGridProps) {
   }
 
   // --- Page identity (count chip label) ---
-  const unitLabel =
-    kind === TextureSetKind.Universal
-      ? 'material'
-      : kind === TextureSetKind.ModelSpecific
-        ? 'texture'
-        : 'set'
+  // One noun for the entity on every texture-set page, the way the other lists
+  // use a single unit label. "Global Materials" / "Multi-Model Textures" name
+  // the *kind*, so counting them as "materials" here and "textures" there read
+  // as two different things.
+  const unitLabel = 'texture set'
 
   // --- File upload (toolbar button) ---
   const handleUploadClick = useCallback(() => {

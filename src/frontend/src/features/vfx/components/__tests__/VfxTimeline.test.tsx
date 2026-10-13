@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 
 import type { VfxDefinition } from '../../types'
-import { VfxTimeline } from '../VfxTimeline'
+import { labelStride, VfxTimeline } from '../VfxTimeline'
 
 const definition: VfxDefinition = {
   version: 1,
@@ -88,5 +88,42 @@ describe('VfxTimeline', () => {
     )
 
     expect(onSeek).toHaveBeenCalledWith(0.5)
+  })
+
+  it('thins the tick labels when the ruler is too narrow for one per tick', () => {
+    // A 100px ruler piling 9 ticks (a 2s effect, 0.25s apart) leaves ~12px per
+    // label, so every third one is drawn: 0, 0.75, 1.5.
+    const width = jest
+      .spyOn(Element.prototype, 'clientWidth', 'get')
+      .mockReturnValue(100)
+    try {
+      renderTimeline(jest.fn())
+
+      const labels = screen
+        .getAllByTestId('vfx-timeline-tick')
+        .map(tick => tick.textContent)
+        .filter(Boolean)
+
+      expect(labels).toEqual(['0', '0.75', '1.5'])
+    } finally {
+      width.mockRestore()
+    }
+  })
+})
+
+describe('labelStride', () => {
+  it('keeps every label when the ruler has room', () => {
+    expect(labelStride(5, 400)).toBe(1)
+    expect(labelStride(4, 100)).toBe(1)
+  })
+
+  it('thins labels as the ruler narrows so they never overlap', () => {
+    // 13 ticks ~16px apart on a phone: a ~32px label needs every other one.
+    expect(labelStride(13, 194)).toBe(2)
+  })
+
+  it('never goes below one label, even unmeasured', () => {
+    expect(labelStride(1, 10)).toBe(1)
+    expect(labelStride(5, 0)).toBe(1)
   })
 })

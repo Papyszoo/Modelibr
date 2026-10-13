@@ -12,6 +12,12 @@
   min-height: 0;
   background: var(--mod-color-bg);
   color: var(--mod-color-text);
+  /* The editor lives in a tab that can itself sit in a splitter panel, so the
+     preview/inspector squeeze is measured on the editor, not the window - a
+     @media breakpoint would keep the 320px inspector column in a narrow panel
+     (same reasoning as the scene editor). */
+  container-type: inline-size;
+  container-name: vfx-editor;
 }
 
 /* ── Toolbar ─────────────────────────────────────────────────────────────── */
@@ -282,6 +288,63 @@
   scroll-padding-top: 3rem;
   background: var(--mod-color-surface);
   border-left: 1px solid var(--mod-color-border);
+}
+
+/*
+ * Narrow: the preview keeps a usable height on top and the inspector stacks
+ * under it (the scene editor's narrow layout). Side by side, the fixed 320px
+ * inspector left the preview ~70px wide on a 390px screen.
+ */
+@container vfx-editor (max-width: 767px) {
+  .vfx-workspace {
+    flex-direction: column;
+  }
+
+  .vfx-preview {
+    flex: 0 0 auto;
+    height: 240px;
+  }
+
+  .vfx-inspector {
+    flex: 1 1 auto;
+    width: auto;
+    min-height: 0;
+    border-left: none;
+    border-top: 1px solid var(--mod-color-border);
+  }
+
+  /*
+   * A toolbar group can be wider than the editor on a phone, where it was
+   * clipped at the right edge: the add-component row lost Sound and the
+   * transport lost the Length unit. Let the groups shrink with the toolbar.
+   */
+  .vfx-toolbar-group {
+    min-width: 0;
+  }
+
+  /* The transport's fields wrap so the Length unit stays on screen. */
+  .vfx-transport {
+    flex-wrap: wrap;
+  }
+
+  /*
+   * All four add-component segments do not fit on one phone line, so wrap them
+   * rather than clip Sound at the edge. Wrapped segments no longer join, so
+   * each one becomes a standalone rounded button with a real gap.
+   */
+  .vfx-segmented {
+    gap: var(--mod-space-2xs);
+    flex-wrap: wrap;
+  }
+
+  .vfx-segmented .vfx-segment:not(.p-button):not(.p-component):not(.p-link),
+  .vfx-segmented
+    .vfx-segment:not(.p-button):not(.p-component):not(.p-link):first-child,
+  .vfx-segmented
+    .vfx-segment:not(.p-button):not(.p-component):not(.p-link):last-child {
+    margin-left: 0;
+    border-radius: var(--mod-radius-sm);
+  }
 }
 
 .vfx-inspector-empty {

@@ -455,6 +455,28 @@
   overflow: hidden;
 }
 
+/*
+ * Mobile shell (below the tablet breakpoint, `useIsMobile`): a side panel is a
+ * full-bleed drawer over the canvas instead of a column beside it - the same
+ * one-panel-over-the-content rule the mobile shell uses for its dock panels.
+ * Split side by side, the panel left the canvas ~100px wide on a 390px screen.
+ */
+.viewer-layout--mobile {
+  position: relative;
+}
+
+.viewer-layout--mobile .viewer-panel {
+  position: absolute;
+  inset: 0;
+  z-index: 200;
+  background: var(--surface-card);
+}
+
+/* No resize handles on touch - the panels are overlays here. */
+.viewer-layout--mobile .viewer-resize-divider {
+  display: none;
+}
+
 /* Drag overlay */
 .viewer-drag-overlay {
   position: absolute;

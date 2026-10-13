@@ -114,4 +114,59 @@ describe('ListSelectionBar', () => {
       screen.queryByRole('button', { name: /Bulk actions/ })
     ).not.toBeInTheDocument()
   })
+
+  // Regression: the context menu is positioned from the event's pageX/pageY. A
+  // keyboard activation (Enter/Space on the button) fires a click at 0,0, which
+  // dropped the bulk menu in the window's top-left corner instead of under the
+  // button.
+  it('anchors a keyboard activation of Bulk actions on the button', () => {
+    const onBulkActionsClick = jest.fn()
+
+    render(
+      <ListSelectionBar
+        count={2}
+        visibleCount={5}
+        unitLabel="map"
+        onBulkActionsClick={onBulkActionsClick}
+        onSelectAllClick={noop}
+        onDeselectAllClick={noop}
+      />
+    )
+
+    const button = screen.getByRole('button', {
+      name: 'Bulk actions for 2 maps',
+    })
+    button.getBoundingClientRect = () => ({ left: 300, bottom: 120 }) as DOMRect
+
+    fireEvent.click(button, { pageX: 0, pageY: 0 })
+
+    const event = onBulkActionsClick.mock.calls[0][0]
+    expect(event.pageX).toBe(300)
+    expect(event.pageY).toBe(120)
+  })
+
+  it('leaves a pointer click anchored where the pointer clicked', () => {
+    const onBulkActionsClick = jest.fn()
+
+    render(
+      <ListSelectionBar
+        count={2}
+        visibleCount={5}
+        unitLabel="map"
+        onBulkActionsClick={onBulkActionsClick}
+        onSelectAllClick={noop}
+        onDeselectAllClick={noop}
+      />
+    )
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Bulk actions for 2 maps' }),
+      // jsdom derives pageX/pageY from clientX/clientY (scroll is 0).
+      { clientX: 640, clientY: 40 }
+    )
+
+    const event = onBulkActionsClick.mock.calls[0][0]
+    expect(event.pageX).toBe(640)
+    expect(event.pageY).toBe(40)
+  })
 })

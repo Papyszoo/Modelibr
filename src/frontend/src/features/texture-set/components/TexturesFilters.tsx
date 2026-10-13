@@ -188,10 +188,10 @@ export function TexturesFilters({
           />
           <ListToolbarButton
             icon="pi pi-plus"
-            label="Create Set"
+            label="Create Texture Set"
             onClick={onCreateClick}
             tooltip="Create a new texture set"
-            ariaLabel="Create Set"
+            ariaLabel="Create Texture Set"
           />
           <ListToolbarButton
             icon="pi pi-refresh"

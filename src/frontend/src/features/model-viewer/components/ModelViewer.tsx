@@ -36,6 +36,7 @@ import {
   recycleToastContent,
   UNDO_TOAST_LIFE_MS,
 } from '@/shared/components/feedback/RecycleToastContent'
+import { useIsMobile } from '@/shared/hooks'
 import {
   EMPTY_RENDERER_PERF_STATS,
   type RendererPerfStats,
@@ -162,6 +163,10 @@ export function ModelViewer({
     )
 
   // --- Panel state ---
+  // Mobile shell rule: one panel at a time, over the content. Below the tablet
+  // breakpoint the panel columns are dropped and the panel floats over the
+  // canvas, which would otherwise be squeezed to a ~100px sliver.
+  const isMobile = useIsMobile()
   const [leftPanel, setLeftPanel] = useState<PanelContent>(
     savedLayout.leftPanel
   )
@@ -695,12 +700,29 @@ export function ModelViewer({
 
   const gridStyle: React.CSSProperties = {
     display: 'grid',
-    gridTemplateColumns: `${hasLeft ? panelSizes.left + 'px' : '0px'} ${hasLeft ? '4px' : '0px'} 1fr ${hasRight ? '4px' : '0px'} ${hasRight ? panelSizes.right + 'px' : '0px'}`,
-    gridTemplateRows: `${hasTop ? panelSizes.top + 'px' : '0px'} ${hasTop ? '4px' : '0px'} 1fr ${hasBottom ? '4px' : '0px'} ${hasBottom ? panelSizes.bottom + 'px' : '0px'}`,
+    // Mobile: keep the 5x5 template (the canvas and dividers carry inline grid
+    // positions) but zero every track except the centre one, so the canvas owns
+    // the whole layout. The panels are absolutely positioned over it by
+    // `.viewer-layout--mobile`.
+    gridTemplateColumns: isMobile
+      ? '0px 0px minmax(0, 1fr) 0px 0px'
+      : `${hasLeft ? panelSizes.left + 'px' : '0px'} ${hasLeft ? '4px' : '0px'} 1fr ${hasRight ? '4px' : '0px'} ${hasRight ? panelSizes.right + 'px' : '0px'}`,
+    gridTemplateRows: isMobile
+      ? '0px 0px minmax(0, 1fr) 0px 0px'
+      : `${hasTop ? panelSizes.top + 'px' : '0px'} ${hasTop ? '4px' : '0px'} 1fr ${hasBottom ? '4px' : '0px'} ${hasBottom ? panelSizes.bottom + 'px' : '0px'}`,
     flex: 1,
     minHeight: 0,
     overflow: 'hidden',
   }
+
+  // A panel with a grid area would be positioned against that (now zero-width)
+  // area, so on mobile the panels carry no placement at all and the CSS insets
+  // them over the canvas instead.
+  const panelPlacement = (
+    column: string,
+    row: string
+  ): React.CSSProperties | undefined =>
+    isMobile ? undefined : { gridColumn: column, gridRow: row }
 
   // Panel title map
   const panelTitles: Record<string, string> = {
@@ -859,15 +881,18 @@ export function ModelViewer({
             }
           />
 
-          <div className="viewer-layout" style={gridStyle}>
+          <div
+            className={`viewer-layout${isMobile ? ' viewer-layout--mobile' : ''}`}
+            style={gridStyle}
+          >
             {/* Left Panel */}
             {hasLeft && (
               <div
                 className="viewer-panel"
-                style={{
-                  gridColumn: '1 / 2',
-                  gridRow: `${leftRowStart} / ${leftRowEnd}`,
-                }}
+                style={panelPlacement(
+                  '1 / 2',
+                  `${leftRowStart} / ${leftRowEnd}`
+                )}
               >
                 <PanelWrapper
                   title={panelTitles[leftPanel!] ?? 'Panel'}
@@ -884,10 +909,10 @@ export function ModelViewer({
             {hasLeft && (
               <div
                 className={`viewer-resize-divider viewer-resize-divider-h ${resizing === 'left' ? 'resizing' : ''}`}
-                style={{
-                  gridColumn: '2 / 3',
-                  gridRow: `${leftRowStart} / ${leftRowEnd}`,
-                }}
+                style={panelPlacement(
+                  '2 / 3',
+                  `${leftRowStart} / ${leftRowEnd}`
+                )}
                 onMouseDown={e => startResize('left', e)}
               />
             )}
@@ -896,10 +921,7 @@ export function ModelViewer({
             {hasTop && (
               <div
                 className="viewer-panel"
-                style={{
-                  gridColumn: `${topColStart} / ${topColEnd}`,
-                  gridRow: '1 / 2',
-                }}
+                style={panelPlacement(`${topColStart} / ${topColEnd}`, '1 / 2')}
               >
                 <PanelWrapper
                   title={panelTitles[topPanel!] ?? 'Panel'}
@@ -916,10 +938,7 @@ export function ModelViewer({
             {hasTop && (
               <div
                 className={`viewer-resize-divider viewer-resize-divider-v ${resizing === 'top' ? 'resizing' : ''}`}
-                style={{
-                  gridColumn: `${topColStart} / ${topColEnd}`,
-                  gridRow: '2 / 3',
-                }}
+                style={panelPlacement(`${topColStart} / ${topColEnd}`, '2 / 3')}
                 onMouseDown={e => startResize('top', e)}
               />
             )}
@@ -1038,10 +1057,10 @@ export function ModelViewer({
             {hasBottom && (
               <div
                 className={`viewer-resize-divider viewer-resize-divider-v ${resizing === 'bottom' ? 'resizing' : ''}`}
-                style={{
-                  gridColumn: `${bottomColStart} / ${bottomColEnd}`,
-                  gridRow: '4 / 5',
-                }}
+                style={panelPlacement(
+                  `${bottomColStart} / ${bottomColEnd}`,
+                  '4 / 5'
+                )}
                 onMouseDown={e => startResize('bottom', e)}
               />
             )}
@@ -1050,10 +1069,10 @@ export function ModelViewer({
             {hasBottom && (
               <div
                 className="viewer-panel"
-                style={{
-                  gridColumn: `${bottomColStart} / ${bottomColEnd}`,
-                  gridRow: '5 / 6',
-                }}
+                style={panelPlacement(
+                  `${bottomColStart} / ${bottomColEnd}`,
+                  '5 / 6'
+                )}
               >
                 <PanelWrapper
                   title={panelTitles[bottomPanel!] ?? 'Panel'}
@@ -1070,10 +1089,10 @@ export function ModelViewer({
             {hasRight && (
               <div
                 className={`viewer-resize-divider viewer-resize-divider-h ${resizing === 'right' ? 'resizing' : ''}`}
-                style={{
-                  gridColumn: '4 / 5',
-                  gridRow: `${rightRowStart} / ${rightRowEnd}`,
-                }}
+                style={panelPlacement(
+                  '4 / 5',
+                  `${rightRowStart} / ${rightRowEnd}`
+                )}
                 onMouseDown={e => startResize('right', e)}
               />
             )}
@@ -1082,10 +1101,10 @@ export function ModelViewer({
             {hasRight && (
               <div
                 className="viewer-panel"
-                style={{
-                  gridColumn: '5 / 6',
-                  gridRow: `${rightRowStart} / ${rightRowEnd}`,
-                }}
+                style={panelPlacement(
+                  '5 / 6',
+                  `${rightRowStart} / ${rightRowEnd}`
+                )}
               >
                 <PanelWrapper
                   title={panelTitles[rightPanel!] ?? 'Panel'}

@@ -14,6 +14,11 @@
 .pack-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  /* Rows are content-sized, not "as much of the container as fits": the card
+     clips its overflow, so its automatic minimum height is 0 and a definite
+     grid height let the rows be squeezed into whatever space was left - 30
+     packs rendered as 76px strips with the titles clipped away. */
+  grid-auto-rows: max-content;
   gap: 1.5rem;
   padding: 1rem 0;
   overflow-y: auto;

@@ -1,4 +1,10 @@
-import { type JSX, type PointerEvent, useRef } from 'react'
+import {
+  type JSX,
+  type PointerEvent,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from 'react'
 
 import type { VfxComponent, VfxComponentType, VfxDefinition } from '../types'
 
@@ -33,6 +39,24 @@ function tickStep(duration: number): number {
   return 10
 }
 
+/** Roughly the width of a tick label like "0.25", plus a gap, in px. */
+const TICK_LABEL_SPAN = 32
+
+/**
+ * How many ticks to skip between labels so they never overlap.
+ *
+ * `count` evenly spaced ticks across a ruler `width` px wide sit
+ * `width / (count - 1)` apart; thinning to every `stride`-th clears
+ * `TICK_LABEL_SPAN`. A narrow ruler thins harder, a wide one keeps every
+ * label. An unmeasured (zero-width) ruler keeps them all.
+ */
+// eslint-disable-next-line react-refresh/only-export-components -- exported so the thinning rule can be unit-tested
+export function labelStride(count: number, width: number): number {
+  if (count <= 1 || width <= 0) return 1
+  const spacing = width / (count - 1)
+  return Math.max(1, Math.ceil(TICK_LABEL_SPAN / spacing))
+}
+
 /**
  * One track per component on a shared clock.
  *
@@ -53,6 +77,21 @@ export function VfxTimeline({
   const { duration } = definition
   const percent = (seconds: number) => `${(seconds / duration) * 100}%`
 
+  // Track the ruler's own width so labels can be thinned to the space
+  // available: at phone width a label per tick overlaps into one run of
+  // digits. The editor can sit in a splitter panel, so the observed element
+  // is the ruler, not the window.
+  const [rulerWidth, setRulerWidth] = useState(0)
+  useLayoutEffect(() => {
+    const element = rulerRef.current
+    if (!element) return
+    const measure = () => setRulerWidth(element.clientWidth)
+    measure()
+    const observer = new ResizeObserver(measure)
+    observer.observe(element)
+    return () => observer.disconnect()
+  }, [])
+
   const timeAt = (clientX: number): number => {
     const rect = rulerRef.current?.getBoundingClientRect()
     if (!rect || rect.width === 0) return 0
@@ -67,6 +106,7 @@ export function VfxTimeline({
   const step = tickStep(duration)
   const ticks: number[] = []
   for (let t = 0; t <= duration + 1e-6; t += step) ticks.push(t)
+  const stride = labelStride(ticks.length, rulerWidth)
 
   return (
     <div className="vfx-timeline" data-testid="vfx-timeline">
@@ -83,13 +123,14 @@ export function VfxTimeline({
             if (event.buttons === 1) onSeek(timeAt(event.clientX))
           }}
         >
-          {ticks.map(t => (
+          {ticks.map((t, index) => (
             <span
               key={t.toFixed(3)}
               className="vfx-timeline-tick"
+              data-testid="vfx-timeline-tick"
               style={{ left: percent(t) }}
             >
-              {Number(t.toFixed(2))}
+              {index % stride === 0 ? Number(t.toFixed(2)) : ''}
             </span>
           ))}
           <div
