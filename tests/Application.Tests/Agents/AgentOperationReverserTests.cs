@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Application.Abstractions;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
@@ -1159,6 +1160,74 @@ public class AgentOperationReverserTests
         Assert.False(applied.Value[0].Reversed);
         _setAssetMetadata.Verify(h => h.Handle(
             It.IsAny<SetAssetMetadataCommand>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Reversing_A_Metadata_Write_That_Changed_The_Category_Restores_The_Category_Id()
+    {
+        // The merged set_asset_metadata sets tags and category, so its inverse has to be
+        // able to restore both. The read side reports category as {id, name} for a picker,
+        // while the write takes the id - without the conversion the undo built a patch the
+        // write refuses.
+        const string before = """
+            {"assetType":"Model","assetId":9,"fields":[
+              {"key":"category","readOnly":false,"value":{"id":3,"name":"Props"}},
+              {"key":"tags","readOnly":false,"value":["wood"]}]}
+            """;
+        const string after = """
+            {"assetType":"Model","assetId":9,"fields":[
+              {"key":"category","readOnly":false,"value":{"id":8,"name":"Weapons"}},
+              {"key":"tags","readOnly":false,"value":["wood"]}]}
+            """;
+        Records(Completed("k1", "set-asset-metadata", "Model", 9, before: before, after: after));
+        _setAssetMetadata
+            .Setup(h => h.Handle(It.IsAny<SetAssetMetadataCommand>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result.Success(new AssetMetadataResponse(
+                "Model", 9, "chair", 1, 1, Array.Empty<AssetMetadataValue>(),
+                new AssetMetadataCompleteness(0, 0, Array.Empty<string>()))));
+
+        var applied = await _reverser.ApplyAsync((await _reverser.PlanAsync("k1", null)).Value);
+
+        Assert.True(applied.Value[0].Reversed);
+        _setAssetMetadata.Verify(h => h.Handle(
+            It.Is<SetAssetMetadataCommand>(c =>
+                c.Fields.Count == 1
+                && c.Fields["category"].ValueKind == JsonValueKind.Number
+                && c.Fields["category"].GetInt32() == 3
+                // tags did not change, so the undo leaves them alone
+                && !c.Fields.ContainsKey("tags")),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Reversing_A_Metadata_Write_That_Cleared_The_Category_Restores_The_Previous_Id()
+    {
+        // Clearing a category reads back as the object with a null id; the inverse has to
+        // put the previous id back, not the object.
+        const string before = """
+            {"assetType":"Model","assetId":9,"fields":[
+              {"key":"category","readOnly":false,"value":{"id":3,"name":"Props"}}]}
+            """;
+        const string after = """
+            {"assetType":"Model","assetId":9,"fields":[
+              {"key":"category","readOnly":false}]}
+            """;
+        Records(Completed("k1", "set-asset-metadata", "Model", 9, before: before, after: after));
+        _setAssetMetadata
+            .Setup(h => h.Handle(It.IsAny<SetAssetMetadataCommand>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result.Success(new AssetMetadataResponse(
+                "Model", 9, "chair", 1, 1, Array.Empty<AssetMetadataValue>(),
+                new AssetMetadataCompleteness(0, 0, Array.Empty<string>()))));
+
+        var applied = await _reverser.ApplyAsync((await _reverser.PlanAsync("k1", null)).Value);
+
+        Assert.True(applied.Value[0].Reversed);
+        _setAssetMetadata.Verify(h => h.Handle(
+            It.Is<SetAssetMetadataCommand>(c =>
+                c.Fields.Count == 1
+                && c.Fields["category"].ValueKind == JsonValueKind.Number
+                && c.Fields["category"].GetInt32() == 3),
+            It.IsAny<CancellationToken>()), Times.Once);
     }
 
     /// <summary>

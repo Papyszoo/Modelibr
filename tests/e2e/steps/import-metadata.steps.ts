@@ -401,12 +401,15 @@ Then(
 // ---- Path refusal ---------------------------------------------------------------
 
 When(
-    "an agent calls {string} with an unreadable server path",
-    async ({ page }, tool: string) => {
+    "an agent calls {string} for {string} with an unreadable server path",
+    async ({ page }, tool: string, assetType: string) => {
         const args: Record<string, unknown> = {
             path: "/no/such/batch3-file.bin",
             name: "Batch3 Unreadable",
         };
+        if (tool === "import_asset") {
+            args.assetType = assetType;
+        }
         if (tool === "import_texture_set") {
             args.channels = [
                 { path: "/no/such/batch3-file.png", textureType: "Albedo" },
@@ -677,14 +680,15 @@ Then("that model should carry the annotation tags", async ({ page }) => {
     expect(tags).toContain("batch3-annotation-tag");
 });
 
-// ---- set_tags / set_category ----------------------------------------------------
+// ---- set_asset_metadata (tags and category) -------------------------------------
 
 When(
     "an agent sets that model's tags to {string}",
     async ({ page }, tags: string) => {
-        const result = await callTool(page, "set_tags", {
-            modelId: lastModel(page).id,
-            tags: tags.split(",").map((tag) => tag.trim()),
+        const result = await callTool(page, "set_asset_metadata", {
+            assetType: "Model",
+            assetId: lastModel(page).id,
+            fields: { tags: tags.split(",").map((tag) => tag.trim()) },
         });
         expect(result.status, JSON.stringify(result)).toBe("ok");
     },
@@ -711,9 +715,10 @@ When(
             name: string;
         }>(CATEGORY_KEY);
         expect(category, "No batch3 category was provisioned").toBeTruthy();
-        const result = await callTool(page, "set_category", {
-            modelId: lastModel(page).id,
-            categoryId: category!.id,
+        const result = await callTool(page, "set_asset_metadata", {
+            assetType: "Model",
+            assetId: lastModel(page).id,
+            fields: { category: category!.id },
         });
         expect(result.status, JSON.stringify(result)).toBe("ok");
     },

@@ -2,6 +2,7 @@ using System.Text.Json;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Services;
 using Application.Agents;
+using Application.Extraction.Jobs;
 using Application.Models;
 using Application.Packs;
 using Application.Search;
@@ -30,28 +31,8 @@ public class AssetWriteMcpToolsTests
     private static McpCallerContext Caller() => McpCallerContext.Unauthenticated();
 
     /// <summary>
-    /// The model read the write tools now perform to record what they are about to
-    /// overwrite. Returns a model with no category and no tags unless told otherwise.
+    /// An audit whose claim always succeeds (the key was free).
     /// </summary>
-    private static Mock<IQueryHandler<GetModelByIdQuery, GetModelByIdQueryResponse>> ModelRead(
-        int modelId = 1, int? categoryId = null)
-    {
-        var model = new ModelDetailDto
-        {
-            Id = modelId,
-            Name = "probe",
-            Tags = new[] { "old-tag" },
-            Description = "old description",
-            Category = categoryId is null ? null : new ModelCategorySummaryDto { Id = categoryId.Value, Name = "Old" },
-        };
-
-        var read = new Mock<IQueryHandler<GetModelByIdQuery, GetModelByIdQueryResponse>>();
-        read.Setup(h => h.Handle(It.IsAny<GetModelByIdQuery>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(Result.Success(new GetModelByIdQueryResponse(model)));
-        return read;
-    }
-
-    /// <summary>An audit whose claim always succeeds (the key was free).</summary>
     private static Mock<IAgentAudit> ClaimGranted()
     {
         var audit = new Mock<IAgentAudit>();
@@ -86,19 +67,19 @@ public class AssetWriteMcpToolsTests
     }
 
     [Fact]
-    public async Task SetCategory_Claims_The_Key_Before_Writing_Then_Completes_It()
+    public async Task TriggerRederive_Claims_The_Key_Before_Writing_Then_Completes_It()
     {
-        var handler = new Mock<ICommandHandler<SetModelCategoryCommand, SetModelCategoryResponse>>();
-        handler.Setup(h => h.Handle(It.IsAny<SetModelCategoryCommand>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(Result.Success(new SetModelCategoryResponse(1, 5)));
+        var handler = new Mock<ICommandHandler<EnqueueExtractionJobCommand, EnqueueExtractionJobResponse>>();
+        handler.Setup(h => h.Handle(It.IsAny<EnqueueExtractionJobCommand>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result.Success(new EnqueueExtractionJobResponse(9, false)));
         var audit = ClaimGranted();
 
-        var result = await AssetWriteMcpTools.SetCategory(
-            ModelRead().Object, handler.Object, audit.Object, Caller(), 1, "key-1", 5);
+        var result = await AssetWriteMcpTools.TriggerRederive(
+            handler.Object, audit.Object, Caller(), "Model", 1, "key-1");
 
         Assert.Contains("\"ok\"", Json(result));
         audit.Verify(a => a.TryBeginAsync(
-            It.Is<AgentWrite>(w => w.Operation == "set-category" && w.AssetId == 1), It.IsAny<CancellationToken>()),
+            It.Is<AgentWrite>(w => w.Operation == "trigger-rederive" && w.AssetId == 1), It.IsAny<CancellationToken>()),
             Times.Once);
         audit.Verify(a => a.CompleteAsync(
             "key-1", "gen-1", "Model", 1, It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Once);
@@ -129,16 +110,16 @@ public class AssetWriteMcpToolsTests
     }
 
     [Fact]
-    public async Task SetCategory_Is_Idempotent_And_Skips_The_Write()
+    public async Task TriggerRederive_Is_Idempotent_And_Skips_The_Write()
     {
-        var handler = new Mock<ICommandHandler<SetModelCategoryCommand, SetModelCategoryResponse>>();
-        var audit = ClaimCompleted("key-1", "set-category", "Model", 1);
+        var handler = new Mock<ICommandHandler<EnqueueExtractionJobCommand, EnqueueExtractionJobResponse>>();
+        var audit = ClaimCompleted("key-1", "trigger-rederive", "Model", 1);
 
-        var result = await AssetWriteMcpTools.SetCategory(
-            ModelRead().Object, handler.Object, audit.Object, Caller(), 1, "key-1", 5);
+        var result = await AssetWriteMcpTools.TriggerRederive(
+            handler.Object, audit.Object, Caller(), "Model", 1, "key-1");
 
         Assert.Contains("already-applied", Json(result));
-        handler.Verify(h => h.Handle(It.IsAny<SetModelCategoryCommand>(), It.IsAny<CancellationToken>()), Times.Never);
+        handler.Verify(h => h.Handle(It.IsAny<EnqueueExtractionJobCommand>(), It.IsAny<CancellationToken>()), Times.Never);
         audit.Verify(a => a.CompleteAsync(
             It.IsAny<string>(), "gen-1", It.IsAny<string>(), It.IsAny<int?>(), It.IsAny<string>(), It.IsAny<string>(),
             It.IsAny<CancellationToken>()),
@@ -146,18 +127,18 @@ public class AssetWriteMcpToolsTests
     }
 
     [Fact]
-    public async Task SetCategory_Failure_Releases_The_Claim_So_A_Retry_Can_Run()
+    public async Task TriggerRederive_Failure_Releases_The_Claim_So_A_Retry_Can_Run()
     {
         // Regression: with claim-before-write, a failed write must give the key back -
         // otherwise retrying the same key answers "already-applied" for an operation
         // that never happened.
-        var handler = new Mock<ICommandHandler<SetModelCategoryCommand, SetModelCategoryResponse>>();
-        handler.Setup(h => h.Handle(It.IsAny<SetModelCategoryCommand>(), It.IsAny<CancellationToken>()))
-            .ReturnsAsync(Result.Failure<SetModelCategoryResponse>(new Error("ModelNotFound", "nope")));
+        var handler = new Mock<ICommandHandler<EnqueueExtractionJobCommand, EnqueueExtractionJobResponse>>();
+        handler.Setup(h => h.Handle(It.IsAny<EnqueueExtractionJobCommand>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result.Failure<EnqueueExtractionJobResponse>(new Error("ModelNotFound", "nope")));
         var audit = ClaimGranted();
 
-        var result = await AssetWriteMcpTools.SetCategory(
-            ModelRead().Object, handler.Object, audit.Object, Caller(), 1, "key-1", 5);
+        var result = await AssetWriteMcpTools.TriggerRederive(
+            handler.Object, audit.Object, Caller(), "Model", 1, "key-1");
 
         Assert.Contains("ModelNotFound", Json(result));
         audit.Verify(a => a.AbandonAsync("key-1", "gen-1", It.IsAny<CancellationToken>()), Times.Once);
@@ -311,14 +292,14 @@ public class AssetWriteMcpToolsTests
         // proves nothing was written, and it does not: the command commits before the tool
         // returns. So a throw now settles the key as ambiguous, and only a returned failure
         // releases it.
-        var handler = new Mock<ICommandHandler<SetModelCategoryCommand, SetModelCategoryResponse>>();
-        handler.Setup(h => h.Handle(It.IsAny<SetModelCategoryCommand>(), It.IsAny<CancellationToken>()))
+        var handler = new Mock<ICommandHandler<EnqueueExtractionJobCommand, EnqueueExtractionJobResponse>>();
+        handler.Setup(h => h.Handle(It.IsAny<EnqueueExtractionJobCommand>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("connection reset"));
         var audit = ClaimGranted();
 
         await Assert.ThrowsAsync<InvalidOperationException>(
-            () => AssetWriteMcpTools.SetCategory(
-                ModelRead().Object, handler.Object, audit.Object, Caller(), 1, "key-8", 5));
+            () => AssetWriteMcpTools.TriggerRederive(
+                handler.Object, audit.Object, Caller(), "Model", 1, "key-8"));
 
         audit.Verify(a => a.InterruptAsync(
             "key-8", "gen-1", It.IsAny<string>(), It.IsAny<int?>(), It.IsAny<CancellationToken>()), Times.Once);
@@ -335,16 +316,16 @@ public class AssetWriteMcpToolsTests
     {
         // Cancelling the request does not roll back a transaction that already committed,
         // so cancellation is the same "unknown" as a throw.
-        var handler = new Mock<ICommandHandler<SetModelCategoryCommand, SetModelCategoryResponse>>();
-        handler.Setup(h => h.Handle(It.IsAny<SetModelCategoryCommand>(), It.IsAny<CancellationToken>()))
+        var handler = new Mock<ICommandHandler<EnqueueExtractionJobCommand, EnqueueExtractionJobResponse>>();
+        handler.Setup(h => h.Handle(It.IsAny<EnqueueExtractionJobCommand>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new OperationCanceledException());
         var audit = ClaimGranted();
         using var cts = new CancellationTokenSource();
         cts.Cancel();
 
         await Assert.ThrowsAsync<OperationCanceledException>(
-            () => AssetWriteMcpTools.SetCategory(
-                ModelRead().Object, handler.Object, audit.Object, Caller(), 1, "key-10", 5,
+            () => AssetWriteMcpTools.TriggerRederive(
+                handler.Object, audit.Object, Caller(), "Model", 1, "key-10",
                 cancellationToken: cts.Token));
 
         // Settled with an uncancelled token - the caller's token is already dead, and the

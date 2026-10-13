@@ -19,7 +19,7 @@ namespace WebApi.Mcp;
 public sealed class AssetMetadataWriteMcpTools
 {
     [McpServerTool(Name = "set_asset_metadata")]
-    [Description("Merge schema fields onto an asset. `fields` is a JSON object of schema field keys to values: a key you omit is left alone, and a key set to null is cleared. Works for every asset family - the call resolves where each field lives. Idempotent per idempotencyKey and undoable with reverse_operation.")]
+    [Description("Merge schema fields onto an asset: `tags`, `description` and `category` (the category id, or null to clear) join licence, author, credit, style, theme and source. `fields` is a JSON object of schema field keys to values - a key you omit is left alone, and a key set to null is cleared. Works for every asset family: the call resolves where each field lives. Call get_metadata_schema for the field list. Idempotent per idempotencyKey and undoable with reverse_operation.")]
     public static Task<object> SetAssetMetadata(
         ICommandHandler<SetAssetMetadataCommand, AssetMetadataResponse> handler,
         IQueryHandler<ReadAssetMetadataQuery, AssetMetadataResponse> readHandler,

@@ -19,10 +19,10 @@ Moving `./data/` aside instead of deleting it makes the old instance restorable:
 
 ## The MCP surface today
 
-**11 tools + 1 prompt.** Read (always on): `search_assets`, `get_asset`, `get_part`,
-`compute_on_demand`, `list_facets`. Write (only with `MCP_WRITE_ENABLED=true`):
-`set_tags`, `set_category`, `create_pack`, `add_to_pack`, `trigger_rederive`,
-`import_model`, plus the `import_library` prompt. All return real data.
+**11 tools + 1 prompt.** Read (always on): `search_assets`, `get_asset` (a part read is
+`get_asset(partPath)`), `compute_on_demand`, `list_facets`. Write (only with
+`MCP_WRITE_ENABLED=true`): `set_asset_metadata`, `create_pack`, `add_to_pack`,
+`trigger_rederive`, `import_model`, plus the `import_library` prompt. All return real data.
 
 **Every write tool is Model-only.** There is no agent-reachable path for sounds,
 textures, texture sets, sprites or env maps - importing the CC0 sound corpus had to

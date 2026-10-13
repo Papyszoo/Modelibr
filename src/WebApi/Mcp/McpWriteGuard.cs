@@ -314,6 +314,17 @@ internal static class McpWriteGuard
     };
 
     /// <summary>
+    /// The operator flag that turns the write surface on. It decides which tool types are
+    /// registered, and a read tool that may queue work honours the same flag here rather
+    /// than being registered behind it - so "writes off" means the same thing whether the
+    /// tool is a write tool or a read one with a queueing branch.
+    /// </summary>
+    internal const string WriteFlag = "MCP_WRITE_ENABLED";
+
+    internal static bool WriteEnabled(IConfiguration configuration) =>
+        configuration[WriteFlag] == "true";
+
+    /// <summary>
     /// The operator flag that permits work nothing can quietly undo.
     ///
     /// Here rather than on one tool class because two of them gate on it, and a second copy

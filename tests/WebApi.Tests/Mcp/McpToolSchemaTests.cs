@@ -20,7 +20,8 @@ public class McpToolSchemaTests
         var method = typeof(SceneWriteMcpTools).GetMethod(methodName)
                      ?? typeof(AssetSearchMcpTools).GetMethod(methodName)
                      ?? typeof(AssetWriteMcpTools).GetMethod(methodName)
-                     ?? typeof(AssetMetadataWriteMcpTools).GetMethod(methodName);
+                     ?? typeof(AssetMetadataWriteMcpTools).GetMethod(methodName)
+                     ?? typeof(ProjectWriteMcpTools).GetMethod(methodName);
         Assert.NotNull(method);
 
         var tool = McpServerTool.Create(method!);
@@ -170,6 +171,49 @@ public class McpToolSchemaTests
         var shapeKeys = ObjectBody(entry.GetProperty("shapeKeys"));
         Assert.Contains("object", TypeNames(shapeKeys));
         Assert.Contains("number", TypeNames(shapeKeys.GetProperty("additionalProperties")));
+    }
+
+    [Fact]
+    public void SetProjectProfile_Describes_Dimensions_And_Settings_As_Objects()
+    {
+        // Typed records, not a JSON blob: a strict client has to be able to see that
+        // dimensions is an array of {dimension, options} objects and settings an object
+        // with its fields - the shape the dictionary trap made clients send as a string.
+        var dimensions = ArrayBody(Property(SchemaFor("set_project_profile", "SetProjectProfile"), "dimensions"));
+        Assert.Contains("array", TypeNames(dimensions));
+
+        var entry = dimensions.GetProperty("items").GetProperty("properties");
+        Assert.True(entry.TryGetProperty("dimension", out _));
+        Assert.True(entry.TryGetProperty("options", out _));
+
+        var settings = ObjectBody(Property(SchemaFor("set_project_profile", "SetProjectProfile"), "settings"));
+        Assert.Contains("object", TypeNames(settings));
+        Assert.True(settings.GetProperty("properties").TryGetProperty("maxTrianglesPerAsset", out _));
+    }
+
+    /// <summary>
+    /// The array half of a nullable schema node, which may be emitted as
+    /// <c>anyOf: [{array…}, {null}]</c> rather than a type array.
+    /// </summary>
+    private static JsonElement ArrayBody(JsonElement node)
+    {
+        if (node.TryGetProperty("items", out _))
+        {
+            return node;
+        }
+
+        if (node.TryGetProperty("anyOf", out var anyOf))
+        {
+            foreach (var option in anyOf.EnumerateArray())
+            {
+                if (option.TryGetProperty("items", out _))
+                {
+                    return option;
+                }
+            }
+        }
+
+        return node;
     }
 
     /// <summary>

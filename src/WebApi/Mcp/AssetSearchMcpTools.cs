@@ -2,22 +2,32 @@ using System.ComponentModel;
 using System.Text.Json;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Storage;
+using Application.Agents;
+using Application.Blender;
 using Application.Extraction;
 using Application.Extraction.Compute;
+using Application.Extraction.Jobs;
 using Application.Search;
 using Application.Thumbnails;
 using Domain.ValueObjects;
+using Microsoft.Extensions.Configuration;
 using ModelContextProtocol;
 using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
+using SharedKernel;
+using static WebApi.Mcp.McpWriteGuard;
 
 namespace WebApi.Mcp;
 
 /// <summary>
 /// Local MCP tools exposing the asset library to an agent. A <b>thin pass-through</b>
 /// over the ordinary query handlers (prompts 23–25) - no extraction or search logic
-/// lives here. Read-only: agent writes are deliberately out of scope. Search logging
-/// (prompt 24) covers these queries too, since they route through the same handler.
+/// lives here. Reads, with one deliberate exception: <c>compute_on_demand</c> can queue
+/// the measurement that fills a cache row it was asked about. Unlike <c>render_scene</c>
+/// (a read that may queue work), that branch is a write in every sense - it honours
+/// <c>MCP_WRITE_ENABLED</c>, checks the write scope, and records an audit row exactly like
+/// the other job-queuing tools - so a read-only server never queues anything. Search
+/// logging (prompt 24) covers these queries too, since they route through the same handler.
 /// </summary>
 [McpServerToolType]
 public sealed class AssetSearchMcpTools
@@ -402,6 +412,9 @@ public sealed class AssetSearchMcpTools
     [Description("Get the derived metadata, part list and material slot names for an asset. " +
                  "Pass the versionId from the search hit you are inspecting: without it this answers " +
                  "about the asset's active version, which is not necessarily the version that hit named. " +
+                 "Pass partPath to narrow the part list to one part (its detail plus the parent asset's " +
+                 "derived metadata), for a part a search hit named by its part-path identifier - " +
+                 "part paths are only stable within a version, so pass that hit's versionId too. " +
                  "When the source file carried them, the response also carries `animations` - one entry per clip " +
                  "as `{name, durationSeconds, kinds}`, where kinds is skeletal / morph / material - and " +
                  "`shapeKeys` as `{meshName, names}` per morph-capable mesh. " +
@@ -410,36 +423,14 @@ public sealed class AssetSearchMcpTools
                  "READ THESE BEFORE STACKING. place_asset(on:) alone rests a node on the target's whole-asset " +
                  "bounding-box top, which is right for a table and wrong for anything with structure - " +
                  "it puts a cushion on a sofa's BACK rather than its seat. Pass that `index` as " +
-                 "place_asset(onSurface:) and the node is seated on the surface you meant.")]
+                 "place_asset(onSurface:) and the node is seated on the surface you meant. " +
+                 "Each part also carries its geometryHash - feed it to compute_on_demand for that part's cached metrics.")]
     public static async Task<object> GetAsset(
         IQueryHandler<GetAssetMetadataQuery, AssetMetadataResponse> handler,
         [Description("Asset family, e.g. Model.")] string assetType,
         [Description("Asset id.")] int assetId,
         [Description("Version to inspect - use the search hit's versionId. Defaults to the active version.")] int? versionId = null,
-        McpCallerContext? caller = null,
-        CancellationToken cancellationToken = default)
-    {
-        if (caller?.FamilyDenial(assetType) is { } denied)
-        {
-            return new { error = "AssetFamilyNotAllowed", message = denied };
-        }
-
-        var result = await handler.Handle(
-            new GetAssetMetadataQuery(assetType, assetId, VersionId: versionId), cancellationToken);
-        return result.IsFailure
-            ? new { error = result.Error.Code, message = result.Error.Message }
-            : result.Value;
-    }
-
-    [McpServerTool(Name = "get_part")]
-    [Description("Get a single part's detail (by its part-path identifier) plus the parent asset's derived metadata. " +
-                 "Pass the versionId from the search hit that named this part - part paths are only stable within a version.")]
-    public static async Task<object> GetPart(
-        IQueryHandler<GetAssetMetadataQuery, AssetMetadataResponse> handler,
-        [Description("Asset family, e.g. Model.")] string assetType,
-        [Description("Asset id.")] int assetId,
-        [Description("Part path (from the scene-graph part-path scheme).")] string partPath,
-        [Description("Version to inspect - use the search hit's versionId. Defaults to the active version.")] int? versionId = null,
+        [Description("Optional part path (e.g. /Building/Roof) to read one part instead of the whole part list.")] string? partPath = null,
         McpCallerContext? caller = null,
         CancellationToken cancellationToken = default)
     {
@@ -474,21 +465,40 @@ public sealed class AssetSearchMcpTools
     };
 
     [McpServerTool(Name = "compute_on_demand")]
-    [Description("Return a cached expensive-compute metric (LOCAL-space surface area, manifold check, per-part render, ...) for a geometry hash, " +
-                 "or 'pending' if it has not been computed yet. Results are cached and shared across every asset with the same geometry. " +
-                 "surface-area here is measured in the mesh's OWN space and carries \"space\": \"local\" - it does NOT include the scale an " +
+    [Description("Answer an expensive geometry metric for a part, keyed by its geometryHash (get_asset returns one per part). " +
+                 "Answerable metrics: surface-area (LOCAL-space, see below) and manifold. A miss is not a dead end: pass the " +
+                 "modelId that carries this geometry together with an idempotencyKey and, when this server allows writes, the tool " +
+                 "queues analyze_meshes for it, returning pending plus a jobId pollable with get_job_status - call again once that " +
+                 "job is Done and the cached value is served. Queueing is a write: with MCP_WRITE_ENABLED off, or without a key, " +
+                 "the reply is the same pending made explicit and nothing is queued. " +
+                 "Results are cached and shared across every asset with the same geometry. surface-area here is measured in the mesh's OWN space " +
+                 "and carries \"space\": \"local\" - it does NOT include the scale an " +
                  "instance is placed at, because the geometry hash is blind to the transform and one row is shared by every instance. " +
                  "For the world-space area of a particular object, run analyze_meshes and read surfaceArea off the job. " +
                  "UV overlap and texel density are NOT available here either - they depend on the UV layout, " +
                  "which the geometry hash also ignores; analyze_meshes returns those on the job itself.")]
     public static async Task<object> ComputeOnDemand(
         IQueryHandler<GetComputeResultQuery, ComputeResultResponse> handler,
-        [Description("Order-invariant geometry hash of the target part.")] string geometryHash,
-        [Description("Metric name: surface-area (local-space) | manifold | part-render.")] string metric,
+        IAgentAudit audit,
+        McpCallerContext caller,
+        IConfiguration configuration,
+        [Description("Order-invariant geometry hash of the target part - get_asset returns one per part.")] string geometryHash,
+        [Description("Metric name: surface-area (local-space) | manifold.")] string metric,
         [Description("Geometry hash version (defaults to 1).")] int hashVersion = 1,
+        [Description("The model whose part carries this geometry hash. On a cache miss, passing it (with idempotencyKey) queues the analyze_meshes job that computes and caches the metric; without it the reply says what to run.")] int? modelId = null,
+        [Description("Version of that model to measure - use the version the hash was read from. Defaults to the model's active version.")] int? versionId = null,
+        [Description("Unique key so a retried call does not queue the analysis twice. Required when you pass modelId to queue on a cache miss.")] string? idempotencyKey = null,
+        IQueryHandler<GetAssetMetadataQuery, AssetMetadataResponse>? assetHandler = null,
+        ICommandHandler<RequestBlenderOperationCommand, BlenderOperationRequested>? blender = null,
         CancellationToken cancellationToken = default)
     {
-        if (PerLayoutMetrics.TryGetValue(metric?.Trim() ?? string.Empty, out var friendly))
+        var trimmedMetric = metric?.Trim() ?? string.Empty;
+
+        // A padded hash used to be looked up raw while the model check compared a trimmed
+        // one, so one value was treated as two. Normalise once, before either read.
+        var normalizedHash = geometryHash?.Trim() ?? string.Empty;
+
+        if (PerLayoutMetrics.TryGetValue(trimmedMetric, out var friendly))
         {
             return new
             {
@@ -501,11 +511,151 @@ public sealed class AssetSearchMcpTools
             };
         }
 
+        // A typo used to answer "pending" forever. Naming the vocabulary costs one check and
+        // is the difference between a corrected retry and a caller waiting on a row no run
+        // will ever write.
+        if (!ComputeMetrics.Cached.Contains(trimmedMetric, StringComparer.OrdinalIgnoreCase))
+        {
+            return new
+            {
+                error = "UnknownMetric",
+                message = $"'{metric}' is not a metric this cache answers. Answerable: {string.Join(", ", ComputeMetrics.Cached)}. " +
+                          "uv-overlap and texel-density depend on the UV layout and come back from analyze_meshes, not here.",
+                validMetrics = ComputeMetrics.Cached,
+            };
+        }
+
         var result = await handler.Handle(
-            new GetComputeResultQuery(geometryHash, hashVersion, metric), cancellationToken);
-        return result.IsFailure
-            ? new { error = result.Error.Code, message = result.Error.Message }
-            : new { status = result.Value.Status, result = result.Value.Result };
+            new GetComputeResultQuery(normalizedHash, hashVersion, trimmedMetric), cancellationToken);
+        if (result.IsFailure)
+        {
+            return new { error = result.Error.Code, message = result.Error.Message };
+        }
+
+        if (!string.Equals(result.Value.Status, "pending", StringComparison.Ordinal))
+        {
+            return new { status = result.Value.Status, result = result.Value.Result };
+        }
+
+        // The cache is only ever filled by analyze_meshes, which needs a model - a geometry
+        // hash alone cannot be measured. Say exactly what fills the row, or queue it.
+        if (modelId is not { } targetModel)
+        {
+            return new
+            {
+                status = "pending",
+                metric = trimmedMetric,
+                geometryHash = normalizedHash,
+                note = "No cached value yet. Read the part's geometryHash with get_asset, then run " +
+                       "analyze_meshes on the model that carries it (or pass modelId and idempotencyKey here " +
+                       "to queue it now, when writes are enabled); the resulting row is shared by every asset " +
+                       "with this geometry.",
+            };
+        }
+
+        // Queueing the measurement is a write, and the write surface is opt-in. With writes
+        // off this stays a read: the caller is told what fills the row and how to run it
+        // themselves, and no Blender job is created on a server whose operator turned writes off.
+        if (!WriteEnabled(configuration))
+        {
+            return new
+            {
+                status = "pending",
+                metric = trimmedMetric,
+                geometryHash = normalizedHash,
+                note = "No cached value yet, and writing is disabled on this server (MCP_WRITE_ENABLED is off), " +
+                       "so the measurement cannot be queued here. Run analyze_meshes on the model that carries " +
+                       "this geometry, or ask the operator to enable writes and pass modelId with an idempotencyKey.",
+            };
+        }
+
+        // The queue is an audited, replay-safe write like analyze_meshes itself. Without a
+        // key a retry could not be told from a first attempt, so none is attempted.
+        if (string.IsNullOrWhiteSpace(idempotencyKey))
+        {
+            return new
+            {
+                status = "pending",
+                metric = trimmedMetric,
+                geometryHash = normalizedHash,
+                note = "No cached value yet. Pass idempotencyKey together with modelId to queue analyze_meshes " +
+                       "for this geometry; without one the queue is not attempted, so a retry cannot be made safe.",
+            };
+        }
+
+        return await Guarded(
+            audit,
+            caller,
+            new AgentWrite(idempotencyKey, "analyze-meshes", "Model", targetModel),
+            async ct =>
+            {
+                // The hash and the model have to belong together: queueing a job for some
+                // other mesh would leave this row unwritten and the caller polling for an
+                // answer that never comes - exactly the pending-forever shape this tool
+                // has to avoid.
+                if (assetHandler is { } assets)
+                {
+                    var metadata = await assets.Handle(
+                        new GetAssetMetadataQuery("Model", targetModel, VersionId: versionId), ct);
+                    if (metadata.IsFailure)
+                    {
+                        return Failed(metadata.Error);
+                    }
+
+                    var carriesHash = metadata.Value.Parts.Any(
+                        part => string.Equals(part.GeometryHash, normalizedHash, StringComparison.Ordinal));
+                    if (!carriesHash)
+                    {
+                        return Failed(new Error(
+                            "GeometryNotOnModel",
+                            $"Model {targetModel}'s {(versionId is { } version ? $"version {version}" : "active version")} " +
+                            $"has no part with geometry hash '{normalizedHash}'. Read the parts with get_asset and pass a hash " +
+                            "one of them carries, together with that read's versionId."));
+                    }
+                }
+
+                if (blender is null)
+                {
+                    return Failed(new
+                    {
+                        status = "pending",
+                        metric = trimmedMetric,
+                        geometryHash = normalizedHash,
+                        note = "No cached value yet, and the analyzer is unavailable in this session. Run analyze_meshes(modelId), " +
+                               "then call compute_on_demand again.",
+                    });
+                }
+
+                var queued = await blender.Handle(
+                    new RequestBlenderOperationCommand(targetModel, BlenderOperations.MeshAnalysis, versionId), ct);
+                if (queued.IsFailure)
+                {
+                    return Failed(new
+                    {
+                        status = "pending",
+                        metric = trimmedMetric,
+                        geometryHash = normalizedHash,
+                        note = $"No cached value yet, and analyze_meshes could not be queued: {queued.Error.Message} " +
+                               "Run analyze_meshes directly once it can run, then call compute_on_demand again.",
+                    });
+                }
+
+                return Applied(
+                    new
+                    {
+                        status = "pending",
+                        metric = trimmedMetric,
+                        geometryHash = normalizedHash,
+                        jobId = queued.Value.JobId,
+                        modelId = queued.Value.ModelId,
+                        versionId = queued.Value.VersionId,
+                        alreadyQueued = queued.Value.AlreadyQueued,
+                        note = "The measurement is queued; the cache row lands when it finishes and is shared by every asset with " +
+                               "this geometry. Poll get_job_status(jobId), then call compute_on_demand again for the value.",
+                    },
+                    "Model", queued.Value.ModelId, queued.Value);
+            },
+            cancellationToken);
     }
 
     [McpServerTool(Name = "get_index_status")]

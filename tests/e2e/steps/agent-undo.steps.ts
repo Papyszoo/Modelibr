@@ -105,9 +105,10 @@ When("an agent sets the reversible model's tags to {string}", async ({ page }, t
     const idempotencyKey = McpClient.key("undo-set-tags");
     const result = await (
         await mcp(page)
-    ).callTool("set_tags", {
-        modelId: model!.id,
-        tags: tags.split(",").map((tag) => tag.trim()),
+    ).callTool("set_asset_metadata", {
+        assetType: "Model",
+        assetId: model!.id,
+        fields: { tags: tags.split(",").map((tag) => tag.trim()) },
         idempotencyKey,
     });
     expect(result.status, JSON.stringify(result)).toBe("ok");
@@ -137,9 +138,10 @@ When("an agent sets the reversible model's category to {string}", async ({ page 
     const idempotencyKey = McpClient.key("undo-set-category");
     const result = await (
         await mcp(page)
-    ).callTool("set_category", {
-        modelId: model!.id,
-        categoryId: created!.id,
+    ).callTool("set_asset_metadata", {
+        assetType: "Model",
+        assetId: model!.id,
+        fields: { category: created!.id },
         idempotencyKey,
     });
     expect(result.status, JSON.stringify(result)).toBe("ok");

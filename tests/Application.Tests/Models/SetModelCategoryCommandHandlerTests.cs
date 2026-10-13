@@ -42,7 +42,7 @@ public class SetModelCategoryCommandHandlerTests
         _uow.Verify(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
 
         // Regression: category is denormalised into the search projection during
-        // extraction. Without this write, `set_category` followed by a category-filtered
+        // extraction. Without this write, a category edit followed by a category-filtered
         // search could not see its own write until something re-derived the asset.
         _searchDocuments.Verify(
             r => r.SetCategoryForAssetAsync("Model", 1, 5, "Weapons", It.IsAny<CancellationToken>()),

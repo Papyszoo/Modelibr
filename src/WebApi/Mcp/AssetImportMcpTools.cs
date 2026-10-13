@@ -42,152 +42,143 @@ public sealed class AssetImportMcpTools
         [property: Description("Albedo, Normal, Roughness, Metallic, AO, Height, Emissive, Opacity, Specular, SplitChannel...")] string TextureType,
         [property: Description("For channel-packed maps only: R, G, B, A or RGB. Omit for a normal single-purpose map.")] string? SourceChannel = null);
 
-    [McpServerTool(Name = "import_sound")]
-    [Description("Import a sound from a server-readable path. Duration and waveform peaks are derived by the worker afterwards - do not try to supply them.")]
-    public static Task<object> ImportSound(
-        ICommandHandler<CreateSoundWithFileCommand, CreateSoundWithFileResponse> handler,
+    [McpServerTool(Name = "import_asset")]
+    [Description("Import a sound, sprite or environment map from a server-readable path. assetType picks the family: " +
+                 "Sound, Sprite or EnvironmentMap. Duration, waveform peaks and thumbnails are derived by the worker " +
+                 "afterwards - do not try to supply them. A model is imported with import_model; a material " +
+                 "(several channel files) with import_texture_set.")]
+    public static Task<object> ImportAsset(
+        ICommandHandler<CreateSoundWithFileCommand, CreateSoundWithFileResponse> soundHandler,
+        ICommandHandler<CreateSpriteWithFileCommand, CreateSpriteWithFileResponse> spriteHandler,
+        ICommandHandler<CreateEnvironmentMapWithFileCommand, CreateEnvironmentMapWithFileResponse> environmentMapHandler,
         IAgentAudit audit,
         McpCallerContext caller,
-        [Description("Absolute path to an audio file readable by the SERVER.")] string path,
+        [Description("Sound, Sprite or EnvironmentMap.")] string assetType,
+        [Description("Absolute path to the file readable by the SERVER.")] string path,
         [Description("Unique key so a retried call does not re-import.")] string idempotencyKey,
         [Description("Optional name (defaults to the file name without its extension).")] string? name = null,
-        [Description("Optional sound category id.")] int? categoryId = null,
-        [Description("Optional pack id to file the sound under.")] int? packId = null,
+        [Description("Sprite only: Static (default), SpriteSheet, Gif or Apng.")] string spriteType = "Static",
+        [Description("Sound/Sprite only: optional category id.")] int? categoryId = null,
+        [Description("EnvironmentMap only: optional resolution label, e.g. '1k', '4k'.")] string? sizeLabel = null,
+        [Description("Optional pack id to file the imported asset under.")] int? packId = null,
         [Description("Optional batch id. Writes sharing one can be undone together with reverse_operation.")] string? batchId = null,
         CancellationToken cancellationToken = default)
     {
+        var family = ImportableFamilies.FirstOrDefault(
+            f => string.Equals(f, assetType?.Trim(), StringComparison.OrdinalIgnoreCase));
+        if (family is null)
+        {
+            return Task.FromResult<object>(new
+            {
+                error = "UnknownAssetType",
+                message = $"'{assetType}' cannot be imported here.",
+                validValues = ImportableFamilies,
+                note = "A model is imported with import_model; a material (several channel files) with import_texture_set.",
+            });
+        }
+
+        // The per-family operation names predate the merge: reverse_operation reverses by
+        // operation, and its import branches recycle the created asset. Renaming them would
+        // orphan that undo for no gain.
+        var operation = family == AgentAssetFamilies.Sound ? "import-sound"
+            : family == AgentAssetFamilies.Sprite ? "import-sprite"
+            : "import-environment-map";
+
         return Guarded(
             audit,
             caller,
-            new AgentWrite(idempotencyKey, "import-sound", "Sound", BatchId: batchId),
+            new AgentWrite(idempotencyKey, operation, family, BatchId: batchId),
             async ct =>
             {
-                var (failure, upload) = await ReadUploadAsync(path, ct);
-                if (failure is not null) return failure;
-
-                // Duration 0 on purpose: the waveform job measures it. Guessing here would
-                // write a wrong number that nothing later corrects.
-                var result = await handler.Handle(
-                    new CreateSoundWithFileCommand(
-                        upload!,
-                        name ?? System.IO.Path.GetFileNameWithoutExtension(path),
-                        Duration: 0,
-                        Peaks: null,
-                        categoryId,
-                        BatchId: null,
-                        packId,
-                        ProjectId: null),
-                    ct);
-
-                return result.IsFailure
-                    ? Failed(result.Error)
-                    : Applied(
-                        new { status = "ok", soundId = result.Value.SoundId, name = result.Value.Name, fileId = result.Value.FileId },
-                        "Sound", result.Value.SoundId, result.Value);
-            },
-            cancellationToken);
-    }
-
-    [McpServerTool(Name = "import_sprite")]
-    [Description("Import a sprite from a server-readable path. spriteType: Static, SpriteSheet, Gif or Apng.")]
-    public static Task<object> ImportSprite(
-        ICommandHandler<CreateSpriteWithFileCommand, CreateSpriteWithFileResponse> handler,
-        IAgentAudit audit,
-        McpCallerContext caller,
-        [Description("Absolute path to an image file readable by the SERVER.")] string path,
-        [Description("Unique key so a retried call does not re-import.")] string idempotencyKey,
-        [Description("Optional name (defaults to the file name without its extension).")] string? name = null,
-        [Description("Static (default), SpriteSheet, Gif or Apng.")] string spriteType = "Static",
-        [Description("Optional sprite category id.")] int? categoryId = null,
-        [Description("Optional pack id to file the sprite under.")] int? packId = null,
-        [Description("Optional batch id. Writes sharing one can be undone together with reverse_operation.")] string? batchId = null,
-        CancellationToken cancellationToken = default)
-    {
-        return Guarded(
-            audit,
-            caller,
-            new AgentWrite(idempotencyKey, "import-sprite", "Sprite", BatchId: batchId),
-            async ct =>
-            {
-                if (!TryParseEnum<SpriteType>(spriteType, out var parsedType, out var typeError))
+                var parsedSpriteType = SpriteType.Static;
+                if (family == AgentAssetFamilies.Sprite)
                 {
-                    return typeError!;
+                    if (!TryParseEnum<SpriteType>(spriteType, out parsedSpriteType, out var typeError))
+                    {
+                        return typeError!;
+                    }
                 }
 
                 var (failure, upload) = await ReadUploadAsync(path, ct);
                 if (failure is not null) return failure;
 
-                var result = await handler.Handle(
-                    new CreateSpriteWithFileCommand(
-                        upload!,
-                        name ?? System.IO.Path.GetFileNameWithoutExtension(path),
-                        parsedType,
-                        categoryId,
-                        BatchId: null,
-                        packId,
-                        ProjectId: null),
-                    ct);
+                var resolvedName = name ?? System.IO.Path.GetFileNameWithoutExtension(path);
 
-                return result.IsFailure
-                    ? Failed(result.Error)
-                    : Applied(
-                        new { status = "ok", spriteId = result.Value.SpriteId, name = result.Value.Name, fileId = result.Value.FileId },
-                        "Sprite", result.Value.SpriteId, result.Value);
-            },
-            cancellationToken);
-    }
+                if (family == AgentAssetFamilies.Sound)
+                {
+                    // Duration 0 on purpose: the waveform job measures it. Guessing here would
+                    // write a wrong number that nothing later corrects.
+                    var result = await soundHandler.Handle(
+                        new CreateSoundWithFileCommand(
+                            upload!,
+                            resolvedName,
+                            Duration: 0,
+                            Peaks: null,
+                            categoryId,
+                            BatchId: null,
+                            packId,
+                            ProjectId: null),
+                        ct);
 
-    [McpServerTool(Name = "import_environment_map")]
-    [Description("Import an environment map (HDRI or equirectangular image) from a server-readable path.")]
-    public static Task<object> ImportEnvironmentMap(
-        ICommandHandler<CreateEnvironmentMapWithFileCommand, CreateEnvironmentMapWithFileResponse> handler,
-        IAgentAudit audit,
-        McpCallerContext caller,
-        [Description("Absolute path to an HDRI/image file readable by the SERVER.")] string path,
-        [Description("Unique key so a retried call does not re-import.")] string idempotencyKey,
-        [Description("Optional name (defaults to the file name without its extension).")] string? name = null,
-        [Description("Optional resolution label for this variant, e.g. '1k', '4k'.")] string? sizeLabel = null,
-        [Description("Optional pack id to file the environment map under.")] int? packId = null,
-        [Description("Optional batch id. Writes sharing one can be undone together with reverse_operation.")] string? batchId = null,
-        CancellationToken cancellationToken = default)
-    {
-        return Guarded(
-            audit,
-            caller,
-            new AgentWrite(idempotencyKey, "import-environment-map", "EnvironmentMap", BatchId: batchId),
-            async ct =>
-            {
-                var (failure, upload) = await ReadUploadAsync(path, ct);
-                if (failure is not null) return failure;
+                    return result.IsFailure
+                        ? Failed(result.Error)
+                        : Applied(
+                            new { status = "ok", soundId = result.Value.SoundId, name = result.Value.Name, fileId = result.Value.FileId },
+                            family, result.Value.SoundId, result.Value);
+                }
+
+                if (family == AgentAssetFamilies.Sprite)
+                {
+                    var result = await spriteHandler.Handle(
+                        new CreateSpriteWithFileCommand(
+                            upload!,
+                            resolvedName,
+                            parsedSpriteType,
+                            categoryId,
+                            BatchId: null,
+                            packId,
+                            ProjectId: null),
+                        ct);
+
+                    return result.IsFailure
+                        ? Failed(result.Error)
+                        : Applied(
+                            new { status = "ok", spriteId = result.Value.SpriteId, name = result.Value.Name, fileId = result.Value.FileId },
+                            family, result.Value.SpriteId, result.Value);
+                }
 
                 // Cube faces are a six-file upload with its own contract; this tool covers
                 // the single-file (equirectangular/HDRI) case, which is what asset sites ship.
-                var result = await handler.Handle(
+                var environmentMap = await environmentMapHandler.Handle(
                     new CreateEnvironmentMapWithFileCommand(
                         upload!,
                         CubeFaces: null,
-                        name ?? System.IO.Path.GetFileNameWithoutExtension(path),
+                        resolvedName,
                         sizeLabel,
                         BatchId: null,
                         packId,
                         ProjectId: null),
                     ct);
 
-                return result.IsFailure
-                    ? Failed(result.Error)
+                return environmentMap.IsFailure
+                    ? Failed(environmentMap.Error)
                     : Applied(
                         new
                         {
                             status = "ok",
-                            environmentMapId = result.Value.EnvironmentMapId,
-                            name = result.Value.Name,
-                            variantId = result.Value.VariantId,
-                            projectionType = result.Value.ProjectionType,
+                            environmentMapId = environmentMap.Value.EnvironmentMapId,
+                            name = environmentMap.Value.Name,
+                            variantId = environmentMap.Value.VariantId,
+                            projectionType = environmentMap.Value.ProjectionType,
                         },
-                        "EnvironmentMap", result.Value.EnvironmentMapId, result.Value);
+                        family, environmentMap.Value.EnvironmentMapId, environmentMap.Value);
             },
             cancellationToken);
     }
+
+    /// <summary>The families this tool carries, and the vocabulary its assetType accepts.</summary>
+    private static readonly string[] ImportableFamilies =
+        [AgentAssetFamilies.Sound, AgentAssetFamilies.Sprite, AgentAssetFamilies.EnvironmentMap];
 
     [McpServerTool(Name = "import_texture_set")]
     [Description("Import a whole material as one texture set: pass every channel file at once (albedo, normal, roughness...). kind: ModelSpecific (a model's baked maps) or Universal (a reusable tiling material).")]
@@ -544,7 +535,7 @@ public sealed class AssetImportMcpTools
                 ? McpUploadContracts.ModelAlternatives
                 : null,
             afterwards = textureSetId is null
-                ? "Curate the result with set_tags / set_category / add_to_pack, or bind a material with bind_texture_set."
+                ? "Curate the result with set_asset_metadata / add_to_pack, or bind a material with bind_texture_set."
                 : "Ask for another ticket with the same textureSetId (and a fresh idempotencyKey) for each remaining channel.",
         };
     }

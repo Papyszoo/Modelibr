@@ -133,7 +133,7 @@ public interface IAssetSearchDocumentRepository
 
     /// <summary>
     /// Re-points the denormalised tags and description after a metadata-only mutation
-    /// (<c>set_tags</c>, the tag editor).
+    /// (<c>set_asset_metadata</c>, the tag editor).
     /// </summary>
     /// <remarks>
     /// The learning loop this projection exists to serve: a user corrects what an asset is

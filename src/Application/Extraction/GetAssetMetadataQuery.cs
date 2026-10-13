@@ -8,7 +8,8 @@ namespace Application.Extraction;
 
 /// <summary>
 /// Reads the derived metadata + part detail for an asset. The ordinary endpoint the MCP
-/// <c>get_asset</c>/<c>get_part</c> tools wrap - no MCP-specific read path.
+/// <c>get_asset</c> tool wraps (with a partPath it narrows to one part) - no MCP-specific
+/// read path.
 /// </summary>
 /// <param name="VersionId">
 /// Which version to read. Omitted means the asset's <b>active</b> version - the one search
@@ -140,8 +141,8 @@ internal sealed class GetAssetMetadataQueryHandler
 
         var suggestedCategories = Application.Search.CategorySuggester.Suggest(ExtractTokens(derived));
 
-        // Built from every part, not just the ones a part-path filter left standing: an
-        // agent calling get_part still needs to know what the whole node can be dressed by.
+        // Built from every part, not just the ones a part-path filter left standing: a
+        // caller reading one part still needs to know what the whole node can be dressed by.
         var materialSlots = parts
             .SelectMany(p => AssetPartDetail.MaterialSlots(p.Detail))
             .Distinct(StringComparer.OrdinalIgnoreCase)

@@ -52,7 +52,7 @@ public class McpRoundTripIntegrationTests : IClassFixture<ModelibrWebFactory>
             triangleCount: 500));
 
         context.ComputeCacheEntries.Add(ComputeCacheEntry.Create(
-            Hash, 1, "uv-overlap", "{\"uvOverlap\":0.01}", now));
+            Hash, 1, "surface-area", "{\"space\":\"local\",\"surfaceArea\":12.166688}", now));
 
         await context.SaveChangesAsync();
     }
@@ -83,19 +83,22 @@ public class McpRoundTripIntegrationTests : IClassFixture<ModelibrWebFactory>
         Assert.Contains("/Anvil", assetJson);
         Assert.Contains(Hash, assetJson);
 
-        // 3. get_part → returns the single part.
-        var partResult = await AssetSearchMcpTools.GetPart(
+        // 3. get_asset(partPath) → returns the single part (the merged get_part form).
+        var partResult = await AssetSearchMcpTools.GetAsset(
             sp.GetRequiredService<IQueryHandler<GetAssetMetadataQuery, AssetMetadataResponse>>(),
-            "Model", AssetId, "/Anvil");
+            "Model", AssetId, partPath: "/Anvil");
         Assert.Contains("/Anvil", Json(partResult));
 
         // 4. compute_on_demand → returns the cached metric (by geometry hash from step 2/3).
         var computeResult = await AssetSearchMcpTools.ComputeOnDemand(
             sp.GetRequiredService<IQueryHandler<GetComputeResultQuery, ComputeResultResponse>>(),
-            Hash, "uv-overlap");
+            sp.GetRequiredService<Application.Agents.IAgentAudit>(),
+            McpCallerContext.Unauthenticated(),
+            sp.GetRequiredService<Microsoft.Extensions.Configuration.IConfiguration>(),
+            Hash, "surface-area");
         var computeJson = Json(computeResult);
         Assert.Contains("cached", computeJson);
-        Assert.Contains("uvOverlap", computeJson);
+        Assert.Contains("surfaceArea", computeJson);
 
         // 5. list_facets → advertises the structural filters.
         Assert.Contains("shapeClass", Json(AssetSearchMcpTools.ListFacets()));

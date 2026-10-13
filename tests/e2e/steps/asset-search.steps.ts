@@ -619,7 +619,7 @@ Then(
     },
 );
 
-// ---- get_asset / get_part / get_assets ------------------------------------------
+// ---- get_asset / get_assets ------------------------------------------------------
 
 When(
     "an agent reads the batch3 search model over MCP",
@@ -647,7 +647,7 @@ Then(
 
 When("an agent reads the first part over MCP", async ({ page }) => {
     const partPath = state<string>(page, "asset-search:part-path");
-    await callTool(page, "get_part", {
+    await callTool(page, "get_asset", {
         assetType: "Model",
         assetId: model(page).id,
         partPath,

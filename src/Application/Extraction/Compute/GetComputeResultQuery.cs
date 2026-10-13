@@ -116,6 +116,13 @@ public static class ComputeMetrics
     public const string Manifold = "manifold";
 
     /// <summary>
+    /// Every metric the hash-keyed cache answers - the vocabulary <c>compute_on_demand</c>
+    /// accepts, and the set the worker writes. Kept here so the tool and the cache cannot
+    /// advertise different lists.
+    /// </summary>
+    public static readonly IReadOnlyList<string> Cached = [SurfaceArea, Manifold];
+
+    /// <summary>
     /// The value <c>surface-area</c> rows carry in their <c>space</c> field.
     ///
     /// <para>

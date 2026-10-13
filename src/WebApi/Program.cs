@@ -316,9 +316,10 @@ namespace WebApi
                         // Filling in what an asset says about itself - licence, credit,
                         // style, where it came from. A write like any other tagging call.
                         .WithTools<WebApi.Mcp.AssetMetadataWriteMcpTools>()
-                        // Telling a scene which project it belongs to. A scene write, and
-                        // the only project-shaped one an agent gets - the profile itself is
-                        // the user's statement of intent, not something to infer.
+                        // Telling a scene which project it belongs to, and recording the
+                        // user's project profile - engines, platforms, genre, style,
+                        // perspective, budget - when they state it. The profile is their
+                        // statement of intent: an agent records it, it never infers it.
                         .WithTools<WebApi.Mcp.ProjectWriteMcpTools>()
                         .WithPrompts<WebApi.Mcp.ImportLibraryPrompts>()
                         // The playbook for building a scene. Registered with the write

@@ -3,6 +3,7 @@ using Application.Abstractions.Messaging;
 using Application.Agents;
 using Application.Files;
 using Application.Projects;
+using Application.Projects.Profile;
 using Application.Scenes;
 using Domain.Projects;
 using ModelContextProtocol.Server;
@@ -11,9 +12,10 @@ using static WebApi.Mcp.McpWriteGuard;
 namespace WebApi.Mcp;
 
 /// <summary>
-/// The one project-shaped write an agent needs: telling a scene which project it belongs to
-/// (prompt 13-C/D1). Editing the profile itself is deliberately left to the user - it is a
-/// statement about what is being made, not something an agent should infer and set.
+/// The project-shaped writes an agent needs: telling a scene which project it belongs to
+/// (prompt 13-C/D1), and setting a project's profile - engines, platforms, genre, style,
+/// perspective and the fidelity budget - when the user states it. The profile is the user's
+/// statement of what is being made: an agent records it, it never infers it.
 /// </summary>
 [McpServerToolType]
 public sealed class ProjectWriteMcpTools
@@ -49,6 +51,89 @@ public sealed class ProjectWriteMcpTools
                     result.Value,
                     // The link being replaced is the whole of what this write destroys.
                     new { projectId = result.Value.PreviousProjectId });
+            },
+            cancellationToken);
+    }
+
+    [McpServerTool(Name = "set_project_profile")]
+    [Description("Set a project's profile: the engines, platforms, genres, styles and camera perspectives it is made for, and the fidelity budget those imply. " +
+                 "Call list_project_profile_options first for the option ids. A dimension you omit is left alone; a dimension with an empty options list is cleared. " +
+                 "Settings are a patch: an omitted value keeps its current one, and a name listed in settings.clear is cleared. Idempotent per idempotencyKey.")]
+    public static Task<object> SetProjectProfile(
+        ICommandHandler<SetProjectProfileCommand, ProjectBriefDto> handler,
+        IAgentAudit audit,
+        McpCallerContext caller,
+        [Description("Project id.")] int projectId,
+        [Description("Unique key so a retried call does not re-apply.")] string idempotencyKey,
+        [Description("Dimension assignments: dimension name (engine, platform, genre, style, perspective) to the option ids chosen for it. Options come from list_project_profile_options.")] ProfileDimensionInput[]? dimensions = null,
+        [Description("Fidelity/world settings patch. Omitted values are kept.")] ProfileSettingsInput? settings = null,
+        [Description("Optional batch id. Writes sharing one can be undone together with reverse_operation.")] string? batchId = null,
+        CancellationToken cancellationToken = default)
+    {
+        return Guarded(
+            audit,
+            caller,
+            new AgentWrite(idempotencyKey, "set-project-profile", "Project", projectId, BatchId: batchId),
+            async ct =>
+            {
+                Dictionary<string, IReadOnlyList<ProjectProfileAssignment>>? byDimension = null;
+                if (dimensions is { Length: > 0 })
+                {
+                    byDimension = new Dictionary<string, IReadOnlyList<ProjectProfileAssignment>>(StringComparer.OrdinalIgnoreCase);
+                    foreach (var entry in dimensions)
+                    {
+                        if (string.IsNullOrWhiteSpace(entry.Dimension))
+                        {
+                            return Failed(new
+                            {
+                                error = "InvalidProfileDimension",
+                                message = "Every dimensions entry needs a dimension name.",
+                            });
+                        }
+
+                        var name = entry.Dimension.Trim();
+                        if (!byDimension.TryAdd(
+                                name,
+                                (entry.Options ?? Array.Empty<ProfileAssignmentInput>())
+                                    .Select(a => new ProjectProfileAssignment(a.OptionId, a.Role))
+                                    .ToList()))
+                        {
+                            // Two entries for one dimension would make "cleared" and "filled"
+                            // the same request, decided by array order - refuse rather than guess.
+                            return Failed(new
+                            {
+                                error = "InvalidProfileDimension",
+                                message = $"Dimension '{name}' is listed more than once; one entry per dimension.",
+                            });
+                        }
+                    }
+                }
+
+                var settingsPatch = settings is null
+                    ? null
+                    : new ProjectProfileSettings(
+                        settings.MaxTrianglesPerAsset,
+                        settings.MaxTextureSize,
+                        settings.TargetSceneTriangles,
+                        settings.PixelsPerUnit,
+                        settings.UnitsPerMetre,
+                        settings.UpAxis,
+                        settings.Handedness,
+                        settings.PaletteHex,
+                        settings.Clear?.ToHashSet(StringComparer.OrdinalIgnoreCase));
+
+                var result = await handler.Handle(
+                    new SetProjectProfileCommand(projectId, byDimension, settingsPatch), ct);
+                if (result.IsFailure)
+                {
+                    return Failed(result.Error);
+                }
+
+                // The whole brief comes back, so the caller sees every dimension - including
+                // the ones this call did not touch - exactly as the write left them.
+                return Applied(
+                    new { status = "ok", project = result.Value },
+                    "Project", projectId, result.Value);
             },
             cancellationToken);
     }
@@ -566,4 +651,32 @@ public sealed class ProjectWriteMcpTools
             },
             cancellationToken);
     }
+
+    /// <summary>One dimension of a profile write: the dimension and the option ids chosen for it.</summary>
+    /// <param name="Options">
+    /// An empty array clears the dimension; omitting the whole entry leaves it alone.
+    /// </param>
+    public sealed record ProfileDimensionInput(
+        [property: Description("Dimension name: engine, platform, genre, style or perspective.")] string Dimension,
+        [property: Description("Option ids assigned to this dimension, from list_project_profile_options. An empty array clears the dimension; omit the dimension entirely to leave it alone.")] ProfileAssignmentInput[]? Options = null);
+
+    /// <param name="Role">
+    /// Only meaningful on the engine dimension: which engine is for authoring and which for runtime.
+    /// </param>
+    public sealed record ProfileAssignmentInput(
+        [property: Description("Profile option id.")] int OptionId,
+        [property: Description("Optional role, e.g. 'auth' or 'runtime' for an engine.")] string? Role = null);
+
+    /// <summary>The fidelity/world settings patch; an omitted value is kept, and a name in
+    /// <paramref name="Clear"/> is cleared.</summary>
+    public sealed record ProfileSettingsInput(
+        [property: Description("Per-asset triangle budget.")] int? MaxTrianglesPerAsset = null,
+        [property: Description("Maximum texture dimension in pixels.")] int? MaxTextureSize = null,
+        [property: Description("Scene triangle budget.")] int? TargetSceneTriangles = null,
+        [property: Description("Pixels per unit.")] int? PixelsPerUnit = null,
+        [property: Description("World scale: metres per unit.")] double? UnitsPerMetre = null,
+        [property: Description("Up axis, e.g. Y or Z.")] string? UpAxis = null,
+        [property: Description("Handedness, e.g. left or right.")] string? Handedness = null,
+        [property: Description("Palette colours as hex strings.")] string[]? PaletteHex = null,
+        [property: Description("Names to clear: maxTrianglesPerAsset, maxTextureSize, targetSceneTriangles, pixelsPerUnit, unitsPerMetre, upAxis, handedness, paletteHex.")] string[]? Clear = null);
 }

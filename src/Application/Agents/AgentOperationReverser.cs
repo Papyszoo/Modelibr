@@ -611,12 +611,37 @@ internal sealed class AgentOperationReverser : IAgentOperationReverser
                 continue;
             }
 
-            values[key.GetString()!] = TryGetPropertyInsensitive(field, "value", out var value)
-                ? value.Clone()
-                : null;
+            values[key.GetString()!] = NormalizeFieldValue(
+                key.GetString()!,
+                TryGetPropertyInsensitive(field, "value", out var value) ? value.Clone() : null);
         }
 
         return values;
+    }
+
+    /// <summary>
+    /// A recorded field value in the shape the write accepts.
+    ///
+    /// <para>
+    /// Only <c>category</c> needs this: it reads back as an object (<c>{id, name}</c>) because
+    /// a picker needs the name, while <c>set_asset_metadata</c> takes the id. Without the
+    /// conversion, undoing a category change built a patch the write refuses with
+    /// "'category' expects a category id, or null to clear it".
+    /// </para>
+    /// </summary>
+    private static JsonElement? NormalizeFieldValue(string key, JsonElement? value)
+    {
+        if (value is not { } element
+            || !string.Equals(key, "category", StringComparison.Ordinal)
+            || element.ValueKind != JsonValueKind.Object)
+        {
+            return value;
+        }
+
+        // A cleared category reads back as the object with a null id, which is a clear.
+        return TryGetPropertyInsensitive(element, "id", out var id) && id.ValueKind != JsonValueKind.Null
+            ? id.Clone()
+            : null;
     }
 
     /// <summary>

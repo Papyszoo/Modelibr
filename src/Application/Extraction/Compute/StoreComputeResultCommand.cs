@@ -9,8 +9,8 @@ namespace Application.Extraction.Compute;
 
 /// <summary>
 /// Worker-facing upsert of a computed expensive-metric result into the hash-keyed
-/// cache. The worker computes UV overlap / texel density / a per-part render and
-/// posts it here; it's then instantly available for every asset sharing the hash.
+/// cache. The worker posts the local-space surface area and the manifold check here,
+/// and they become instantly available for every asset sharing the geometry hash.
 /// </summary>
 public record StoreComputeResultCommand(
     string GeometryHash,

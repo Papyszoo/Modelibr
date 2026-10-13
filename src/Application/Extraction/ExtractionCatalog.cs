@@ -22,7 +22,7 @@ public static class ExtractorFamilies
     public const string Audio = "Audio";
     public const string Script = "Script";
 
-    /// <summary>On-demand expensive compute (UV overlap, texel density, per-part renders) - its own concurrency lane.</summary>
+    /// <summary>On-demand expensive compute (local-space surface area, manifold check) - its own concurrency lane.</summary>
     public const string Compute = "Compute";
 }
 

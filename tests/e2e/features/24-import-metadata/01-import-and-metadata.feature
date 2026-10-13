@@ -27,16 +27,16 @@ Feature: Import and asset metadata
         Then the library texture set imported through the ticket should exist
 
     Scenario Outline: An import tool refuses a path the server cannot read
-        When an agent calls "<tool>" with an unreadable server path
+        When an agent calls "<tool>" for "<assetType>" with an unreadable server path
         Then the agent should be told the path was not found
 
         Examples:
-            | tool                   |
-            | import_model           |
-            | import_sprite          |
-            | import_sound           |
-            | import_environment_map |
-            | import_texture_set     |
+            | tool               | assetType      |
+            | import_model       | Model          |
+            | import_asset       | Sound          |
+            | import_asset       | Sprite         |
+            | import_asset       | EnvironmentMap |
+            | import_texture_set | TextureSet     |
 
     Scenario: An automatically classified import can be rejected
         Given a batch3 model named like a chair exists

@@ -363,8 +363,8 @@ public class AssetSearchDocument
     public void SetActive(bool isActive) => IsActive = isActive;
 
     /// <summary>
-    /// Re-points the denormalised category fields after a category-only mutation, so an
-    /// agent that calls <c>set_category</c> can immediately confirm the write with a
+    /// Re-points the denormalised category fields after a category-only mutation, so a
+    /// category write can immediately confirm itself with a
     /// category-filtered search instead of waiting for the next re-derive.
     /// </summary>
     public void SetCategory(int? categoryId, string? categoryName)

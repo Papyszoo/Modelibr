@@ -3,6 +3,7 @@ using Application.Abstractions.Messaging;
 using Application.Agents;
 using Application.Files;
 using Application.Projects;
+using Application.Projects.Profile;
 using Domain.Models;
 using Domain.Projects;
 using Moq;
@@ -84,6 +85,97 @@ public class ProjectStudioMcpToolsTests
             Array.Empty<ProjectCharacterImageDto>(), Array.Empty<ProjectCharacterModelDto>(),
             Array.Empty<CharacterAbilityDto>(), Array.Empty<CharacterVariantDto>(),
             0, 0, 0, 0, Now, Now);
+
+    /// <summary>A minimal brief, so the tool's response shape can be asserted on.</summary>
+    private static ProjectBriefDto Brief(int id = 1) =>
+        new(id, "Rift", null, null,
+            Array.Empty<ProjectProfileValueDto>(), Array.Empty<ProjectProfileValueDto>(),
+            Array.Empty<ProjectProfileValueDto>(), Array.Empty<ProjectProfileValueDto>(),
+            Array.Empty<ProjectProfileValueDto>(),
+            new ProjectBudgetDto(null, null, null, null),
+            null,
+            new ProjectWorldConventionDto(1, "Y", "right", true, Array.Empty<string>(), Array.Empty<string>()),
+            new ProjectStyleSignalsDto(null, null, null, null, Array.Empty<string>(), Array.Empty<string>(), null, Array.Empty<string>()),
+            Array.Empty<string>(),
+            Array.Empty<ProjectConceptImageBriefDto>(), Array.Empty<ProjectEnvironmentMapBriefDto>(),
+            Array.Empty<ProjectVfxBriefDto>(), Array.Empty<ProjectSceneBriefDto>(),
+            new ProjectAssetCountsDto(0, 0, 0, 0, 0, 0, 0, 0),
+            Array.Empty<string>());
+
+    [Fact]
+    public async Task SetProjectProfile_Sends_Dimensions_And_Settings_Then_Returns_The_Brief()
+    {
+        var handler = new Mock<ICommandHandler<SetProjectProfileCommand, ProjectBriefDto>>();
+        handler.Setup(h => h.Handle(It.IsAny<SetProjectProfileCommand>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result.Success(Brief()));
+        var audit = ClaimGranted();
+
+        var result = await ProjectWriteMcpTools.SetProjectProfile(
+            handler.Object, audit.Object, Caller(), projectId: 1, idempotencyKey: "key-profile",
+            dimensions:
+            [
+                new ProjectWriteMcpTools.ProfileDimensionInput(
+                    "engine",
+                    [new ProjectWriteMcpTools.ProfileAssignmentInput(7, "auth")]),
+                // An entry with no options is a clear, not an omission to skip.
+                new ProjectWriteMcpTools.ProfileDimensionInput("style", null),
+            ],
+            settings: new ProjectWriteMcpTools.ProfileSettingsInput(
+                MaxTrianglesPerAsset: 15000, Clear: ["paletteHex"]));
+
+        Assert.Contains("\"ok\"", Json(result));
+        handler.Verify(h => h.Handle(
+            It.Is<SetProjectProfileCommand>(c =>
+                c.ProjectId == 1
+                && c.Dimensions != null
+                && c.Dimensions["engine"].Single().OptionId == 7
+                && c.Dimensions["engine"].Single().Role == "auth"
+                && c.Dimensions["style"].Count == 0
+                && c.Settings != null
+                && c.Settings.MaxTrianglesPerAsset == 15000
+                && c.Settings.Clear != null
+                && c.Settings.Clear.Contains("paletteHex")),
+            It.IsAny<CancellationToken>()), Times.Once);
+        audit.Verify(a => a.CompleteAsync(
+            "key-profile", "gen-1", "Project", 1, It.IsAny<string>(), It.IsAny<string>(),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task SetProjectProfile_Reports_A_Refused_Dimension_And_Releases_The_Key()
+    {
+        var handler = new Mock<ICommandHandler<SetProjectProfileCommand, ProjectBriefDto>>();
+        handler.Setup(h => h.Handle(It.IsAny<SetProjectProfileCommand>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result.Failure<ProjectBriefDto>(new Error("UnknownProfileDimension", "no")));
+        var audit = ClaimGranted();
+
+        var result = await ProjectWriteMcpTools.SetProjectProfile(
+            handler.Object, audit.Object, Caller(), projectId: 1, idempotencyKey: "key-dim",
+            dimensions: [new ProjectWriteMcpTools.ProfileDimensionInput("vibe", null)]);
+
+        Assert.Contains("UnknownProfileDimension", Json(result));
+        audit.Verify(a => a.AbandonAsync("key-dim", "gen-1", It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task SetProjectProfile_Refuses_A_Repeated_Dimension()
+    {
+        // Two entries for one dimension make "cleared" and "filled" the same request,
+        // decided by array order - refused rather than guessed.
+        var handler = new Mock<ICommandHandler<SetProjectProfileCommand, ProjectBriefDto>>();
+
+        var result = await ProjectWriteMcpTools.SetProjectProfile(
+            handler.Object, ClaimGranted().Object, Caller(), projectId: 1, idempotencyKey: "key-dup",
+            dimensions:
+            [
+                new ProjectWriteMcpTools.ProfileDimensionInput("style", null),
+                new ProjectWriteMcpTools.ProfileDimensionInput("Style", null),
+            ]);
+
+        Assert.Contains("listed more than once", Json(result));
+        handler.Verify(
+            h => h.Handle(It.IsAny<SetProjectProfileCommand>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
 
     [Fact]
     public async Task AddProjectComment_Claims_The_Key_Then_Creates_With_Its_Asset_Target()
