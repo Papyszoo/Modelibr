@@ -857,7 +857,7 @@ Then(
 
                 threeScene.traverse((obj: any) => {
                     // Only check MeshStandardMaterial (our app's loaded model materials)
-                    // to avoid false positives from Stage shadow plane (MeshBasicMaterial)
+                    // to avoid false positives from shadow/helper planes (MeshBasicMaterial)
                     if (
                         obj.isMesh &&
                         obj.material &&
@@ -1088,7 +1088,7 @@ async function getAnyTextureUuid(page: any): Promise<string | null> {
 
 /**
  * Captures the current texture UUID from the Three.js scene for comparison.
- * Only looks at MeshStandardMaterial meshes to avoid picking up Stage shadow plane (MeshBasicMaterial).
+ * Only looks at MeshStandardMaterial meshes to avoid picking up shadow/helper planes (MeshBasicMaterial).
  */
 When("I capture the current texture state", async ({ page }) => {
     const textureTracker = getTextureTracker(page);

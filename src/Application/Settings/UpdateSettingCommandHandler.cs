@@ -10,18 +10,15 @@ namespace Application.Settings;
 internal class UpdateSettingCommandHandler : ICommandHandler<UpdateSettingCommand, UpdateSettingResponse>
 {
     private readonly ISettingRepository _settingRepository;
-    private readonly IApplicationSettingsRepository _applicationSettingsRepository;
     private readonly IDateTimeProvider _dateTimeProvider;
     private readonly IUnitOfWork _unitOfWork;
 
     public UpdateSettingCommandHandler(
         ISettingRepository settingRepository,
-        IApplicationSettingsRepository applicationSettingsRepository,
         IDateTimeProvider dateTimeProvider,
         IUnitOfWork unitOfWork)
     {
         _settingRepository = settingRepository;
-        _applicationSettingsRepository = applicationSettingsRepository;
         _dateTimeProvider = dateTimeProvider;
         _unitOfWork = unitOfWork;
     }
@@ -50,20 +47,6 @@ internal class UpdateSettingCommandHandler : ICommandHandler<UpdateSettingComman
             {
                 existingSetting.UpdateValue(command.Value, now);
                 setting = await _settingRepository.UpdateAsync(existingSetting, cancellationToken);
-            }
-
-            // The recycled-files retention also has a column on ApplicationSettings.
-            // The key-value row above is what the purge job reads (its presence is
-            // the user's opt-in - the column's old default of 30 was never one), and
-            // this keeps the column in sync with the choice.
-            if (command.Key == SettingKeys.CleanRecycledFilesAfterDays &&
-                int.TryParse(command.Value, out var retentionDays))
-            {
-                var applicationSettings =
-                    await _applicationSettingsRepository.GetAsync(cancellationToken)
-                    ?? ApplicationSettings.CreateDefault(now);
-                applicationSettings.UpdateCleanRecycledFilesAfterDays(retentionDays, now);
-                await _applicationSettingsRepository.SaveAsync(applicationSettings, cancellationToken);
             }
 
             await _unitOfWork.SaveChangesAsync(cancellationToken);

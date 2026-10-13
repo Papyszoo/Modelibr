@@ -99,14 +99,12 @@ namespace Infrastructure.Persistence
         public DbSet<ModelConceptImage> ModelConceptImages => Set<ModelConceptImage>();
         public DbSet<ProjectConceptImage> ProjectConceptImages => Set<ProjectConceptImage>();
         public DbSet<ProjectReferenceLink> ProjectReferenceLinks => Set<ProjectReferenceLink>();
-        public DbSet<Stage> Stages => Set<Stage>();
         public DbSet<Scene> Scenes => Set<Scene>();
         public DbSet<SceneRender> SceneRenders => Set<SceneRender>();
         public DbSet<SceneAssetUsage> SceneAssetUsages => Set<SceneAssetUsage>();
         public DbSet<Thumbnail> Thumbnails => Set<Thumbnail>();
         public DbSet<ThumbnailJob> ThumbnailJobs => Set<ThumbnailJob>();
         public DbSet<ThumbnailJobEvent> ThumbnailJobEvents => Set<ThumbnailJobEvent>();
-        public DbSet<ApplicationSettings> ApplicationSettings => Set<ApplicationSettings>();
         public DbSet<Setting> Settings => Set<Setting>();
         public DbSet<BatchUpload> BatchUploads => Set<BatchUpload>();
         public DbSet<Sprite> Sprites => Set<Sprite>();
@@ -1161,19 +1159,6 @@ namespace Infrastructure.Persistence
                 entity.HasIndex(link => new { link.ProjectId, link.ProjectCharacterId });
             });
 
-            // Configure Stage entity
-            modelBuilder.Entity<Stage>(entity =>
-            {
-                entity.HasKey(s => s.Id);
-                entity.Property(s => s.Name).IsRequired().HasMaxLength(200);
-                entity.Property(s => s.ConfigurationJson).IsRequired();
-                entity.Property(s => s.CreatedAt).IsRequired();
-                entity.Property(s => s.UpdatedAt).IsRequired();
-
-                // Create index for efficient querying by name
-                entity.HasIndex(s => s.Name);
-            });
-
             // Configure Scene entity - an agent-authorable composition of library assets.
             // The document is stored as validated JSON rather than shredded into node rows:
             // it is read and written whole, the editor's undo works on whole documents, and
@@ -1431,21 +1416,6 @@ namespace Infrastructure.Persistence
                     .WithMany()
                     .HasForeignKey(tje => tje.ThumbnailJobId)
                     .OnDelete(DeleteBehavior.Cascade);
-            });
-
-            // Configure ApplicationSettings entity
-            modelBuilder.Entity<ApplicationSettings>(entity =>
-            {
-                entity.HasKey(s => s.Id);
-                entity.Property(s => s.MaxFileSizeBytes).IsRequired();
-                entity.Property(s => s.MaxThumbnailSizeBytes).IsRequired();
-                entity.Property(s => s.ThumbnailFrameCount).IsRequired();
-                entity.Property(s => s.ThumbnailSize).IsRequired();
-                entity.Property(s => s.CleanRecycledFilesAfterDays).IsRequired();
-                entity.Property(s => s.TextureProxySize).IsRequired()
-                    .HasDefaultValue(512);
-                entity.Property(s => s.CreatedAt).IsRequired();
-                entity.Property(s => s.UpdatedAt).IsRequired();
             });
 
             // Configure Setting entity

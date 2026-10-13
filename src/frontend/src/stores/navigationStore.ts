@@ -221,7 +221,6 @@ export function getTabLabel(
     environmentMapId?: string
     packId?: string
     projectId?: string
-    stageId?: string
     scriptId?: string
     sceneId?: string
     modelName?: string
@@ -229,7 +228,6 @@ export function getTabLabel(
     environmentMapName?: string
     packName?: string
     projectName?: string
-    stageName?: string
     scriptName?: string
     sceneName?: string
   } = {}
@@ -240,7 +238,6 @@ export function getTabLabel(
     environmentMapId,
     packId,
     projectId,
-    stageId,
     scriptId,
     sceneId,
     modelName,
@@ -248,7 +245,6 @@ export function getTabLabel(
     environmentMapName,
     packName,
     projectName,
-    stageName,
     scriptName,
     sceneName,
   } = options
@@ -299,11 +295,6 @@ export function getTabLabel(
     case 'scriptViewer':
       if (scriptName) return scriptName
       return scriptId ? `Script ${scriptId}` : 'Script'
-    case 'stageList':
-      return 'Stages'
-    case 'stageEditor':
-      if (stageName) return stageName
-      return stageId ? `Stage ${stageId}` : 'Stage Editor'
     case 'scenes':
       return 'Scenes'
     case 'sceneEditor':
@@ -353,10 +344,6 @@ export function createTab(
         tabId = `project-${id}`
         params.projectId = id
         break
-      case 'stageEditor':
-        tabId = `stage-${id}`
-        params.stageId = id
-        break
       case 'scriptViewer':
         tabId = `script-${id}`
         params.scriptId = id
@@ -383,7 +370,6 @@ export function createTab(
         environmentMapId: type === 'environmentMapViewer' ? id : undefined,
         packId: type === 'packViewer' ? id : undefined,
         projectId: type === 'projectViewer' ? id : undefined,
-        stageId: type === 'stageEditor' ? id : undefined,
         scriptId: type === 'scriptViewer' ? id : undefined,
         sceneId: type === 'sceneEditor' ? id : undefined,
         modelName: type === 'modelViewer' && name ? name : undefined,
@@ -392,7 +378,6 @@ export function createTab(
           type === 'environmentMapViewer' && name ? name : undefined,
         packName: type === 'packViewer' && name ? name : undefined,
         projectName: type === 'projectViewer' && name ? name : undefined,
-        stageName: type === 'stageEditor' && name ? name : undefined,
         scriptName: type === 'scriptViewer' && name ? name : undefined,
         sceneName: type === 'sceneEditor' && name ? name : undefined,
       }),
@@ -404,7 +389,6 @@ export function createTab(
     environmentMapId: params.environmentMapId,
     packId: params.packId,
     projectId: params.projectId,
-    stageId: params.stageId,
     scriptId: params.scriptId,
     sceneId: params.sceneId,
   }

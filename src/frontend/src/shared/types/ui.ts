@@ -16,8 +16,6 @@ export type TabType =
   | 'sounds'
   | 'scripts'
   | 'scriptViewer'
-  | 'stageList'
-  | 'stageEditor'
   | 'scenes'
   | 'sceneEditor'
   | 'vfxList'
@@ -41,7 +39,6 @@ export interface Tab {
   environmentMapId?: string
   packId?: string
   projectId?: string
-  stageId?: string
   scriptId?: string
   sceneId?: string
 }

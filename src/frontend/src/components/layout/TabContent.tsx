@@ -79,16 +79,6 @@ const ScriptViewer = lazy(() =>
     default: module.ScriptViewer,
   }))
 )
-const StageList = lazy(() =>
-  import('@/features/stage-editor').then(module => ({
-    default: module.StageList,
-  }))
-)
-const StageEditor = lazy(() =>
-  import('@/features/stage-editor').then(module => ({
-    default: module.StageEditor,
-  }))
-)
 const ScenesTab = lazy(() =>
   import('@/features/scenes').then(module => ({
     default: module.ScenesTab,
@@ -245,12 +235,6 @@ export function TabContent({ tab }: TabContentProps): JSX.Element {
           return <div>Error: No script ID provided</div>
         }
         return <ScriptViewer scriptId={parseInt(tab.scriptId)} tabId={tab.id} />
-
-      case 'stageList':
-        return <StageList />
-
-      case 'stageEditor':
-        return <StageEditor stageId={tab.stageId} />
 
       case 'scenes':
         return <ScenesTab />

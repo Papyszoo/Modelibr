@@ -142,16 +142,6 @@ const TILES: Tile[] = [
     targetLabel: 'Scenes',
   },
   {
-    key: 'stages',
-    group: 'assets',
-    icon: 'pi-th-large',
-    label: 'Stages',
-    description: 'Lighting rigs for viewing one model - superseded by Scenes.',
-    targetType: 'stageList',
-    targetLabel: 'Stages',
-    disabled: true,
-  },
-  {
     key: 'vfx',
     group: 'assets',
     icon: 'pi-sparkles',

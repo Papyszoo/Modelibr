@@ -1206,37 +1206,6 @@ export const systemHandlers = [
   }),
 
   // ════════════════════════════════════════════════════════════════════════
-  //  STAGES
-  // ════════════════════════════════════════════════════════════════════════
-
-  http.get('*/stages', async () => {
-    return HttpResponse.json({ stages: [] })
-  }),
-
-  http.get('*/stages/:id', async () => {
-    return HttpResponse.json({
-      id: 1,
-      name: 'Default',
-      configurationJson: '{}',
-      createdAt: now(),
-      updatedAt: now(),
-    })
-  }),
-
-  http.post('*/stages', async ({ request }) => {
-    const body = (await request.json()) as { name: string }
-    return HttpResponse.json(
-      { id: Date.now(), name: body.name },
-      { status: 201 }
-    )
-  }),
-
-  http.put('*/stages/:id', async ({ request }) => {
-    const body = (await request.json()) as { configurationJson: string }
-    return HttpResponse.json({ id: Number('1'), name: 'Stage', ...body })
-  }),
-
-  // ════════════════════════════════════════════════════════════════════════
   //  SETTINGS
   // ════════════════════════════════════════════════════════════════════════
 

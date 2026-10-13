@@ -16,17 +16,11 @@ public class ModelUploadedEventHandlerTests
 {
     private static Mock<ISettingsService> SettingsServiceMock(bool generateOnUpload)
     {
-        var settings = ApplicationSettings.CreateDefault(DateTime.UtcNow);
-        if (!generateOnUpload)
+        // CreateDefault enables uploads by default; flip via the record's init-only property.
+        var settings = ApplicationSettingsSnapshot.CreateDefault(DateTime.UtcNow) with
         {
-            // CreateDefault enables uploads by default; flip via the domain setter.
-            settings.UpdateThumbnailSettings(
-                frameCount: settings.ThumbnailFrameCount,
-                size: settings.ThumbnailSize,
-                generateOnUpload: false,
-                generateAnimated: settings.GenerateAnimatedThumbnail,
-                updatedAt: DateTime.UtcNow);
-        }
+            GenerateThumbnailOnUpload = generateOnUpload,
+        };
 
         var mock = new Mock<ISettingsService>();
         mock.Setup(s => s.GetSettingsAsync(It.IsAny<CancellationToken>()))

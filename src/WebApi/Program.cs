@@ -376,7 +376,6 @@ namespace WebApi
             app.MapProjectStudioEndpoints();
             app.MapProjectCharacterEndpoints();
             app.MapModelCategoryEndpoints();
-            app.MapStageEndpoints();
             app.MapSceneEndpoints();
             app.MapSettingsEndpoints();
             app.MapBatchUploadEndpoints();

@@ -20,11 +20,8 @@ import { Locator, Page, expect } from "@playwright/test";
  * Tile titles in the New Tab page. Used to locate the tile button when
  * opening a tab via UI.
  *
- * Tab types not in this map (`stageList`) have no tile - `stageList` is
- * disabled while the feature is incomplete. Tests that need it inject the
- * tab via localStorage state - see `injectAndActivateTab`. (The legacy
- * `textureSets` type was removed from the app entirely; a persisted-state
- * migration rewrites it to `modelTextures`.)
+ * The legacy `textureSets` type was removed from the app entirely; a
+ * persisted-state migration rewrites it to `modelTextures`.
  */
 const TILE_LABELS: Record<string, string> = {
   modelList: "Models",
@@ -44,8 +41,6 @@ const TILE_LABELS: Record<string, string> = {
   recycledFiles: "Recycled Files",
   settings: "Settings",
 };
-
-const STATE_INJECTABLE_TYPES = new Set(["stageList"]);
 
 const KNOWN_TAB_TYPES = new Set([
   "modelList",
@@ -72,8 +67,6 @@ const KNOWN_TAB_TYPES = new Set([
   "settings",
   "history",
   "recycledFiles",
-  "stageList",
-  "stageEditor",
 ]);
 
 /** Selector for an open dock tab of the given type. */
@@ -128,13 +121,6 @@ export async function navigateToApp(page: Page): Promise<void> {
  * Flow: click `+` on the target dock bar → New Tab page renders → click the
  * matching tile → placeholder converts in place to the target type.
  *
- * For tab types that have no tile (`textureSets`, `stageList`), this falls
- * back to a localStorage state injection + reload - same pattern used by
- * `openModelViewer`. Those entries are deliberately not surfaced in the New
- * Tab page (combined texture-sets view is replaced by Global Materials /
- * Model Textures; stages is disabled while incomplete) but the underlying
- * tab types still work, so tests can drive them directly.
- *
  * @param side  Which panel's dock bar to use ('left' | 'right')
  * @param tabType  The tab type key (e.g. 'globalMaterials', 'packs')
  */
@@ -143,15 +129,10 @@ export async function openTabViaMenu(
   tabType: string,
   side: "left" | "right" = "left",
 ): Promise<void> {
-  if (STATE_INJECTABLE_TYPES.has(tabType)) {
-    await injectAndActivateTab(page, tabType, side);
-    return;
-  }
-
   const tileLabel = TILE_LABELS[tabType];
   if (!tileLabel) {
     throw new Error(
-      `Unknown tab type "${tabType}" - no tile in New Tab page and not state-injectable`,
+      `Unknown tab type "${tabType}" - no tile in the New Tab page`,
     );
   }
 
@@ -224,109 +205,6 @@ export async function dragTabToRightPanel(
     page.locator(`.dock-bar-right ${tabSelector(tabType)}`).first(),
   ).toBeVisible({ timeout: 5000 });
   console.log(`[Nav] Dragged "${tabType}" tab into the right panel ✓`);
-}
-
-/**
- * Inject a tab directly into the persisted navigation state and reload.
- *
- * Used for tab types that have no New Tab page tile (e.g. the combined
- * `textureSets` view, kept for the kind-filter e2e tests, and `stageList`,
- * disabled in the UI). The reload guarantees Zustand rehydrates from the
- * mutated localStorage and the app paints the right tab as active.
- */
-async function injectAndActivateTab(
-  page: Page,
-  tabType: string,
-  side: "left" | "right",
-): Promise<void> {
-  await page.evaluate(
-    ({ type, side }) => {
-      const storageKey = "modelibr_navigation";
-      const sessionWindowIdKey = "modelibr_windowId";
-      const storedRaw = localStorage.getItem(storageKey);
-      const stored = storedRaw
-        ? JSON.parse(storedRaw)
-        : {
-            state: {
-              activeWindows: {},
-              recentlyClosedTabs: [],
-              recentlyClosedWindows: [],
-            },
-            version: 0,
-          };
-
-      let windowId = sessionStorage.getItem(sessionWindowIdKey);
-      if (!windowId) {
-        windowId = crypto.randomUUID();
-        sessionStorage.setItem(sessionWindowIdKey, windowId);
-      }
-
-      const defaultWindowState = {
-        tabs: [
-          {
-            id: "modelList",
-            type: "modelList",
-            label: "Models",
-            params: {},
-            internalUiState: {},
-          },
-        ],
-        activeTabId: "modelList",
-        activeRightTabId: null,
-        splitterSize: 50,
-        lastActiveAt: new Date().toISOString(),
-      };
-
-      const activeWindows = stored.state?.activeWindows || {};
-      const windowState = activeWindows[windowId] || defaultWindowState;
-
-      const labels: Record<string, string> = {
-        stageList: "Stages",
-      };
-
-      const params: Record<string, string> =
-        side === "right" ? { panel: "right" } : {};
-
-      const newTab = {
-        id: type,
-        type,
-        label: labels[type] ?? type,
-        params,
-        internalUiState: {},
-      };
-
-      const existingTabs = (windowState.tabs || []).filter(
-        (tab: { id: string }) => tab.id !== type,
-      );
-      existingTabs.push(newTab);
-
-      const activeUpdate =
-        side === "right" ? { activeRightTabId: type } : { activeTabId: type };
-
-      activeWindows[windowId] = {
-        ...windowState,
-        tabs: existingTabs,
-        ...activeUpdate,
-        lastActiveAt: new Date().toISOString(),
-      };
-
-      stored.state = {
-        activeWindows,
-        recentlyClosedTabs: stored.state?.recentlyClosedTabs || [],
-        recentlyClosedWindows: stored.state?.recentlyClosedWindows || [],
-      };
-
-      localStorage.setItem(storageKey, JSON.stringify(stored));
-    },
-    { type: tabType, side },
-  );
-
-  await page.reload({ waitUntil: "domcontentloaded" });
-  await page.waitForSelector(".p-splitter", {
-    state: "visible",
-    timeout: 15000,
-  });
-  console.log(`[Nav] Injected "${tabType}" tab into ${side} panel via state ✓`);
 }
 
 /**

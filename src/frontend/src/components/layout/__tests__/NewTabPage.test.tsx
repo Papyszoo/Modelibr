@@ -207,28 +207,6 @@ describe('NewTabPage', () => {
     expect(setActiveTab).toHaveBeenCalledWith(updated[0].id)
   })
 
-  it('renders the Stages tile as disabled and does not open it on click', () => {
-    const setTabs = jest.fn()
-    const setActiveTab = jest.fn()
-    const ctx = makeContextValue({
-      tabs: [newTab],
-      activeTab: 'newTab',
-      setTabs,
-      setActiveTab,
-    })
-    renderWithContext(<NewTabPage tabId="newTab" />, ctx)
-
-    const stagesTile = screen.getByText('Stages').closest('button')
-    expect(stagesTile).toBeInTheDocument()
-    expect(stagesTile).toBeDisabled()
-
-    // `fireEvent.click` on a disabled button is a no-op in the DOM,
-    // but we still want to ensure no tab mutation happens.
-    fireEvent.click(stagesTile as HTMLElement)
-    expect(setTabs).not.toHaveBeenCalled()
-    expect(setActiveTab).not.toHaveBeenCalled()
-  })
-
   it('preserves panel marker when converting in a right-panel tab', () => {
     const rightPanelNewTab: Tab = {
       ...newTab,

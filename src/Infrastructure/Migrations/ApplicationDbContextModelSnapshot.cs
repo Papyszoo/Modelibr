@@ -175,51 +175,6 @@ namespace Infrastructure.Migrations
                     b.ToTable("AgentUploadTickets");
                 });
 
-            modelBuilder.Entity("Domain.Models.ApplicationSettings", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<int>("CleanRecycledFilesAfterDays")
-                        .HasColumnType("integer");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<bool>("GenerateAnimatedThumbnail")
-                        .HasColumnType("boolean");
-
-                    b.Property<bool>("GenerateThumbnailOnUpload")
-                        .HasColumnType("boolean");
-
-                    b.Property<long>("MaxFileSizeBytes")
-                        .HasColumnType("bigint");
-
-                    b.Property<long>("MaxThumbnailSizeBytes")
-                        .HasColumnType("bigint");
-
-                    b.Property<int>("TextureProxySize")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasDefaultValue(512);
-
-                    b.Property<int>("ThumbnailFrameCount")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("ThumbnailSize")
-                        .HasColumnType("integer");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.HasKey("Id");
-
-                    b.ToTable("ApplicationSettings");
-                });
-
             modelBuilder.Entity("Domain.Models.AssetDerivation", b =>
                 {
                     b.Property<int>("Id")
@@ -2822,36 +2777,6 @@ namespace Infrastructure.Migrations
                         .IsUnique();
 
                     b.ToTable("SpriteCategories");
-                });
-
-            modelBuilder.Entity("Domain.Models.Stage", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<string>("ConfigurationJson")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("Name");
-
-                    b.ToTable("Stages");
                 });
 
             modelBuilder.Entity("Domain.Models.StoreImportJob", b =>

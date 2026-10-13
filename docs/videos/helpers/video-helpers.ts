@@ -134,7 +134,6 @@ type VideoTab = {
     setId?: string;
     packId?: string;
     projectId?: string;
-    stageId?: string;
 };
 
 type LegacyNavigationSnapshot = {
@@ -151,7 +150,6 @@ const STATIC_TAB_LABELS: Record<string, string> = {
     projects: "Projects",
     sprites: "Sprites",
     sounds: "Sounds",
-    stageList: "Stages",
     history: "History",
     settings: "Settings",
     recycledFiles: "Recycled Files",
@@ -204,17 +202,6 @@ function buildVideoTab(tabId: string, panel: "left" | "right"): VideoTab {
             label: `Project ${projectId}`,
             params: { ...params, projectId },
             projectId,
-        };
-    }
-
-    if (tabId.startsWith("stage-")) {
-        const stageId = tabId.substring(6);
-        return {
-            id: tabId,
-            type: "stageEditor",
-            label: `Stage ${stageId}`,
-            params: { ...params, stageId },
-            stageId,
         };
     }
 

@@ -224,7 +224,6 @@ export const TabProvider = ({
           type === 'environmentMaps' ||
           type === 'packs' ||
           type === 'sprites' ||
-          type === 'stageList' ||
           type === 'vfxList' ||
           (type === 'modelViewer' &&
             tab.modelId === (data as { id?: string })?.id) ||
@@ -233,9 +232,7 @@ export const TabProvider = ({
           (type === 'environmentMapViewer' &&
             tab.environmentMapId === (data as { id?: string })?.id) ||
           (type === 'packViewer' &&
-            tab.packId === (data as { id?: string })?.id) ||
-          (type === 'stageEditor' &&
-            tab.stageId === (data as { id?: string })?.id))
+            tab.packId === (data as { id?: string })?.id))
     )
 
     if (existingTab) {

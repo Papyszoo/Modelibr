@@ -53,10 +53,6 @@ const getTabTooltip = (tab: Tab): string => {
       return 'Sounds'
     case 'scripts':
       return 'Scripts'
-    case 'stageEditor':
-      return 'Stage Editor'
-    case 'stageList':
-      return 'Stages List'
     case 'scenes':
       return 'Scenes'
     case 'sceneEditor':

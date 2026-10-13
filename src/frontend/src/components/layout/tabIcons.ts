@@ -26,8 +26,6 @@ const TAB_ICONS: Record<TabType, string> = {
   sounds: 'pi-volume-up',
   scripts: 'pi-code',
   scriptViewer: 'pi-file-edit',
-  stageList: 'pi-th-large',
-  stageEditor: 'pi-table',
   scenes: 'pi-map',
   sceneEditor: 'pi-sitemap',
   vfxList: 'pi-objects-column',

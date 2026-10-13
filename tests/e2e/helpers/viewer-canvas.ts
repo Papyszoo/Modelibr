@@ -5,9 +5,9 @@ import { waitForR3FCanvas } from "./list-toolbar-helper";
 /**
  * Container of the model viewer's OWN three.js canvas.
  *
- * Six components mount a react-three-fiber `<Canvas>` (scenes, model viewer,
- * script preview, stage editor, texture-set preview, environment-map preview)
- * and both dock sides render their active tab simultaneously, so several
+ * Several components mount a react-three-fiber `<Canvas>` (scenes, model
+ * viewer, script preview, texture-set preview, environment-map preview) and
+ * both dock sides render their active tab simultaneously, so several
  * `<canvas>` elements are normally in the DOM at once. A bare `canvas`
  * locator binds to whichever one is FIRST in document order and then waits
  * for *that* element - which may belong to another feature and may never

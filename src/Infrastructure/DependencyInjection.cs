@@ -118,11 +118,9 @@ namespace Infrastructure
             services.AddScoped<IProjectReferenceRepository, ProjectReferenceRepository>();
             services.AddScoped<IModelCategoryRepository, ModelCategoryRepository>();
             services.AddScoped<IModelTagRepository, ModelTagRepository>();
-            services.AddScoped<IStageRepository, StageRepository>();
             services.AddScoped<ISceneRepository, SceneRepository>();
             services.AddScoped<ISceneAssetUsageRepository, SceneAssetUsageRepository>();
             services.AddScoped<ISceneRenderRepository, SceneRenderRepository>();
-            services.AddScoped<IApplicationSettingsRepository, ApplicationSettingsRepository>();
             services.AddScoped<ISettingRepository, SettingRepository>();
             services.AddScoped<IBatchUploadRepository, BatchUploadRepository>();
             services.AddScoped<ISpriteRepository, SpriteRepository>();

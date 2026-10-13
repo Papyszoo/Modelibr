@@ -587,11 +587,6 @@ export const handlers = [
     })
   }),
 
-  // Stages
-  http.get(`${BASE_URL}/stages`, () => {
-    return HttpResponse.json([])
-  }),
-
   // Settings / theme
   http.get(`${BASE_URL}/settings/theme`, () => {
     return HttpResponse.json({ theme: 'dark' })

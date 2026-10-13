@@ -50,12 +50,6 @@ export async function updateSettings(settings: {
   return response.data
 }
 
-export function refreshCache(type?: 'models' | 'textureSets' | 'packs'): void {
-  // Legacy apiCacheStore hook removed. React Query is now responsible for caching.
-  // This function is kept (no-op) to avoid breaking imports if any appear later.
-  void type
-}
-
 // ── Blender Installation Management ───────────────────────────────────
 
 export interface BlenderVersionInfo {

@@ -21,8 +21,6 @@ const ALL_KINDS: Record<TabType, true> = {
   sounds: true,
   scripts: true,
   scriptViewer: true,
-  stageList: true,
-  stageEditor: true,
   scenes: true,
   sceneEditor: true,
   vfxList: true,

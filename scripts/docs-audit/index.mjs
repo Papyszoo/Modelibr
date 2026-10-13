@@ -158,10 +158,7 @@ const manifestOutputs = [
   };
   // Exempt tab types must carry a reason. Remove an entry when the feature
   // becomes user-reachable - the audit will then demand documentation.
-  const exempt = {
-    stageList: "Stages tile is disabled in NewTabPage ('under rework')",
-    stageEditor: "Stages tile is disabled in NewTabPage ('under rework')",
-  };
+  const exempt = {};
   const doc = read("docs/docs/features/user-interface.md");
   const undocumented = tabTypes.filter((t) => {
     if (exempt[t]) return false;
