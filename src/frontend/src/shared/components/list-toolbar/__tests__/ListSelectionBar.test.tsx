@@ -145,6 +145,41 @@ describe('ListSelectionBar', () => {
     expect(event.pageY).toBe(120)
   })
 
+  // Regression: `getBoundingClientRect` is viewport relative while PrimeReact
+  // positions from page coordinates, so the rect has to be offset by the window
+  // scroll or a scrolled page drops the menu above the button.
+  it('offsets a keyboard activation by the window scroll', () => {
+    const onBulkActionsClick = jest.fn()
+    // jsdom keeps scrollX/scrollY at 0 as plain values, so stub them directly.
+    Object.defineProperty(window, 'scrollX', { configurable: true, value: 50 })
+    Object.defineProperty(window, 'scrollY', { configurable: true, value: 400 })
+
+    render(
+      <ListSelectionBar
+        count={2}
+        visibleCount={5}
+        unitLabel="map"
+        onBulkActionsClick={onBulkActionsClick}
+        onSelectAllClick={noop}
+        onDeselectAllClick={noop}
+      />
+    )
+
+    const button = screen.getByRole('button', {
+      name: 'Bulk actions for 2 maps',
+    })
+    button.getBoundingClientRect = () => ({ left: 300, bottom: 120 }) as DOMRect
+
+    fireEvent.click(button, { pageX: 0, pageY: 0 })
+
+    const event = onBulkActionsClick.mock.calls[0][0]
+    expect(event.pageX).toBe(350)
+    expect(event.pageY).toBe(520)
+
+    Object.defineProperty(window, 'scrollX', { configurable: true, value: 0 })
+    Object.defineProperty(window, 'scrollY', { configurable: true, value: 0 })
+  })
+
   it('leaves a pointer click anchored where the pointer clicked', () => {
     const onBulkActionsClick = jest.fn()
 

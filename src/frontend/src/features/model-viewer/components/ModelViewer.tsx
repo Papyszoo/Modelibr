@@ -285,6 +285,34 @@ export function ModelViewer({
     [leftPanel, rightPanel, topPanel, bottomPanel]
   )
 
+  // The mobile rule above ("one panel at a time") has to be enforced: on mobile
+  // every panel is a full-bleed overlay, so a second open panel would sit hidden
+  // underneath the first. Keep the most recently opened one and close the rest
+  // (also collapses a multi-panel desktop layout when the viewport narrows).
+  useEffect(() => {
+    if (!isMobile) return
+    const open = [
+      leftPanel !== null ? 'left' : null,
+      rightPanel !== null ? 'right' : null,
+      topPanel !== null ? 'top' : null,
+      bottomPanel !== null ? 'bottom' : null,
+    ].filter(
+      (side): side is 'left' | 'right' | 'top' | 'bottom' => side !== null
+    )
+    if (open.length <= 1) return
+
+    const keeper =
+      [...panelOpenOrder.current]
+        .reverse()
+        .find(side => open.some(openSide => openSide === side)) ?? open[0]
+
+    panelOpenOrder.current = [keeper]
+    if (keeper !== 'left') setLeftPanel(null)
+    if (keeper !== 'right') setRightPanel(null)
+    if (keeper !== 'top') setTopPanel(null)
+    if (keeper !== 'bottom') setBottomPanel(null)
+  }, [isMobile, leftPanel, rightPanel, topPanel, bottomPanel])
+
   // Resize divider mouse handlers
   const startResize = useCallback(
     (side: string, e: React.MouseEvent) => {

@@ -163,8 +163,10 @@ function anchorMenuEvent(event: ReactMouseEvent<HTMLElement>): void {
   const rect = event.currentTarget?.getBoundingClientRect()
   if (!rect) return
 
-  event.pageX = rect.left
-  event.pageY = rect.bottom
+  // PrimeReact reads pageX/pageY (document space), but a rect is viewport
+  // relative - add the window scroll or a scrolled page drops the menu.
+  event.pageX = rect.left + window.scrollX
+  event.pageY = rect.bottom + window.scrollY
 }
 
 /**
