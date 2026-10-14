@@ -359,9 +359,19 @@ test.describe("Projects", () => {
         const coverCard = page.locator(".container-cover-card");
         await moveToLocator(page, coverCard, 320);
 
-        const firstConceptImage = page.getByRole("button", {
-            name: /open concept image/i,
-        }).first();
+        // Concept images moved off the Details page onto the studio's
+        // References board, so switch the project workspace to that view
+        // before opening one.
+        const referencesTab = page.getByTestId("project-workspace-tab-references");
+        await moveToLocator(page, referencesTab, 240);
+        await referencesTab.click();
+        const referenceBoard = page.getByTestId("project-reference-board");
+        await expect(referenceBoard).toBeVisible({ timeout: ciVideoTimeout });
+        await mediumPause(page);
+
+        const firstConceptImage = referenceBoard
+            .getByRole("button", { name: /open reference/i })
+            .first();
         await moveToLocator(page, firstConceptImage, 280);
         await firstConceptImage.click();
         await viewerPause(page, 950);

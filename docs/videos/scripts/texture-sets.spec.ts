@@ -170,13 +170,13 @@ test.describe("Texture Sets", () => {
         const leftPanel = page.locator(".p-splitter-panel").nth(0);
         // The dedicated `<h1>Texture Sets</h1>` header band was removed
         // when the page adopted the shared list-toolbar - page identity
-        // is now carried by the toolbar's count chip + the "Create Set"
-        // button. Confirm we're on the right page by waiting on those.
+        // is now carried by the toolbar's count chip + the "Create Texture
+        // Set" button. Confirm we're on the right page by waiting on those.
         await expect(leftPanel.locator(".list-toolbar")).toBeVisible({
             timeout: ciVideoTimeout,
         });
         await expect(
-            leftPanel.getByRole("button", { name: /create set/i }),
+            leftPanel.getByRole("button", { name: /create texture set/i }),
         ).toBeVisible({
             timeout: ciVideoTimeout,
         });

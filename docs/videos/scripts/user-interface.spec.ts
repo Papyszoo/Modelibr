@@ -7,7 +7,6 @@ import {
     mediumPause,
     longPause,
     viewerPause,
-    smoothDrag,
     navigateTo,
     clearAllData,
     disableHighlights,
@@ -166,25 +165,36 @@ test.describe("User Interface", () => {
 
         // Find the sprites tab in the left dock bar
         const leftDockBar = leftPanel.locator(".dock-bar");
-        const rightPanel = page.locator(".p-splitter-panel").nth(1);
-        const rightDockBar = rightPanel.locator(".dock-bar");
 
-        // Find the sprites tab - look for the tab that corresponds to sprites
-        // Try to find it by matching tab content/tooltip
-        const spritesTab = leftDockBar.locator(".draggable-tab").last();
+        // The window starts as ONE panel: the right panel appears as a drop
+        // target only once a drag is in flight, so the source is grabbed
+        // first and the destination measured mid-drag.
+        const spritesTab = leftDockBar
+            .locator('.draggable-tab[data-tab-type="sprites"]')
+            .first();
+        await spritesTab.waitFor({ state: "visible", timeout: 5000 });
         const spritesTabBox = await spritesTab.boundingBox();
-        const rightDockBarBox = await rightDockBar.boundingBox();
 
-        if (spritesTabBox && rightDockBarBox) {
-            // Perform a smooth drag from the sprites tab to the right dock bar
-            await smoothDrag(
-                page,
-                spritesTabBox.x + spritesTabBox.width / 2,
-                spritesTabBox.y + spritesTabBox.height / 2,
-                rightDockBarBox.x + rightDockBarBox.width / 2,
-                rightDockBarBox.y + rightDockBarBox.height / 2,
-                40, // more steps for a visible, smooth drag
-            );
+        if (spritesTabBox) {
+            const startX = spritesTabBox.x + spritesTabBox.width / 2;
+            const startY = spritesTabBox.y + spritesTabBox.height / 2;
+            await page.mouse.move(startX, startY, { steps: 15 });
+            await viewerPause(page, 300);
+            await page.mouse.down();
+            await page.mouse.move(startX + 24, startY, { steps: 6 });
+
+            const rightDockBar = page.locator(".dock-bar-right");
+            await rightDockBar.waitFor({ state: "visible", timeout: 5000 });
+            const rightDockBarBox = await rightDockBar.boundingBox();
+            if (rightDockBarBox) {
+                await page.mouse.move(
+                    rightDockBarBox.x + rightDockBarBox.width / 2,
+                    rightDockBarBox.y + rightDockBarBox.height / 2,
+                    { steps: 40 },
+                );
+                await viewerPause(page, 250);
+                await page.mouse.up();
+            }
         }
         await mediumPause(page);
 
@@ -202,26 +212,30 @@ test.describe("User Interface", () => {
         await longPause(page);
 
         // ────────────────────────────────────────────────────────────
-        // Step 4: Close a tab on the left (close the Models tab)
+        // Step 4: Close a tab on the left (close the Sounds tab)
         // ────────────────────────────────────────────────────────────
 
-        // Find the Models tab on the left dock bar (should be the first tab)
-        const modelsTab = leftDockBar.locator(".draggable-tab").first();
-        await modelsTab.waitFor({ state: "visible", timeout: 5000 });
+        // The Models and Projects entries are pinned in the main dock, so a
+        // pinned page keeps its slot and has no close button; Sounds is an
+        // ordinary closable tab.
+        const soundsTab = leftDockBar
+            .locator('.draggable-tab[data-tab-type="sounds"]')
+            .first();
+        await soundsTab.waitFor({ state: "visible", timeout: 5000 });
 
         // Hover over it to reveal the close button
-        const modelsTabBox = await modelsTab.boundingBox();
-        if (modelsTabBox) {
+        const soundsTabBox = await soundsTab.boundingBox();
+        if (soundsTabBox) {
             await page.mouse.move(
-                modelsTabBox.x + modelsTabBox.width / 2,
-                modelsTabBox.y + modelsTabBox.height / 2,
+                soundsTabBox.x + soundsTabBox.width / 2,
+                soundsTabBox.y + soundsTabBox.height / 2,
                 { steps: 20 },
             );
         }
         await viewerPause(page, 400);
 
-        // Click the close button on the models tab
-        const closeBtn = modelsTab.locator(".tab-close-btn");
+        // Click the close button on the sounds tab
+        const closeBtn = soundsTab.locator(".tab-close-btn");
         await closeBtn.waitFor({ state: "visible", timeout: 5000 });
 
         const closeBtnBox = await closeBtn.boundingBox();
@@ -243,13 +257,13 @@ test.describe("User Interface", () => {
         await longPause(page);
 
         // ────────────────────────────────────────────────────────────
-        // Step 5: Restore the recently closed Models tab via the
+        // Step 5: Restore the recently closed Sounds tab via the
         //         "Recently Closed" section in the New Tab page
         // ────────────────────────────────────────────────────────────
 
         await openNewTabPageInPanel(page, leftPanel);
 
-        // The most-recently-closed entry is the Models tab; the section is
+        // The most-recently-closed entry is the Sounds tab; the section is
         // scoped to the New Tab page that just opened in the left panel.
         const newtabInLeft = leftPanel.locator(".newtab-page").last();
         const recentsHeader = newtabInLeft.locator(".newtab-section-tag", {
@@ -258,11 +272,11 @@ test.describe("User Interface", () => {
         await recentsHeader.waitFor({ state: "visible", timeout: 5000 });
         await mediumPause(page);
 
-        const reopenModels = newtabInLeft.locator(
-            '.newtab-recent button[title="Reopen Models"]',
+        const reopenSounds = newtabInLeft.locator(
+            '.newtab-recent button[title="Reopen Sounds"]',
         );
-        await reopenModels.waitFor({ state: "visible", timeout: 3000 });
-        const reopenBox = await reopenModels.boundingBox();
+        await reopenSounds.waitFor({ state: "visible", timeout: 3000 });
+        const reopenBox = await reopenSounds.boundingBox();
         if (reopenBox) {
             await page.mouse.move(
                 reopenBox.x + reopenBox.width / 2,
@@ -271,13 +285,13 @@ test.describe("User Interface", () => {
             );
             await viewerPause(page, 300);
         }
-        await reopenModels.click();
+        await reopenSounds.click();
         await mediumPause(page);
 
-        // Confirm the placeholder converted in place and the Models tab is back.
+        // Confirm the placeholder converted in place and the Sounds tab is back.
         await expect(newtabInLeft).toBeHidden({ timeout: 5000 });
         await leftDockBar
-            .locator('.draggable-tab[data-pr-tooltip="Models List"]')
+            .locator('.draggable-tab[data-tab-type="sounds"]')
             .first()
             .waitFor({ state: "visible", timeout: 5000 });
 

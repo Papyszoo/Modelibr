@@ -62,6 +62,12 @@ test.describe("Model Management", () => {
         };
 
         const moveToAndClick = async (locator: ReturnType<typeof page.locator>) => {
+            // The grid is virtualised, and with the category sidebar open it is
+            // only one card wide - so with three models the comparison card can
+            // sit below the fold. Raw mouse events do not auto-scroll the way
+            // locator.click does, so the coordinates would land outside the
+            // viewport and the click would hit the page instead of the card.
+            await locator.scrollIntoViewIfNeeded();
             const box = await locator.boundingBox();
             if (!box) {
                 throw new Error("Could not determine element position");
