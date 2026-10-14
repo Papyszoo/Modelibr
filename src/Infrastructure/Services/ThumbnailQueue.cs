@@ -5,6 +5,7 @@ using Application.Settings;
 using Domain.Models;
 using Domain.ValueObjects;
 using Microsoft.Extensions.Logging;
+using SharedKernel;
 
 namespace Infrastructure.Services;
 
@@ -392,7 +393,7 @@ public class ThumbnailQueue : IThumbnailQueue
         var claimed = await _thumbnailJobRepository.TryClaimPendingJobAsync(job.Id, workerId, claimedAt, cancellationToken);
         if (!claimed)
         {
-            _logger.LogDebug("Worker {WorkerId} lost the claim race for job {JobId}; will poll again", SanitizeForLog(workerId), job.Id);
+            _logger.LogDebug("Worker {WorkerId} lost the claim race for job {JobId}; will poll again", LogSanitizer.Sanitize(workerId), job.Id);
             return null;
         }
 
@@ -402,7 +403,7 @@ public class ThumbnailQueue : IThumbnailQueue
         job.TryClaim(workerId, claimedAt);
 
         _logger.LogInformation("Worker {WorkerId} claimed thumbnail job {JobId} for model {ModelId} version {ModelVersionId} (attempt {AttemptCount})",
-            SanitizeForLog(workerId), job.Id, job.ModelId, job.ModelVersionId, job.AttemptCount);
+            LogSanitizer.Sanitize(workerId), job.Id, job.ModelId, job.ModelVersionId, job.AttemptCount);
 
         // Notify other workers about job status change for coordination
         await _queueNotificationService.NotifyJobStatusChangedAsync(job.Id, job.Status.ToString(), workerId, cancellationToken);
@@ -542,9 +543,4 @@ public class ThumbnailQueue : IThumbnailQueue
 
         return cleanedUpCount;
     }
-
-    // Neutralize CR/LF/TAB in worker-supplied values before logging so a crafted
-    // worker id can't forge fake log lines (CodeQL cs/log-forging).
-    private static string SanitizeForLog(string? input) =>
-        input?.Replace("\n", "").Replace("\r", "").Replace("\t", "") ?? string.Empty;
 }

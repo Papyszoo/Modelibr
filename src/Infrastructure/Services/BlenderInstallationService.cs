@@ -8,6 +8,7 @@ using Application.Settings;
 using Domain.Models;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using SharedKernel;
 
 namespace Infrastructure.Services;
 
@@ -223,7 +224,7 @@ public sealed class BlenderInstallationService : IBlenderInstallationService
             Directory.CreateDirectory(archiveDir);
             var archivePath = Path.Combine(archiveDir, archiveFileName);
 
-            _logger.LogInformation("Downloading Blender {Version} from {Url}", SanitizeForLog(version), SanitizeForLog(downloadUrl));
+            _logger.LogInformation("Downloading Blender {Version} from {Url}", LogSanitizer.Sanitize(version), LogSanitizer.Sanitize(downloadUrl));
 
             // Download with progress
             var httpClient = _httpClientFactory.CreateClient("BlenderDownload");
@@ -253,7 +254,7 @@ public sealed class BlenderInstallationService : IBlenderInstallationService
             // Extract
             _state = "extracting";
             _progress = 0;
-            _logger.LogInformation("Extracting Blender {Version}", SanitizeForLog(version));
+            _logger.LogInformation("Extracting Blender {Version}", LogSanitizer.Sanitize(version));
 
             var extractDir = Path.Combine(_installBasePath, $"blender-{version}");
             if (Directory.Exists(extractDir))
@@ -289,7 +290,7 @@ public sealed class BlenderInstallationService : IBlenderInstallationService
                 _error = "Blender binary found but appears invalid (too small or missing).";
                 return;
             }
-            _logger.LogInformation("Blender binary found at {Path} ({Size:N0} bytes)", SanitizeForLog(blenderBinary), binaryInfo.Length);
+            _logger.LogInformation("Blender binary found at {Path} ({Size:N0} bytes)", LogSanitizer.Sanitize(blenderBinary), binaryInfo.Length);
 
             // Clean up archive
             try { System.IO.File.Delete(archivePath); } catch { /* ignore */ }
@@ -303,7 +304,7 @@ public sealed class BlenderInstallationService : IBlenderInstallationService
 
             await PersistSettingsAsync(version, blenderBinary);
 
-            _logger.LogInformation("Blender {Version} installed at {Path}", SanitizeForLog(version), SanitizeForLog(blenderBinary));
+            _logger.LogInformation("Blender {Version} installed at {Path}", LogSanitizer.Sanitize(version), LogSanitizer.Sanitize(blenderBinary));
         }
         catch (OperationCanceledException)
         {
@@ -315,7 +316,7 @@ public sealed class BlenderInstallationService : IBlenderInstallationService
         {
             _state = "failed";
             _error = ex.Message;
-            _logger.LogError(ex, "Failed to install Blender {Version}", SanitizeForLog(version));
+            _logger.LogError(ex, "Failed to install Blender {Version}", LogSanitizer.Sanitize(version));
             throw;
         }
         finally
@@ -381,7 +382,7 @@ public sealed class BlenderInstallationService : IBlenderInstallationService
                 _installedPath = pathSetting.Value;
                 _state = "installed";
                 _progress = 100;
-                _logger.LogInformation("Detected existing Blender installation: {Version} at {Path}", SanitizeForLog(versionSetting.Value), SanitizeForLog(pathSetting.Value));
+                _logger.LogInformation("Detected existing Blender installation: {Version} at {Path}", LogSanitizer.Sanitize(versionSetting.Value), LogSanitizer.Sanitize(pathSetting.Value));
             }
         }
         catch (Exception ex)
@@ -547,9 +548,6 @@ public sealed class BlenderInstallationService : IBlenderInstallationService
 
         return null;
     }
-
-    private static string SanitizeForLog(string input) =>
-        input.Replace("\n", "").Replace("\r", "").Replace("\t", "");
 
     private static async Task<string> RunProcessAsync(string fileName, string[] arguments, CancellationToken ct)
     {

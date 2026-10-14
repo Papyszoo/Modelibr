@@ -39,18 +39,18 @@ public class DequeueThumbnailJobCommandHandler : ICommandHandler<DequeueThumbnai
             if (job != null)
             {
                 _logger.LogInformation("Successfully dequeued thumbnail job {JobId} for worker {WorkerId}", 
-                    job.Id, command.WorkerId);
+                    job.Id, LogSanitizer.Sanitize(command.WorkerId));
             }
             else
             {
-                _logger.LogDebug("No thumbnail jobs available for worker {WorkerId}", command.WorkerId);
+                _logger.LogDebug("No thumbnail jobs available for worker {WorkerId}", LogSanitizer.Sanitize(command.WorkerId));
             }
 
             return Result.Success(new DequeueThumbnailJobResponse(job));
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to dequeue thumbnail job for worker {WorkerId}", command.WorkerId);
+            _logger.LogError(ex, "Failed to dequeue thumbnail job for worker {WorkerId}", LogSanitizer.Sanitize(command.WorkerId));
 
             return Result.Failure<DequeueThumbnailJobResponse>(
                 new Error("ThumbnailJobDequeueFailed", 

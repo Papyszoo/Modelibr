@@ -11,6 +11,7 @@ import { SceneRenderView } from './features/scenes/components/SceneRenderView'
 import { sceneViewpointFromName } from './features/scenes/lib/sceneRenderCamera'
 import { VfxRenderView } from './features/vfx/components/VfxRenderView'
 import { overrideApiBaseUrl } from './lib/apiBase'
+import { sanitizeApiBaseUrlOverride } from './lib/apiOverrideUrl'
 
 async function bootstrap() {
   if (import.meta.env.VITE_DEMO_MODE === 'true') {
@@ -54,8 +55,9 @@ function renderTarget() {
   // The renderer's browser lives in the worker container, where the API address
   // baked in for a user's browser generally does not resolve - so it passes the
   // one it uses itself. Applied before the view mounts, because the scene
-  // queries and every file URL read it as they go.
-  const apiOverride = params.get('api')
+  // queries and every file URL read it as they go. Only an http:/https: origin
+  // (or relative path) is honoured; anything else keeps the built-in default.
+  const apiOverride = sanitizeApiBaseUrlOverride(params.get('api'))
   if (apiOverride) {
     overrideApiBaseUrl(apiOverride)
   }
@@ -104,7 +106,7 @@ function readRenderTime(raw: string | null): number {
 
 /** The effect page for `?render=vfx&vfxId=...`; the worker steps its time and photographs it. */
 function vfxRenderTarget(params: URLSearchParams) {
-  const apiOverride = params.get('api')
+  const apiOverride = sanitizeApiBaseUrlOverride(params.get('api'))
   if (apiOverride) {
     overrideApiBaseUrl(apiOverride)
   }

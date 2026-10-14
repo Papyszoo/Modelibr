@@ -97,7 +97,7 @@ public class FinishSoundWaveformJobCommandHandler : ICommandHandler<FinishSoundW
         {
             job.MarkAsCompleted(now);
             _logger.LogInformation("Sound waveform job {JobId} completed successfully (SoundId: {SoundId}, Path: {Path})",
-                command.JobId, job.SoundId.Value, command.WaveformPath);
+                command.JobId, job.SoundId.Value, LogSanitizer.Sanitize(command.WaveformPath));
 
             // Persist the audio metadata the worker extracted while decoding the
             // file. Best-effort: neither a missing sound nor a persistence error
@@ -132,7 +132,7 @@ public class FinishSoundWaveformJobCommandHandler : ICommandHandler<FinishSoundW
         {
             job.MarkAsFailed(command.ErrorMessage ?? "Unknown error", now);
             _logger.LogWarning("Sound waveform job {JobId} failed (SoundId: {SoundId}, Error: {Error})",
-                command.JobId, job.SoundId.Value, command.ErrorMessage);
+                command.JobId, job.SoundId.Value, LogSanitizer.Sanitize(command.ErrorMessage));
         }
 
         // Persist job status last. If the process crashes after the metadata save

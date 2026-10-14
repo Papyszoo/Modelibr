@@ -1,6 +1,7 @@
 using Application.Abstractions.Services;
 using Domain.Models;
 using Microsoft.AspNetCore.SignalR;
+using SharedKernel;
 using WebApi.Hubs;
 
 namespace WebApi.Services;
@@ -77,7 +78,7 @@ public class SignalRThumbnailJobQueueNotificationService : IThumbnailJobQueueNot
                 .SendAsync("JobStatusChanged", notification, cancellationToken);
 
             _logger.LogDebug("Sent job status changed notification for job {JobId} (status: {Status}, worker: {WorkerId})", 
-                jobId, status, workerId);
+                jobId, status, LogSanitizer.Sanitize(workerId));
         }
         catch (Exception ex)
         {
