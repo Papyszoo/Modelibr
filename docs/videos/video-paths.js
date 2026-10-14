@@ -46,3 +46,6 @@ export function clearDirContents(dir) {
         }
     }
 }
+
+// Committed docs screenshots, captured by scripts/screenshots.spec.ts.
+export const screenshotsDir = path.join(__dirname, "..", "static", "img", "screenshots");

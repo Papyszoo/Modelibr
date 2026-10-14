@@ -14,6 +14,7 @@
         "generate:sounds": "node run-videos.js --grep \"Sounds\" --slugs sounds",
         "generate:projects": "node run-videos.js --grep \"Projects\" --slugs projects",
         "generate:packs": "node run-videos.js --grep \"Packs\" --slugs packs",
+        "screenshots": "DOCS_SCREENSHOTS=1 playwright test --config=playwright.config.ts",
         "analyze": "node analyze-videos.js",
         "verify": "node verify-videos.js",
         "trim": "node trim-videos.js",
