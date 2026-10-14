@@ -280,11 +280,17 @@ const emptySceneDocument = JSON.stringify({
   lights: [],
 })
 
-/** A node that places one library model, in the shape a scene document stores. */
+/**
+ * A node that places one library model, in the shape a scene document stores.
+ *
+ * A Model asset must pin a versionId (the real document validator refuses one
+ * that does not), so the version is passed explicitly rather than left out.
+ */
 function demoSceneNode(
   id: string,
   name: string,
   assetId: number,
+  versionId: number,
   position: [number, number, number] = [0, 0, 0]
 ) {
   return {
@@ -295,7 +301,7 @@ function demoSceneNode(
       rotationEuler: { x: 0, y: 0, z: 0 },
       scale: { x: 1, y: 1, z: 1 },
     },
-    asset: { assetType: 'Model', assetId },
+    asset: { assetType: 'Model', assetId, versionId },
     visible: true,
   }
 }
@@ -332,8 +338,8 @@ async function seedDemoScenes() {
       documentJson: JSON.stringify({
         schemaVersion: 1,
         nodes: [
-          demoSceneNode('deck', 'Rope Bridge Deck', 1, [0, 0, 4]),
-          demoSceneNode('bell', 'Bell Tower', 2, [-6, 0, 2]),
+          demoSceneNode('deck', 'Rope Bridge Deck', 1, 1, [0, 0, 4]),
+          demoSceneNode('bell', 'Bell Tower', 2, 2, [-6, 0, 2]),
         ],
         lights: [],
       }),
@@ -354,8 +360,8 @@ async function seedDemoScenes() {
       documentJson: JSON.stringify({
         schemaVersion: 1,
         nodes: [
-          demoSceneNode('deck-again', 'Rope Bridge Deck', 1, [0, 0, 4]),
-          demoSceneNode('shrub', 'Shrub', 4, [3, 0, 1]),
+          demoSceneNode('deck-again', 'Rope Bridge Deck', 1, 1, [0, 0, 4]),
+          demoSceneNode('shrub', 'Shrub', 4, 4, [3, 0, 1]),
         ],
         lights: [],
       }),

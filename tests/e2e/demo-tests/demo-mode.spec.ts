@@ -10,6 +10,7 @@ import { EnvironmentMapsPage } from "../pages/EnvironmentMapsPage";
 import { ModelListPage } from "../pages/ModelListPage";
 import { ModelViewerPage } from "../pages/ModelViewerPage";
 import { RecycledFilesPage } from "../pages/RecycledFilesPage";
+import { ScenesPage } from "../pages/ScenesPage";
 import { SettingsPage } from "../pages/SettingsPage";
 import { SoundListPage } from "../pages/SoundListPage";
 import { SpriteListPage } from "../pages/SpriteListPage";
@@ -644,5 +645,52 @@ test.describe("demo mode e2e", () => {
         } finally {
             await upload.cleanup();
         }
+    });
+
+    // Regression: the seeded Crossing Layout scene's two Model nodes had no
+    // versionId, so the real 0.7 scene loader refused them ("A model resource
+    // must pin a versionId") and the canvas showed two failed, bounds-unknown
+    // placeholders. Asserting on the progress badge catches the missing pin.
+    // (A "bounds unknown" flag is expected in the demo: it derives no geometry.)
+    test("loads the seeded Crossing Layout scene with no failed resources", async ({
+        page,
+    }) => {
+        const scenesPage = new ScenesPage(page);
+
+        await scenesPage.goto();
+        await scenesPage.openScene("Crossing Layout");
+
+        await expect(page.locator('[data-testid="scene-node-row"]')).toHaveCount(
+            2,
+        );
+        await expect(page.getByText("failed to load")).toHaveCount(0);
+        await expect(
+            page.locator('[data-testid="scene-resource-progress"]'),
+        ).not.toContainText("failed");
+    });
+
+    // Regression: Ambient Loop's file id had no demo fixture, so its play button
+    // was permanently disabled by a 404 on the audio element's metadata.
+    test("plays the seeded Ambient Loop sound", async ({ page }) => {
+        const soundListPage = new SoundListPage(page);
+
+        await soundListPage.goto();
+        const card = soundListPage.getSoundCardByName("Ambient Loop").first();
+        await expect(card).toBeVisible({ timeout: 15000 });
+
+        const playButton = card.locator(".sound-control-btn").first();
+        await expect(playButton).toBeEnabled({ timeout: 15000 });
+        await playButton.click();
+
+        // The seeded clip is about a second long, so asserting on the transient
+        // "playing" class is racy. The durable proof of playback is the audio
+        // element advancing past zero with no decode error.
+        const audio = card.locator("audio");
+        await expect
+            .poll(() => audio.evaluate((el) => el.currentTime), {
+                timeout: 10000,
+            })
+            .toBeGreaterThan(0);
+        expect(await audio.evaluate((el) => el.error)).toBeNull();
     });
 });

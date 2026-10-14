@@ -24,6 +24,7 @@ const ALLOWED_EXTENSIONS = new Set([
   '.png',
   '.jpg',
   '.jpeg',
+  '.webp',
   '.exr',
   '.wav',
   '.mp3',
