@@ -41,7 +41,11 @@ and the current revision.
   using its measured origin. A model with no version cannot be placed.
 - **A blockout box**: the **Blockout box** button adds a 1 x 1 x 1 box - useful
   for massing out walls and platforms before assets arrive.
-- **A light**: the **Light** button adds a directional key light.
+- **A light**: the **Light** button adds a directional key light. It opens
+  selected in the property panel, where its name, intensity, colour, position
+  and aim at are editable. Adding a light never darkens the viewport: the
+  default ambient fill stays until the document authors an ambient light of its
+  own.
 
 Select a node to edit it in the property panel. **Position** is in metres,
 **Rotation** in degrees, and **Scale** as a multiplier, each with X/Y/Z fields.
