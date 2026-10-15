@@ -27,7 +27,13 @@ import { useSceneMaterials } from '../hooks/useSceneMaterials'
 import { bindNodeMaterial } from '../lib/sceneDressing'
 import { transformsEqual } from '../lib/sceneGeometry'
 import { buildSceneNodeFacts } from '../lib/sceneNodeFacts'
-import { nextLightId, nextNodeId, nextPlacementX } from '../lib/sceneNodeIds'
+import {
+  type DraftNodeBounds,
+  nextLightId,
+  nextNodeId,
+  nextPlacementX,
+} from '../lib/sceneNodeIds'
+import { sceneResourceKey } from '../lib/sceneResourceKey'
 import type {
   SceneDocument,
   SceneLight,
@@ -130,6 +136,7 @@ export function SceneEditor({
     undo: undoDraft,
     redo: redoDraft,
     selectNode: selectNodeDraft,
+    selectLight: selectLightDraft,
     setNodeTransform: setNodeTransformDraft,
     updateNode: updateNodeDraft,
     removeNode: removeNodeDraft,
@@ -149,6 +156,7 @@ export function SceneEditor({
   const baseRevision = sceneDraft?.baseRevision ?? null
   const isDirty = sceneDraft?.isDirty ?? false
   const selectedNodeId = sceneDraft?.selectedNodeId ?? null
+  const selectedLightId = sceneDraft?.selectedLightId ?? null
   const past = sceneDraft?.past ?? EMPTY_HISTORY
   const future = sceneDraft?.future ?? EMPTY_HISTORY
   const saveError = sceneDraft?.saveError ?? null
@@ -186,8 +194,24 @@ export function SceneEditor({
     [setBlockoutOverrideDraft, sceneId]
   )
   const selectNode = useCallback(
-    (nodeId: string | null) => selectNodeDraft(nodeId, sceneId),
-    [selectNodeDraft, sceneId]
+    (nodeId: string | null) => {
+      selectNodeDraft(nodeId, sceneId)
+      // The inspector has one body. Selecting a node is the answer for what it
+      // shows, so it drops any light selection.
+      if (nodeId !== null) {
+        selectLightDraft(null, sceneId)
+      }
+    },
+    [selectNodeDraft, selectLightDraft, sceneId]
+  )
+  const selectLight = useCallback(
+    (lightId: string | null) => {
+      selectLightDraft(lightId, sceneId)
+      if (lightId !== null) {
+        selectNodeDraft(null, sceneId)
+      }
+    },
+    [selectNodeDraft, selectLightDraft, sceneId]
   )
   const recordNodeFailure = useCallback(
     (nodeId: string, message: string) =>
@@ -323,6 +347,41 @@ export function SceneEditor({
   }, [sceneId, loadedRevision])
 
   const nodeFacts = useMemo(() => buildSceneNodeFacts(view), [view])
+
+  // Measured bounds for assets placed into this draft, keyed by the asset ref
+  // the resource queue uses. The server derives a footprint only on save, so a
+  // node placed in this session has none yet, and placement reads the
+  // measurements the placement itself fetched - otherwise a box added beside
+  // a freshly placed model lands inside it. Keyed per asset rather than per
+  // node: one asset measures the same wherever it is placed.
+  const draftBoundsRef = useRef(new Map<string, DraftNodeBounds>())
+
+  // The per-node measurements placement may use, assembled against the draft
+  // so each entry carries its node's id. Server footprints still win inside
+  // `nextPlacementX`.
+  const draftBoundsFor = useCallback(
+    (
+      current: SceneDocument
+    ): ReadonlyMap<string, DraftNodeBounds> | undefined => {
+      if (draftBoundsRef.current.size === 0) {
+        return undefined
+      }
+      const bounds = new Map<string, DraftNodeBounds>()
+      for (const node of current.nodes) {
+        if (!node.asset) {
+          continue
+        }
+        const measured = draftBoundsRef.current.get(
+          sceneResourceKey(node.asset)
+        )
+        if (measured) {
+          bounds.set(node.id, measured)
+        }
+      }
+      return bounds.size > 0 ? bounds : undefined
+    },
+    []
+  )
 
   // What dresses each node, resolved from ids to names. The canvas resolves the
   // same bindings to render them, through the same query keys, so the panel
@@ -475,6 +534,8 @@ export function SceneEditor({
 
   const selectedNode =
     document?.nodes.find(node => node.id === selectedNodeId) ?? null
+  const selectedLight =
+    document?.lights.find(light => light.id === selectedLightId) ?? null
   const selectedFacts = selectedNodeId
     ? (nodeFacts.get(selectedNodeId) ?? null)
     : null
@@ -517,6 +578,7 @@ export function SceneEditor({
 
       let groundedY = 0
       let width: number | null = null
+      let originFractionX: number | null = null
       try {
         const facts = await getSceneAssetFacts({
           assetType: 'Model',
@@ -525,6 +587,19 @@ export function SceneEditor({
         })
         groundedY = facts.groundedYAtOrigin ?? 0
         width = facts.sourceDimensions?.x ?? null
+        originFractionX = facts.originInBounds?.x ?? null
+        if (facts.sourceDimensions) {
+          // Remembered per asset so the next placement can clear the node this
+          // one becomes, before any server footprint for it exists.
+          draftBoundsRef.current.set(
+            sceneResourceKey({ assetType: 'Model', assetId, versionId }),
+            {
+              sourceDimensions: facts.sourceDimensions,
+              originConvention: facts.originConvention,
+              originInBounds: facts.originInBounds,
+            }
+          )
+        }
       } catch (caught) {
         // Bounds are advisory: an asset that has never been extracted still
         // places, at y=0, and the panel reports its bounds as unknown. Refusing
@@ -551,7 +626,17 @@ export function SceneEditor({
         id: nodeId,
         name: model.name,
         transform: {
-          position: { x: nextPlacementX(current, width), y: groundedY, z: 0 },
+          position: {
+            x: nextPlacementX(
+              current,
+              width,
+              nodeFacts,
+              originFractionX,
+              draftBoundsFor(current)
+            ),
+            y: groundedY,
+            z: 0,
+          },
           rotationEuler: IDENTITY_ROTATION,
           scale: UNIT_SCALE,
         },
@@ -560,7 +645,15 @@ export function SceneEditor({
       })
       selectNode(nodeId)
     },
-    [addNode, selectNode, sceneId, setIsPlacing, setPlaceError]
+    [
+      addNode,
+      selectNode,
+      sceneId,
+      setIsPlacing,
+      setPlaceError,
+      nodeFacts,
+      draftBoundsFor,
+    ]
   )
 
   /**
@@ -600,7 +693,17 @@ export function SceneEditor({
       transform: {
         // Primitives are authored centered, so half its height puts it on the
         // floor - the same offset the server's footprint uses for them.
-        position: { x: nextPlacementX(current, 1), y: 0.5, z: 0 },
+        position: {
+          x: nextPlacementX(
+            current,
+            1,
+            nodeFacts,
+            null,
+            draftBoundsFor(current)
+          ),
+          y: 0.5,
+          z: 0,
+        },
         rotationEuler: IDENTITY_ROTATION,
         scale: UNIT_SCALE,
       },
@@ -608,7 +711,7 @@ export function SceneEditor({
       visible: true,
     })
     selectNode(nodeId)
-  }, [addNode, selectNode, sceneId])
+  }, [addNode, selectNode, sceneId, nodeFacts, draftBoundsFor])
 
   const handleAddLight = useCallback(() => {
     const current =
@@ -617,15 +720,36 @@ export function SceneEditor({
       return
     }
 
-    setLight({
+    const light: SceneLight = {
       id: nextLightId(current, 'light'),
       type: 'directional',
       position: { x: 6, y: 10, z: 6 },
       intensity: 1.1,
       color: '#ffffff',
       name: 'Key light',
-    })
-  }, [setLight, sceneId])
+    }
+    setLight(light)
+    // This button is the only way to reach a light, so it opens in the
+    // inspector ready to adjust instead of merely counting in the header.
+    selectLight(light.id)
+  }, [setLight, selectLight, sceneId])
+
+  /**
+   * Patches the selected light. Read back through the store at call time so an
+   * edit built before a previous one landed still merges onto the latest light
+   * rather than resurrecting a stale copy.
+   */
+  const handleChangeLight = useCallback(
+    (patch: Partial<SceneLight>) => {
+      const own = useSceneEditorStore.getState().drafts[sceneId]
+      const lightId = own?.selectedLightId ?? null
+      const light = own?.document?.lights.find(entry => entry.id === lightId)
+      if (light) {
+        setLight({ ...light, ...patch })
+      }
+    },
+    [setLight, sceneId]
+  )
 
   const handleSave = useCallback(async () => {
     if (!document || baseRevision === null) {
@@ -1088,6 +1212,8 @@ export function SceneEditor({
           <ScenePropertyPanel
             node={selectedNode}
             facts={selectedFacts}
+            light={selectedLight}
+            onChangeLight={handleChangeLight}
             warnings={view.scaleWarnings.filter(
               warning => warning.nodeId === selectedNodeId
             )}

@@ -252,8 +252,10 @@ async function materializeImport(
         },
       ],
       materialNames: [],
-      mainVariantName: '',
-      variantNames: [],
+      // Same as the real import: a store model opens on its own embedded
+      // materials, not the viewer's clay "Default".
+      mainVariantName: '__embedded__',
+      variantNames: ['__embedded__'],
       textureMappings: [],
       textureSetIds: [],
     }

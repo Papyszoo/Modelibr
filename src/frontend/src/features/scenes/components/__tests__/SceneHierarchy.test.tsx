@@ -3,11 +3,13 @@ import userEvent from '@testing-library/user-event'
 
 import { renderWithProviders } from '@/test/renderWithProviders'
 
+import type { SceneOverlap } from '../../types'
 import { SceneHierarchy } from '../SceneHierarchy'
 
 function renderHierarchy(
   overrides: {
     visible?: boolean
+    overlaps?: SceneOverlap[]
     onSelectNode?: jest.Mock
     onToggleVisible?: jest.Mock
     onRemoveNode?: jest.Mock
@@ -35,7 +37,7 @@ function renderHierarchy(
       }
       nodeFacts={new Map()}
       failedNodes={new Map()}
-      overlaps={[]}
+      overlaps={overrides.overlaps ?? []}
       selectedNodeId={null}
       onSelectNode={onSelectNode}
       onToggleVisible={onToggleVisible}
@@ -69,5 +71,33 @@ describe('SceneHierarchy node context menu', () => {
     await userEvent.click(await screen.findByText('Hide'))
 
     expect(onToggleVisible).toHaveBeenCalledWith('node-1', false)
+  })
+})
+
+describe('SceneHierarchy overlap flags', () => {
+  function overlap(likelyIntentional: boolean): SceneOverlap {
+    return {
+      nodeIdA: 'node-1',
+      nodeIdB: 'node-2',
+      intersectionVolume: 0.5,
+      kind: 'resting',
+      likelyIntentional,
+    }
+  }
+
+  it('does not flag an overlap the server marked likely intentional', () => {
+    // Regression: every overlap was flagged, so deliberate contact - a lamp
+    // resting on a table, which the server marks likelyIntentional - read as a
+    // mistake the user did not make.
+    renderHierarchy({ overlaps: [overlap(true)] })
+
+    expect(screen.queryByText('overlapping')).not.toBeInTheDocument()
+  })
+
+  it('still flags an overlap that is not likely intentional', () => {
+    // The other half: filtering must not silence genuine interpenetration.
+    renderHierarchy({ overlaps: [overlap(false)] })
+
+    expect(screen.getByText('overlapping')).toBeInTheDocument()
   })
 })

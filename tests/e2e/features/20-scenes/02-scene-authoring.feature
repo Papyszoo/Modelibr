@@ -249,6 +249,19 @@ Feature: Scene authoring
     And I reopen the scene "Blockout Scene"
     Then the scene should hold 1 node
 
+  @scene-place
+  Scenario: A blockout box added beside a model lands clear of it
+    # Regression: the next node's x was count x its own width, so a 1 m box
+    # dropped beside a 2 m model landed inside it and the server reported an
+    # overlap the user did not create. Placement now starts at the right edge
+    # of the server's own footprints.
+    Given a scene named "Spread Scene" is open
+    And I have placed the test model into the scene
+    When I add a blockout box
+    And I save the scene
+    And I reopen the scene "Spread Scene"
+    Then no scene node should be flagged as overlapping
+
   # Linking a scene to a project is one of the few things this editor sends
   # straight to the server, and it MOVES THE SCENE'S REVISION. The draft the
   # editor is holding was opened against the old one and is only reseeded while

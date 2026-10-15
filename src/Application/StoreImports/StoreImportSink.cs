@@ -23,6 +23,17 @@ namespace Application.StoreImports;
 /// </summary>
 internal sealed class StoreImportSink : IStoreImportSink
 {
+    /// <summary>
+    /// The preset a store-imported model opens on: the file's own embedded materials.
+    ///
+    /// A store model arrives dressed - its textures are inside the file, and the store's
+    /// thumbnail (which the import reuses) is that asset rendered with them. The viewer's
+    /// "Default" preset swaps in the clay stand-in, so without this the model opens looking
+    /// nothing like its own card. The name is the same sentinel the viewer and the
+    /// thumbnail worker read to preserve materials.
+    /// </summary>
+    private const string EmbeddedMaterialsVariant = "__embedded__";
+
     private readonly ICommandHandler<CreatePackCommand, CreatePackResponse> _createPack;
     private readonly ICommandHandler<SetPackStoreProvenanceCommand> _setProvenance;
     private readonly ICommandHandler<SetPackCustomThumbnailCommand> _setPackThumbnail;
@@ -140,7 +151,10 @@ internal sealed class StoreImportSink : IStoreImportSink
                 GenerateThumbnail: generateThumbnail,
                 // The manifest already says what this is - category, tags, licence, author.
                 // Guessing a category from the file name over that would be strictly worse.
-                AutoAssignMetadata: false), ct)).Id;
+                AutoAssignMetadata: false,
+                // See EmbeddedMaterialsVariant: a store model opens on its own materials,
+                // not the viewer's clay stand-in its thumbnail never showed.
+                MainVariantName: EmbeddedMaterialsVariant), ct)).Id;
 
     public Task AddFileToModelAsync(int modelId, IFileUpload file, CancellationToken ct)
         => RunAsync<AddFileToModelCommandResponse>(_addFileToModel.Handle(new AddFileToModelCommand(modelId, file), ct));

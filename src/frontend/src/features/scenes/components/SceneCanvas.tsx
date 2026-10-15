@@ -17,6 +17,7 @@ import { useSceneMaterials } from '../hooks/useSceneMaterials'
 import { useSceneResourceAdmission } from '../hooks/useSceneResourceAdmission'
 import { useSceneViewportMeasurements } from '../hooks/useSceneViewportMeasurements'
 import { useSceneViewportQuality } from '../hooks/useSceneViewportQuality'
+import { needsAmbientFill } from '../lib/sceneLightRig'
 import { buildSceneResourceCandidates } from '../lib/sceneResourcePriority'
 import type {
   SceneDocument,
@@ -343,11 +344,14 @@ function SceneCameraAim({
 }
 
 /**
- * The document's lights, plus a minimal fill when it has none.
+ * The document's lights, plus a minimal ambient fill unless the document
+ * authors one of its own.
  *
- * The fill is not written into the document: an unlit scene should look unlit
- * once the user adds their first light, and silently seeding lights would make
- * "why is my scene brighter than my lighting says" the first question asked.
+ * The fill is not written into the document, and it is not dropped at the
+ * first authored light either: the Light button adds a directional key light,
+ * and a rig of key lights alone rendered darker than the unlit scene it
+ * replaced. It ends at an authored ambient light, which is the document itself
+ * answering what its ambient is. See `needsAmbientFill`.
  */
 function SceneDocumentLights({
   lights,
@@ -371,6 +375,7 @@ function SceneDocumentLights({
 
   return (
     <>
+      {needsAmbientFill(lights) ? <ambientLight intensity={0.6} /> : null}
       {lights.map(light => {
         const position: [number, number, number] = [
           light.position.x,

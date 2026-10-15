@@ -14,10 +14,22 @@ describe('sanitizeApiBaseUrlOverride', () => {
     )
   })
 
-  it('accepts an http origin', () => {
+  it('accepts an http origin without leaving a trailing slash', () => {
     expect(sanitizeApiBaseUrlOverride('http://10.0.0.5:8080')).toBe(
-      'http://10.0.0.5:8080/'
+      'http://10.0.0.5:8080'
     )
+  })
+
+  it('joins cleanly with the file URL builder for both origin spellings', () => {
+    // Regression: `new URL(value).toString()` normalised a bare origin to
+    // `http://host:8080/`, and `getFileUrl` builds `${baseURL}/files/{id}`, so
+    // the render page requested `http://host:8080//files/1` and the worker's
+    // 404 failed the scene render. `getFileUrl`'s module reads `import.meta`
+    // and is mocked in Jest, so this mirrors the one join it does - exactly.
+    for (const raw of ['http://host:8080', 'http://host:8080/']) {
+      const base = sanitizeApiBaseUrlOverride(raw)
+      expect(`${base}/files/1`).toBe('http://host:8080/files/1')
+    }
   })
 
   it('rejects a javascript: URL', () => {

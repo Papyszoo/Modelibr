@@ -56,6 +56,17 @@
   font-size: var(--mod-text-sm);
 }
 
+/* The light's colour swatch, sized like the material editor's. */
+.scene-properties-color {
+  width: 44px;
+  height: 28px;
+  padding: 0;
+  background: none;
+  border: 1px solid var(--mod-color-border);
+  border-radius: var(--mod-radius-sm);
+  cursor: pointer;
+}
+
 .scene-properties-vector {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

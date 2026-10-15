@@ -663,10 +663,16 @@ test.describe("demo mode e2e", () => {
         await expect(page.locator('[data-testid="scene-node-row"]')).toHaveCount(
             2,
         );
-        await expect(page.getByText("failed to load")).toHaveCount(0);
+        // The badge mounts only while resources are incomplete or failed and
+        // unmounts once they resolve, so its absence is the durable statement
+        // that the canvas settled with nothing failed. Asserting on its text
+        // raced the unmount after the scene's two nodes finished loading, where
+        // "element(s) not found" is not "no failed resources". A failed or
+        // stuck resource keeps the badge mounted, which still fails this.
         await expect(
             page.locator('[data-testid="scene-resource-progress"]'),
-        ).not.toContainText("failed");
+        ).toHaveCount(0);
+        await expect(page.getByText("failed to load")).toHaveCount(0);
     });
 
     // Regression: Ambient Loop's file id had no demo fixture, so its play button

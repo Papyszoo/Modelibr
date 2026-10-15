@@ -134,6 +134,17 @@ namespace Application.Models
                 // Create version 1 automatically for new models
                 var version1 = savedModel.CreateVersion("Initial version", _dateTimeProvider.UtcNow);
                 version1.AddFile(fileEntity);
+
+                // A caller that knows the model's identity preset seeds it in the same
+                // write. Another write would mean SetMainVariantCommand, which also
+                // queues a thumbnail regeneration - replacing a store-supplied thumbnail
+                // with a render the import deliberately avoided.
+                if (!string.IsNullOrWhiteSpace(command.MainVariantName))
+                {
+                    version1.AddVariantName(command.MainVariantName, _dateTimeProvider.UtcNow);
+                    version1.SetMainVariant(command.MainVariantName, _dateTimeProvider.UtcNow);
+                }
+
                 await _versionRepository.AddAsync(version1, cancellationToken);
 
                 // Commit again so version1 gets its real database-assigned id -
@@ -227,6 +238,14 @@ namespace Application.Models
     /// metadata of their own - a store import carries the manifest's category and tags, and
     /// guessing over them would be strictly worse.
     /// </param>
+    /// <param name="MainVariantName">
+    /// The preset the model's first version opens on. Null - the ordinary upload - leaves the
+    /// version with no main variant, which the viewer shows as "Default" (the clay stand-in).
+    /// A store import names the embedded-materials preset here: its materials are inside the
+    /// file, and the store thumbnail is that asset rendered with them. Seeded at creation
+    /// rather than through SetMainVariantCommand, which also queues a thumbnail regeneration
+    /// that would replace the store's own thumbnail.
+    /// </param>
     public record AddModelCommand(
         IFileUpload File,
         string? ModelName = null,
@@ -236,7 +255,8 @@ namespace Application.Models
         string? SourceFolder = null,
         IReadOnlyList<string>? SiblingFileNames = null,
         bool AutoAssignMetadata = true,
-        bool DeferProcessing = false) : ICommand<AddModelCommandResponse>;
+        bool DeferProcessing = false,
+        string? MainVariantName = null) : ICommand<AddModelCommandResponse>;
 
     /// <param name="FileSha256">
     /// The stored primary's hash. Returned so a caller that deferred processing can raise

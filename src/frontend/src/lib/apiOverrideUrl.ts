@@ -19,6 +19,11 @@ const ALLOWED_API_OVERRIDE_PROTOCOLS = new Set(['http:', 'https:'])
  * `baseURL`) are accepted; `javascript:`, `data:` and malformed input are
  * rejected. Parsing with `new URL` and allow-listing `protocol` is the shape
  * CodeQL recognises as a URL sanitizer.
+ *
+ * The result never ends in a slash: the app's URL builders join the base and
+ * the path with a literal "/" (`getFileUrl`: `${baseURL}/files/{id}`), so a
+ * trailing slash here turned every file request into `//files/{id}` - a 404.
+ * `new URL` adds one for a bare origin (no path), so it is stripped back off.
  */
 export function sanitizeApiBaseUrlOverride(raw: string | null): string | null {
   if (!raw) return null
@@ -32,9 +37,10 @@ export function sanitizeApiBaseUrlOverride(raw: string | null): string | null {
 
   try {
     const parsed = new URL(value)
-    return ALLOWED_API_OVERRIDE_PROTOCOLS.has(parsed.protocol)
-      ? parsed.toString()
-      : null
+    if (!ALLOWED_API_OVERRIDE_PROTOCOLS.has(parsed.protocol)) {
+      return null
+    }
+    return parsed.toString().replace(/\/+$/, '')
   } catch {
     return null
   }

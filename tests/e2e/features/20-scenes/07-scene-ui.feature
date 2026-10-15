@@ -40,6 +40,16 @@ Feature: Scene editor UI details
         When I save the scene
         Then the stored scene document named "B2 Lit Scene" should hold 1 lights
 
+    Scenario: A light's intensity is editable from the inspector
+        # The Light button used to add a light nothing could select or edit, so
+        # its intensity, colour and aim were reachable only by editing the saved
+        # document by hand.
+        Given a scene named "B2 Edited Light Scene" is open
+        When I add a light from the scene editor
+        And I set the selected light's intensity to 2.5
+        And I save the scene
+        Then the stored scene document named "B2 Edited Light Scene" should hold a light of intensity 2.5
+
     Scenario: The property panel reports a node held on the ground
         Given a ground-held scene named "B2 Grounded Scene" exists
         When I open the scene named "B2 Grounded Scene" from the list

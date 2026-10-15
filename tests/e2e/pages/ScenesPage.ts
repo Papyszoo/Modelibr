@@ -378,6 +378,26 @@ export class ScenesPage {
     return (await this.page.locator(`#${field}-${axis}`).inputValue()) ?? "";
   }
 
+  /**
+   * Types an intensity into the selected light's inspector field and commits it.
+   *
+   * Typed for the same reason `setTransformAxis` is: PrimeReact's InputNumber
+   * maintains its own value from key events, so a programmatic `fill()` updates
+   * the DOM input without the component ever emitting `onValueChange` - the
+   * edit would appear on screen and never reach the document.
+   */
+  async setLightIntensity(value: number): Promise<void> {
+    const input = this.page.getByRole("spinbutton", { name: "Intensity" });
+    await expect(input).toBeVisible();
+    await input.click();
+    await input.press("ControlOrMeta+a");
+    await this.page.keyboard.type(String(value));
+    // InputNumber commits on blur.
+    await input.press("Tab");
+
+    await expect(input).toHaveValue(String(value));
+  }
+
   async save(): Promise<void> {
     const save = this.page.locator(this.saveButton);
     await expect(save).toBeEnabled();

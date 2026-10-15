@@ -64,6 +64,12 @@ interface SceneDraft {
   future: SceneDocument[]
   isDirty: boolean
   selectedNodeId: string | null
+  /**
+   * The light the inspector is editing, or null. Node and light selection are
+   * exclusive: the inspector has one body, and showing a light's fields while a
+   * node sits selected would claim the edits land on the wrong thing.
+   */
+  selectedLightId: string | null
   saveError: string | null
   placeError: string | null
   slotError: string | null
@@ -81,6 +87,7 @@ const EMPTY_DRAFT: SceneDraft = {
   future: [],
   isDirty: false,
   selectedNodeId: null,
+  selectedLightId: null,
   saveError: null,
   placeError: null,
   slotError: null,
@@ -111,6 +118,8 @@ interface SceneEditorState {
   /** True when the draft differs from what was last loaded or saved. */
   isDirty: boolean
   selectedNodeId: string | null
+  /** See `SceneDraft.selectedLightId`. */
+  selectedLightId: string | null
   /** The last save failure for this scene, kept so a tab switch does not hide it. */
   saveError: string | null
   /** The last placement failure, same reason. */
@@ -190,6 +199,8 @@ interface SceneEditorState {
   canRedo: (sceneId?: number) => boolean
 
   selectNode: (nodeId: string | null, sceneId?: number) => void
+  /** Selects the light the inspector edits. Selecting one clears the node selection. */
+  selectLight: (lightId: string | null, sceneId?: number) => void
 
   addNode: (node: SceneNode, sceneId?: number) => void
   updateNode: (
@@ -217,6 +228,7 @@ function flatDraft(state: SceneEditorState): SceneDraft {
     future: state.future,
     isDirty: state.isDirty,
     selectedNodeId: state.selectedNodeId,
+    selectedLightId: state.selectedLightId,
     saveError: state.saveError,
     placeError: state.placeError,
     slotError: state.slotError,
@@ -265,6 +277,7 @@ export const useSceneEditorStore = create<SceneEditorState>((set, get) => ({
   future: [],
   isDirty: false,
   selectedNodeId: null,
+  selectedLightId: null,
   saveError: null,
   placeError: null,
   slotError: null,
@@ -299,6 +312,7 @@ export const useSceneEditorStore = create<SceneEditorState>((set, get) => ({
         future: [],
         isDirty: false,
         selectedNodeId: null,
+        selectedLightId: null,
         // A seed is the start of a scene's session, not a continuation of
         // whatever the last one was showing. Without this, scene 1's save error
         // and node failures were still on screen after opening scene 2 - the
@@ -491,6 +505,9 @@ export const useSceneEditorStore = create<SceneEditorState>((set, get) => ({
   selectNode: (nodeId, sceneId) =>
     set(state => patchDraft(state, { selectedNodeId: nodeId }, sceneId)),
 
+  selectLight: (lightId, sceneId) =>
+    set(state => patchDraft(state, { selectedLightId: lightId }, sceneId)),
+
   addNode: (node, sceneId) =>
     get().edit(
       document => ({ ...document, nodes: [...document.nodes, node] }),
@@ -562,12 +579,18 @@ export const useSceneEditorStore = create<SceneEditorState>((set, get) => ({
       return { ...document, lights }
     }, sceneId),
 
-  removeLight: (lightId, sceneId) =>
+  removeLight: (lightId, sceneId) => {
+    const target = sceneId ?? get().sceneId
     get().edit(
       document => ({
         ...document,
         lights: document.lights.filter(light => light.id !== lightId),
       }),
       sceneId
-    ),
+    )
+
+    if (draftFor(get(), target).selectedLightId === lightId) {
+      set(state => patchDraft(state, { selectedLightId: null }, target))
+    }
+  },
 }))

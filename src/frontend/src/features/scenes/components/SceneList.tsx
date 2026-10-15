@@ -369,6 +369,11 @@ export function SceneList({ onOpenScene }: SceneListProps): JSX.Element {
         onClose={closeCreate}
         header="New scene"
         size="sm"
+        // PrimeReact focuses the dialog's close button when it shows, which
+        // blurred the auto-focused name field and marked it touched - the
+        // dialog opened already saying "Name is required." With the steal off,
+        // focus stays on the name field and validation waits for a real blur.
+        focusOnShow={false}
         footer={
           <>
             {linkFailure ? (

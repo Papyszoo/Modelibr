@@ -84,8 +84,13 @@ export function SceneHierarchy({
     [contextNode, onSelectNode, onToggleVisible, onRemoveNode]
   )
 
+  // Only the overlaps the server does NOT expect to be there are warnings.
+  // `likelyIntentional` covers resting contact, declared anchors and grazes, so
+  // flagging those would report a lamp standing on a table as a mistake.
   const overlapping = new Set(
-    overlaps.flatMap(overlap => [overlap.nodeIdA, overlap.nodeIdB])
+    overlaps
+      .filter(overlap => !overlap.likelyIntentional)
+      .flatMap(overlap => [overlap.nodeIdA, overlap.nodeIdB])
   )
 
   return (

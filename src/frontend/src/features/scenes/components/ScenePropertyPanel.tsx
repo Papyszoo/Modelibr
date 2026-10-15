@@ -9,6 +9,7 @@ import { type JSX, type ReactNode } from 'react'
 import { EmptyState } from '@/shared/components'
 
 import type {
+  SceneLight,
   SceneNode,
   SceneNodeView,
   SceneScaleWarning,
@@ -29,6 +30,14 @@ interface ScenePropertyPanelProps {
   onChangeTransform: (transform: SceneTransform) => void
   onRename: (name: string) => void
   onGroundSnap: () => void
+  /**
+   * The selected light, when a light is selected instead of a node. The panel
+   * then edits the light's own properties - the fields the scene document
+   * already carries, no more - rather than showing a node body it does not
+   * describe.
+   */
+  light?: SceneLight | null
+  onChangeLight?: (patch: Partial<SceneLight>) => void
   /**
    * The selected node's playback and shape-key controls, when its model carries
    * any. Rendered in the panel body like `materials`, and for the same reason:
@@ -55,6 +64,11 @@ interface ScenePropertyPanelProps {
  * asset's real size, where its origin sits, and how far off the ground it is.
  * Those are the numbers that explain why a placement looks wrong, and they are
  * read-only because they describe the asset, not this placement of it.
+ *
+ * A selected light gets the same body: its intensity, colour, position and
+ * aim. Those are the properties the scene document carries, and before this
+ * panel showed them a light added from the editor could only be changed by
+ * editing the saved document by hand.
  */
 export function ScenePropertyPanel({
   node,
@@ -64,9 +78,96 @@ export function ScenePropertyPanel({
   onChangeTransform,
   onRename,
   onGroundSnap,
+  light,
+  onChangeLight,
   animation,
   materials,
 }: ScenePropertyPanelProps): JSX.Element {
+  if (light) {
+    return (
+      <div className="scene-properties" data-testid="scene-properties">
+        <header className="scene-properties-header">
+          <h3>{light.name ?? light.id}</h3>
+          <span className="scene-properties-id">{light.id}</span>
+        </header>
+
+        <div className="scene-properties-body">
+          <label className="scene-properties-field">
+            <span>Name</span>
+            <InputText
+              id="scene-light-name"
+              value={light.name ?? ''}
+              placeholder={light.id}
+              onChange={event => onChangeLight?.({ name: event.target.value })}
+            />
+          </label>
+
+          <div className="scene-properties-field">
+            <span>Type</span>
+            <span
+              className="scene-properties-id"
+              data-testid="scene-light-type"
+            >
+              {light.type}
+            </span>
+          </div>
+
+          <label className="scene-properties-field">
+            <span>Intensity</span>
+            <InputNumber
+              inputId="scene-light-intensity"
+              value={light.intensity}
+              min={0}
+              step={0.1}
+              maxFractionDigits={2}
+              // A key light is adjusted in small steps more often than retyped.
+              showButtons
+              buttonLayout="stacked"
+              incrementButtonIcon="pi pi-chevron-up"
+              decrementButtonIcon="pi pi-chevron-down"
+              onValueChange={event => {
+                // Same null guard as the node fields: a field being cleared
+                // must not write a value validation would refuse.
+                if (typeof event.value === 'number') {
+                  onChangeLight?.({ intensity: event.value })
+                }
+              }}
+            />
+          </label>
+
+          <label className="scene-properties-field">
+            <span>Colour</span>
+            <input
+              id="scene-light-color"
+              type="color"
+              className="scene-properties-color"
+              value={light.color}
+              onChange={event => onChangeLight?.({ color: event.target.value })}
+            />
+          </label>
+
+          <VectorField
+            label="Position"
+            unit="m"
+            value={light.position}
+            step={0.1}
+            onChange={value => onChangeLight?.({ position: value })}
+          />
+
+          {light.type === 'directional' || light.type === 'spot' ? (
+            <VectorField
+              label="Aim at"
+              unit="m"
+              value={light.target ?? { x: 0, y: 0, z: 0 }}
+              step={0.1}
+              onChange={value => onChangeLight?.({ target: value })}
+            />
+          ) : null}
+        </div>
+      </div>
+    )
+  }
+
   if (!node) {
     return (
       <div className="scene-properties">

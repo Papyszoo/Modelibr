@@ -154,6 +154,18 @@ describe('SceneList - creating a scene', () => {
     expect(scenes.createScene).not.toHaveBeenCalled()
   })
 
+  it('opens with the name field focused and no validation error', async () => {
+    // Regression: PrimeReact's Dialog focuses its close button when it shows,
+    // which blurred the auto-focused name field and marked it touched - so the
+    // dialog declared "Name is required." the moment it opened, before the
+    // user had typed anything.
+    renderWithProviders(<SceneList onOpenScene={onOpenScene} />)
+    await userEvent.click(await screen.findByTestId('scene-list-new'))
+
+    expect(screen.getByLabelText('Name')).toHaveFocus()
+    expect(screen.queryByTestId('scene-name-error')).not.toBeInTheDocument()
+  })
+
   it('shows an inline reason when the name is left empty', async () => {
     // Regression: the Create button was simply disabled with no explanation of
     // why, so an empty name read as a broken button.

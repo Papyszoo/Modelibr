@@ -1,4 +1,8 @@
-import type { SceneDocument, SceneNode } from '@/features/scenes/types'
+import type {
+  SceneDocument,
+  SceneLight,
+  SceneNode,
+} from '@/features/scenes/types'
 import {
   SCENE_HISTORY_LIMIT,
   useSceneEditorStore,
@@ -217,6 +221,27 @@ describe('sceneEditorStore', () => {
     useSceneEditorStore.getState().removeNode('lamp')
 
     expect(useSceneEditorStore.getState().selectedNodeId).toBeNull()
+  })
+
+  it('keeps a selected light in the draft and clears it when the light is removed', () => {
+    // The inspector edits the light the draft says is selected; a selection
+    // left pointing at a removed light would show it forever.
+    useSceneEditorStore.getState().open(1, makeDocument(), 1)
+    const light: SceneLight = {
+      id: 'key',
+      type: 'directional',
+      position: { x: 0, y: 5, z: 0 },
+      intensity: 1,
+      color: '#ffffff',
+    }
+    useSceneEditorStore.getState().setLight(light)
+    useSceneEditorStore.getState().selectLight('key')
+
+    expect(useSceneEditorStore.getState().selectedLightId).toBe('key')
+
+    useSceneEditorStore.getState().removeLight('key')
+
+    expect(useSceneEditorStore.getState().selectedLightId).toBeNull()
   })
 
   it('upserts a light by id instead of stacking a second one', () => {

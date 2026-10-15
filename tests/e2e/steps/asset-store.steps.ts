@@ -2,6 +2,10 @@ import { createBdd } from "playwright-bdd";
 import { expect, type Request } from "@playwright/test";
 import { getScenarioState } from "../fixtures/shared-state";
 import {
+    navigateToAppClean,
+    openModelViewer,
+} from "../helpers/navigation-helper";
+import {
     AssetStorePage,
     STORE_FIXTURE_EMAIL,
     STORE_FIXTURE_PASSWORD,
@@ -168,6 +172,17 @@ Then(
         console.log(
             `[Assert] Model "${modelName}" is in category "${categoryName}" (id ${category.id})`,
         );
+    },
+);
+
+When(
+    "I open the imported model viewer for {string}",
+    async ({ page }, modelName: string) => {
+        // The imported model is on the server, not in this scenario's shared
+        // state - this opens its viewer by name straight from the model list,
+        // which is the surface a user sees the import land on.
+        await navigateToAppClean(page);
+        await openModelViewer(page, modelName);
     },
 );
 

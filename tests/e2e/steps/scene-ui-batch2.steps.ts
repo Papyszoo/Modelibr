@@ -226,6 +226,18 @@ Then(
     },
 );
 
+Then("no scene node should be flagged as overlapping", async ({ page }) => {
+    // The server's overlap classification as the hierarchy shows it. A node
+    // dropped inside a wide neighbour is the regression: placement used to step
+    // by the new node's own width only, so a blockout box landed inside the
+    // model beside it and the pair was reported as an overlap nobody made.
+    await expect(
+        page
+            .locator('[data-testid="scene-node-row"]')
+            .getByText("overlapping"),
+    ).toHaveCount(0);
+});
+
 Then(
     "the stored scene document named {string} should name its first node {string}",
     async ({ page }, sceneName: string, nodeName: string) => {
@@ -250,6 +262,22 @@ When("I add a light from the scene editor", async ({ page }) => {
         .getByRole("button", { name: "Light" })
         .click();
 });
+
+When(
+    "I set the selected light's intensity to {float}",
+    async ({ page }, value: number) => {
+        await new ScenesPage(page).setLightIntensity(value);
+    },
+);
+
+Then(
+    "the stored scene document named {string} should hold a light of intensity {float}",
+    async ({ page }, sceneName: string, intensity: number) => {
+        const view = await fetchSceneByName(page, sceneName);
+        expect(view.document.lights).toHaveLength(1);
+        expect(view.document.lights[0].intensity).toBe(intensity);
+    },
+);
 
 Then(
     "the scene editor should report {int} light(s)",
