@@ -327,6 +327,22 @@ async function confirmAndQuit() {
   }
 }
 
+// Applies the two desktop-only options that need Electron APIs rather than
+// just the JSON config: the OS login item and the updater's auto-download
+// behaviour. Both are live-applied - neither is restart-required. Linux has no
+// login-item support in Electron, so only macOS/Windows set it.
+function applyRuntimeOptions(config) {
+  if (!config) {
+    return
+  }
+
+  if (process.platform === 'darwin' || process.platform === 'win32') {
+    app.setLoginItemSettings({ openAtLogin: config.startOnLogin === true })
+  }
+
+  updateManager?.setAutoDownload(config.autoDownloadUpdates === true)
+}
+
 function registerIpc() {
   ipcMain.handle('modelibr:get-status', async () => {
     if (!runtimeManager || bootPhase === 'starting') {
@@ -448,6 +464,8 @@ function registerIpc() {
     // serving their active ports until a relaunch, so the snapshot/URLs stay
     // valid. hasPendingRestart() then reports the desired-vs-active gap.
     runtimeManager.updateConfig(saved)
+    // Login item + updater auto-download apply live.
+    applyRuntimeOptions(saved)
     // If the data folder changed, queue a move so the next launch brings the
     // existing uploads/database into the new location (kept on the running app's
     // current folder until then).
@@ -563,6 +581,8 @@ async function bootstrap() {
     openExternal: url => void shell.openExternal(url),
     log: runtimeLog,
     onChange: () => refreshTray(),
+    // The desktop option from native-runtime.json; live-changeable later.
+    autoDownloadUpdates: config.autoDownloadUpdates === true,
     // Shut the runtime down ourselves before electron-updater quits the app.
     // Leaving it to `before-quit` would preventDefault the quit and finish with
     // app.exit(0), which skips `will-quit` - where the AppImage install runs.
@@ -571,6 +591,10 @@ async function bootstrap() {
       await shutdown()
     },
   })
+
+  // Apply the stored login-item preference on every launch; the updater option
+  // is already wired above.
+  applyRuntimeOptions(config)
 
   registerIpc()
   try {
@@ -600,6 +624,7 @@ async function bootstrap() {
       configPath,
       runtimeManager,
       log: runtimeLog,
+      onRuntimeOptionsChanged: applyRuntimeOptions,
     })
 
     bootPhase = 'ready'

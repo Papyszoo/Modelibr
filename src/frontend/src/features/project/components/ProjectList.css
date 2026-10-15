@@ -14,6 +14,10 @@
 .project-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  /* Same trap as .pack-grid: the card clips its overflow, so its automatic
+     minimum height is 0 and the rows would be compressed into the container
+     height instead of scrolling. */
+  grid-auto-rows: max-content;
   gap: 1.5rem;
   padding: 1rem 0;
   overflow-y: auto;
@@ -97,7 +101,8 @@
 
 .project-grid-card-stats {
   display: flex;
-  gap: 1rem;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
   margin-top: auto;
   padding-top: 0.5rem;
   border-top: 1px solid var(--surface-border);

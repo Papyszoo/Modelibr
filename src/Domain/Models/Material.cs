@@ -35,6 +35,13 @@ public class Material : AggregateRoot
     public MaterialParameters Parameters { get; private set; } = MaterialParameters.Default;
 
     /// <summary>
+    /// The validated v1 effects document, serialized as camelCase JSON, or null when the
+    /// material has no effects. One jsonb document rather than rows: effects are authored
+    /// and rendered as a unit, and the preview and the Godot export read the same numbers.
+    /// </summary>
+    public string? EffectsJson { get; private set; }
+
+    /// <summary>
     /// Geometry the preview thumbnail is rendered on ("sphere", "box", "cylinder",
     /// "torus", "plane"). Matches TextureSet's field so one generator serves both.
     /// A parameters-only material still needs a thumbnail - it is how you shop for it.
@@ -151,6 +158,29 @@ public class Material : AggregateRoot
     public void UpdatePreviewGeometryType(string? previewGeometryType, DateTime updatedAt)
     {
         PreviewGeometryType = NormalizePreviewGeometry(previewGeometryType);
+        UpdatedAt = updatedAt;
+    }
+
+    /// <summary>
+    /// Stores an already-validated v1 effects document. Null or empty is refused - use
+    /// <see cref="ClearEffects"/> to remove effects, so "set nothing" and "set an empty
+    /// string" cannot be confused.
+    /// </summary>
+    public void SetEffects(string? effectsJson, DateTime updatedAt)
+    {
+        if (string.IsNullOrWhiteSpace(effectsJson))
+            throw new ArgumentException(
+                "Material effects cannot be null or empty. Use ClearEffects to remove them.",
+                nameof(effectsJson));
+
+        EffectsJson = effectsJson;
+        UpdatedAt = updatedAt;
+    }
+
+    /// <summary>Removes the effects document; the material renders with its scalar parameters only.</summary>
+    public void ClearEffects(DateTime updatedAt)
+    {
+        EffectsJson = null;
         UpdatedAt = updatedAt;
     }
 

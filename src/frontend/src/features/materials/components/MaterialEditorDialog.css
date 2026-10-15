@@ -1,13 +1,21 @@
 .material-editor {
   display: grid;
-  grid-template-columns: 168px 1fr;
+  /* The preview matches the grid tiles; minmax(0, 1fr) lets the fields column
+     shrink instead of pushing the dialog into horizontal scroll. */
+  grid-template-columns: 240px minmax(0, 1fr);
   gap: var(--mod-space-md);
   align-items: start;
 }
 
-.material-editor-preview {
+.material-editor-preview-pane {
   position: sticky;
   top: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--mod-space-sm);
+}
+
+.material-editor-preview {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -17,13 +25,21 @@
   overflow: hidden;
 }
 
-.material-editor-fields {
+.material-editor-preview-inputs {
   display: flex;
   flex-direction: column;
   gap: var(--mod-space-xs);
 }
 
-.material-editor-fields label {
+.material-editor-fields {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mod-space-xs);
+  min-width: 0;
+}
+
+.material-editor-fields label,
+.material-editor-preview-inputs label {
   font-size: var(--mod-text-xs);
   font-weight: var(--mod-font-weight-medium);
   color: var(--text-color-secondary);
@@ -79,6 +95,98 @@
 
 .material-editor-check label {
   margin: 0;
+}
+
+.material-editor-section-title {
+  font-size: var(--mod-text-xs);
+  font-weight: var(--mod-font-weight-medium);
+  color: var(--text-color-secondary);
+}
+
+/* Hint under a slider: muted and normal weight so it reads as help, not a label. */
+.material-editor-hint {
+  font-size: var(--mod-text-xs);
+  font-weight: var(--mod-font-weight-regular);
+  color: var(--text-color-secondary);
+}
+
+.material-editor-effects {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mod-space-sm);
+  padding-top: var(--mod-space-sm);
+  border-top: 1px solid var(--surface-border);
+}
+
+.material-editor-effect {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mod-space-xs);
+  padding: var(--mod-space-sm);
+  border: 1px solid var(--surface-border);
+  border-radius: var(--mod-radius-lg);
+}
+
+.material-editor-effect-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.material-editor-effect-title {
+  font-size: var(--mod-text-xs);
+  font-weight: var(--mod-font-weight-medium);
+  color: var(--text-color);
+}
+
+.material-editor-effect-param {
+  display: flex;
+  flex-direction: column;
+}
+
+.material-editor-driver {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--mod-space-sm);
+  padding-left: var(--mod-space-sm);
+}
+
+.material-editor-driver label {
+  font-size: var(--mod-text-xs);
+  color: var(--text-color-secondary);
+  white-space: nowrap;
+}
+
+.material-editor-driver-select {
+  min-width: 96px;
+}
+
+/* Match the compact x scale input beside it. */
+.material-editor-driver-select .p-dropdown-label {
+  padding: 2px var(--mod-space-xs);
+  font-size: var(--mod-text-xs);
+}
+
+.material-editor-driver-select .p-dropdown-trigger {
+  width: 1.5rem;
+  font-size: var(--mod-text-xs);
+}
+
+.material-editor-driver-scale {
+  width: 72px;
+  padding: 2px var(--mod-space-xs);
+  font-size: var(--mod-text-xs);
+  color: var(--text-color);
+  background: var(--surface-card);
+  border: 1px solid var(--surface-border);
+  border-radius: var(--mod-radius-sm);
+}
+
+.material-editor-error {
+  margin: 0;
+  font-size: var(--mod-text-xs);
+  color: var(--mod-color-danger);
 }
 
 @media (max-width: 640px) {

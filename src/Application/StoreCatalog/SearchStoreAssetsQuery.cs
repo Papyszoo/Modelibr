@@ -60,10 +60,6 @@ internal sealed class SearchStoreAssetsQueryHandler
         CancellationToken cancellationToken)
     {
         var storeUrl = _catalog.StoreUrl;
-        if (string.IsNullOrWhiteSpace(storeUrl))
-        {
-            return Result.Failure<StoreCatalogSearchResponse>(StoreCatalogErrors.NotConfigured);
-        }
 
         var page = Math.Max(query.Page, 1);
         var pageSize = Math.Clamp(query.PageSize, 1, MaxPageSize);

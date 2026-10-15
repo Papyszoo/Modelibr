@@ -1,9 +1,12 @@
+import type {
+  SceneDocument,
+  SceneLight,
+  SceneNode,
+} from '@/features/scenes/types'
 import {
   SCENE_HISTORY_LIMIT,
   useSceneEditorStore,
 } from '@/stores/sceneEditorStore'
-
-import type { SceneDocument, SceneNode } from '@/features/scenes/types'
 
 /**
  * The undo stack the old stage editor never had.
@@ -37,7 +40,12 @@ function makeNode(id: string): SceneNode {
 
 describe('sceneEditorStore', () => {
   beforeEach(() => {
+    // `close()` forgets only the ACTIVE scene's session, which is the product
+    // behaviour and not a reset. The store is a module singleton, so the session
+    // map is cleared outright here - otherwise one test's scenes outlive it and a
+    // count assertion measures the wrong thing.
     useSceneEditorStore.getState().close()
+    useSceneEditorStore.setState({ drafts: {} })
   })
 
   it('opens a scene with clean history', () => {
@@ -182,20 +190,24 @@ describe('sceneEditorStore', () => {
     // The same trap the dangling anchor above fixes: a slot naming a node that is
     // not there fails the whole save, for a node the user has already deleted.
     const lamp: SceneNode = { ...makeNode('lamp-1'), slotId: 'streetlight' }
-    useSceneEditorStore.getState().open(1, {
-      ...makeDocument([lamp]),
-      slots: [
-        {
-          id: 'streetlight',
-          candidates: [
-            {
-              id: 'A',
-              asset: { assetType: 'Model', assetId: 1, versionId: 1 },
-            },
-          ],
-        },
-      ],
-    })
+    useSceneEditorStore.getState().open(
+      1,
+      {
+        ...makeDocument([lamp]),
+        slots: [
+          {
+            id: 'streetlight',
+            candidates: [
+              {
+                id: 'A',
+                asset: { assetType: 'Model', assetId: 1, versionId: 1 },
+              },
+            ],
+          },
+        ],
+      },
+      1
+    )
 
     useSceneEditorStore.getState().removeNode('lamp-1')
 
@@ -209,6 +221,27 @@ describe('sceneEditorStore', () => {
     useSceneEditorStore.getState().removeNode('lamp')
 
     expect(useSceneEditorStore.getState().selectedNodeId).toBeNull()
+  })
+
+  it('keeps a selected light in the draft and clears it when the light is removed', () => {
+    // The inspector edits the light the draft says is selected; a selection
+    // left pointing at a removed light would show it forever.
+    useSceneEditorStore.getState().open(1, makeDocument(), 1)
+    const light: SceneLight = {
+      id: 'key',
+      type: 'directional',
+      position: { x: 0, y: 5, z: 0 },
+      intensity: 1,
+      color: '#ffffff',
+    }
+    useSceneEditorStore.getState().setLight(light)
+    useSceneEditorStore.getState().selectLight('key')
+
+    expect(useSceneEditorStore.getState().selectedLightId).toBe('key')
+
+    useSceneEditorStore.getState().removeLight('key')
+
+    expect(useSceneEditorStore.getState().selectedLightId).toBeNull()
   })
 
   it('upserts a light by id instead of stacking a second one', () => {
@@ -227,6 +260,200 @@ describe('sceneEditorStore', () => {
     const lights = useSceneEditorStore.getState().document?.lights ?? []
     expect(lights).toHaveLength(1)
     expect(lights[0].intensity).toBe(2)
+  })
+
+  it('keeps one unsaved draft per scene when switching between scenes', () => {
+    // The regression this guards: with one tab per scene, looking at another
+    // scene must not throw away the first one's unsaved edits. Before drafts were
+    // keyed by scene, `openScene` reset every field and the work was only ever in
+    // the browser - unrecoverable.
+    useSceneEditorStore.getState().open(1, makeDocument(), 1)
+    useSceneEditorStore.getState().addNode(makeNode('a'))
+
+    useSceneEditorStore.getState().open(2, makeDocument(), 7)
+    useSceneEditorStore.getState().addNode(makeNode('b'))
+
+    expect(
+      useSceneEditorStore.getState().document?.nodes.map(n => n.id)
+    ).toEqual(['b'])
+
+    // Back to scene 1: its own draft, with its own node and its own revision.
+    useSceneEditorStore.getState().openScene(1)
+    expect(
+      useSceneEditorStore.getState().document?.nodes.map(n => n.id)
+    ).toEqual(['a'])
+    expect(useSceneEditorStore.getState().isDirty).toBe(true)
+    expect(useSceneEditorStore.getState().baseRevision).toBe(1)
+
+    // Undo history belongs to the scene it was made in, not to whichever tab is
+    // currently mounted.
+    expect(useSceneEditorStore.getState().canUndo()).toBe(true)
+  })
+
+  it('starts a scene with no stored draft from a clean state', () => {
+    useSceneEditorStore.getState().open(1, makeDocument(), 1)
+    useSceneEditorStore.getState().addNode(makeNode('a'))
+
+    useSceneEditorStore.getState().openScene(99)
+
+    expect(useSceneEditorStore.getState().openSceneId).toBe(99)
+    expect(useSceneEditorStore.getState().document).toBeNull()
+    expect(useSceneEditorStore.getState().isDirty).toBe(false)
+  })
+
+  it('close forgets the draft, so reopening does not resurrect abandoned edits', () => {
+    useSceneEditorStore.getState().open(1, makeDocument(), 1)
+    useSceneEditorStore.getState().addNode(makeNode('a'))
+
+    // Back is the explicit "forget this" gesture.
+    useSceneEditorStore.getState().close()
+    useSceneEditorStore.getState().openScene(1)
+
+    expect(useSceneEditorStore.getState().document).toBeNull()
+    expect(useSceneEditorStore.getState().isDirty).toBe(false)
+  })
+
+  it('keeps the editor-only state per scene, not per component', () => {
+    // Error banners, the candidate preview, the blockout override and the node
+    // failures were all component useState, which the dock unmounts on every tab
+    // switch. Coming back to a scene used to clear the error you were reading and
+    // drop the view you had chosen - the editor looked like it had forgotten.
+    useSceneEditorStore.getState().open(1, makeDocument(), 1)
+    useSceneEditorStore.getState().setSaveError('The scene could not be saved.')
+    useSceneEditorStore.getState().setBlockoutOverride(true)
+    useSceneEditorStore.getState().recordNodeFailure('lamp', 'texture 404')
+
+    useSceneEditorStore.getState().open(2, makeDocument(), 1)
+
+    // Scene 2 is a different scene: none of scene 1's state leaks into it.
+    expect(useSceneEditorStore.getState().saveError).toBeNull()
+    expect(useSceneEditorStore.getState().blockoutOverride).toBeNull()
+    expect(useSceneEditorStore.getState().failedNodes.size).toBe(0)
+
+    useSceneEditorStore.getState().openScene(1)
+    expect(useSceneEditorStore.getState().saveError).toBe(
+      'The scene could not be saved.'
+    )
+    expect(useSceneEditorStore.getState().blockoutOverride).toBe(true)
+    expect(useSceneEditorStore.getState().failedNodes.get('lamp')).toBe(
+      'texture 404'
+    )
+  })
+
+  it('does not replace the node-failure map when the message is unchanged', () => {
+    // The viewport re-reports a failed resource on every frame. Producing a new
+    // Map each time re-renders the hierarchy for no reason at all.
+    useSceneEditorStore.getState().open(1, makeDocument(), 1)
+    useSceneEditorStore.getState().recordNodeFailure('lamp', 'texture 404')
+    const first = useSceneEditorStore.getState().failedNodes
+
+    useSceneEditorStore.getState().recordNodeFailure('lamp', 'texture 404')
+
+    expect(useSceneEditorStore.getState().failedNodes).toBe(first)
+
+    useSceneEditorStore.getState().recordNodeFailure('lamp', 'texture 500')
+    expect(useSceneEditorStore.getState().failedNodes).not.toBe(first)
+    expect(useSceneEditorStore.getState().failedNodes.get('lamp')).toBe(
+      'texture 500'
+    )
+  })
+
+  it('releases a session so repeated open/close does not grow the map', () => {
+    // A session map that only ever grows is a leak that outlives the tabs it was
+    // opened for, and keeps whole scene documents in memory after the user is
+    // done with them.
+    for (let round = 0; round < 5; round++) {
+      useSceneEditorStore.getState().openScene(100 + round)
+      useSceneEditorStore
+        .getState()
+        .open(100 + round, makeDocument([makeNode('n')]), 1)
+      useSceneEditorStore.getState().discardDraft(100 + round)
+    }
+
+    expect(useSceneEditorStore.getState().sessionCount()).toBe(0)
+  })
+
+  it('clears one node failure without touching the others', () => {
+    useSceneEditorStore.getState().open(1, makeDocument(), 1)
+    useSceneEditorStore.getState().recordNodeFailure('lamp', 'texture 404')
+    useSceneEditorStore.getState().recordNodeFailure('chair', 'mesh 500')
+
+    useSceneEditorStore.getState().clearNodeFailure('lamp')
+
+    const failed = useSceneEditorStore.getState().failedNodes
+    expect(failed.has('lamp')).toBe(false)
+    expect(failed.get('chair')).toBe('mesh 500')
+  })
+
+  it('discardDraft drops one scene without disturbing the other', () => {
+    useSceneEditorStore.getState().open(1, makeDocument(), 1)
+    useSceneEditorStore.getState().addNode(makeNode('a'))
+    useSceneEditorStore.getState().open(2, makeDocument(), 2)
+    useSceneEditorStore.getState().addNode(makeNode('b'))
+
+    // Closing the tab for scene 2 while scene 1's draft is on screen.
+    useSceneEditorStore.getState().discardDraft(2)
+
+    useSceneEditorStore.getState().openScene(1)
+    expect(
+      useSceneEditorStore.getState().document?.nodes.map(n => n.id)
+    ).toEqual(['a'])
+
+    useSceneEditorStore.getState().openScene(2)
+    expect(useSceneEditorStore.getState().document).toBeNull()
+  })
+
+  it('resets the flat projection when the discarded scene is the active one', () => {
+    // Regression: discardDraft deleted only the draft entry, so a reopen (with
+    // no other scene having replaced the projection) early-returned on the equal
+    // scene id and showed the discarded edits as if they were still live.
+    useSceneEditorStore.getState().open(1, makeDocument(), 1)
+    useSceneEditorStore.getState().addNode(makeNode('a'))
+
+    useSceneEditorStore.getState().discardDraft(1)
+
+    expect(useSceneEditorStore.getState().sceneId).toBeNull()
+    expect(useSceneEditorStore.getState().document).toBeNull()
+    expect(useSceneEditorStore.getState().isDirty).toBe(false)
+
+    // Reopening must find nothing to restore.
+    useSceneEditorStore.getState().openScene(1)
+    expect(useSceneEditorStore.getState().document).toBeNull()
+  })
+
+  it('scopes an edit to the scene it names, not the flat projection', () => {
+    // The regression: two scene tabs share the store. Each names its own scene
+    // with every write, so an edit in a background split panel must not land in
+    // whichever draft the flat projection happens to point at.
+    useSceneEditorStore.getState().open(1, makeDocument(), 1)
+    useSceneEditorStore.getState().open(2, makeDocument(), 1)
+
+    useSceneEditorStore.getState().addNode(makeNode('only-in-one'), 1)
+
+    expect(
+      useSceneEditorStore.getState().drafts[1].document?.nodes.map(n => n.id)
+    ).toEqual(['only-in-one'])
+    expect(
+      useSceneEditorStore.getState().drafts[2].document?.nodes
+    ).toHaveLength(0)
+    expect(useSceneEditorStore.getState().drafts[1].isDirty).toBe(true)
+    expect(useSceneEditorStore.getState().drafts[2].isDirty).toBe(false)
+  })
+
+  it('writes a non-active scene without moving the flat projection', () => {
+    useSceneEditorStore.getState().open(1, makeDocument(), 1)
+    useSceneEditorStore.getState().open(2, makeDocument(), 1)
+    // Scene 2 is the flat projection; write scene 1.
+    useSceneEditorStore.getState().selectNode('lamp', 1)
+    useSceneEditorStore.getState().setSaveError('scene 1 failed', 1)
+
+    expect(useSceneEditorStore.getState().drafts[1].selectedNodeId).toBe('lamp')
+    expect(useSceneEditorStore.getState().drafts[1].saveError).toBe(
+      'scene 1 failed'
+    )
+    // The flat projection still describes scene 2.
+    expect(useSceneEditorStore.getState().sceneId).toBe(2)
+    expect(useSceneEditorStore.getState().saveError).toBeNull()
   })
 
   it('ignores an edit that returns the same document', () => {

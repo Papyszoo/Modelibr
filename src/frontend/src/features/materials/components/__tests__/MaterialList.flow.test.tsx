@@ -1,4 +1,4 @@
-import { screen, waitFor } from '@testing-library/react'
+import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
 import { client } from '@/lib/apiBase'
@@ -7,8 +7,15 @@ import { renderWithProviders } from '@/test/renderWithProviders'
 import { type MaterialDto } from '../../api/materialApi'
 import { MaterialList } from '../MaterialList'
 
+// Effects previews mount a WebGL canvas; this flow test is about the request
+// the editor sends, not what the preview draws.
+jest.mock('../MaterialEffectPreview', () => ({
+  MaterialEffectPreview: () => <div data-testid="material-effect-preview" />,
+}))
+
 const mockGet = client.get as jest.Mock
 const mockPost = client.post as jest.Mock
+const mockPut = client.put as jest.Mock
 const mockDelete = client.delete as jest.Mock
 
 function materialDto(
@@ -63,6 +70,7 @@ beforeEach(() => {
     return Promise.resolve({ data: { materials: [brass, plaster] } })
   })
   mockPost.mockResolvedValue({ data: { id: 3, name: 'New material' } })
+  mockPut.mockResolvedValue({ data: brass })
   mockDelete.mockResolvedValue({ data: null })
 })
 
@@ -79,6 +87,32 @@ describe('MaterialList', () => {
     expect(screen.getByText(/dielectric · rough 0\.95/)).toBeInTheDocument()
   })
 
+  // Regression: right-click on a material card went straight to a delete
+  // confirm. Materials are recycled (soft-deleted), so the card menu must offer
+  // Recycle with an Undo restore - never a destructive confirm. This mirrors
+  // the model card menu.
+  it('recycles from the context menu without a confirm and offers Undo', async () => {
+    const user = userEvent.setup()
+    renderWithProviders(<MaterialList />)
+    await screen.findByText('Brushed Brass')
+
+    fireEvent.contextMenu(screen.getAllByTestId('material-tile')[0])
+
+    expect(
+      screen.queryByTestId('material-delete-confirm')
+    ).not.toBeInTheDocument()
+
+    await user.click(await screen.findByText('Recycle'))
+    await waitFor(() => expect(mockDelete).toHaveBeenCalledWith('/materials/1'))
+
+    // The success toast carries an Undo affordance; pressing it restores the
+    // material from the recycle bin instead of leaving the user to find it.
+    await user.click(await screen.findByTestId('material-recycle-undo'))
+    await waitFor(() =>
+      expect(mockPost).toHaveBeenCalledWith('/recycled/material/1/restore')
+    )
+  })
+
   it('sends the typed search to the server and renders the narrowed result', async () => {
     // The search must reach the query key. If it were held in local state
     // without feeding the query, the list would never change and this goes red.
@@ -86,6 +120,8 @@ describe('MaterialList', () => {
     renderWithProviders(<MaterialList />)
     await screen.findByText('Brushed Brass')
 
+    // The search lives in the shared collapsible panel like every other list.
+    await user.click(screen.getByRole('button', { name: 'Search' }))
     await user.type(screen.getByPlaceholderText('Search materials...'), 'brass')
 
     await waitFor(() => {
@@ -119,6 +155,47 @@ describe('MaterialList', () => {
     expect(body.parameters).not.toHaveProperty('baseColorR')
     expect(body.parameters).not.toHaveProperty('baseColorG')
     expect(body.parameters).not.toHaveProperty('baseColorB')
+  })
+
+  it('confirms a saved material with a success toast', async () => {
+    // Regression: the editor closed silently after a save, so a save could not
+    // be told apart from a cancel.
+    const user = userEvent.setup()
+    renderWithProviders(<MaterialList />)
+    await screen.findByText('Brushed Brass')
+
+    await user.click(screen.getByTestId('material-list-new'))
+    await user.type(screen.getByTestId('material-name-input'), 'Rubber')
+    await user.click(screen.getByTestId('material-editor-save'))
+
+    expect(await screen.findByText('Material created')).toBeInTheDocument()
+  })
+
+  it('does not clear a material&apos;s effects when saving the editor', async () => {
+    // Effects are edited elsewhere; the update request must omit them rather
+    // than send effects: null, which the server would read as "remove".
+    const jelly = materialDto(1, 'Wobbly Jelly')
+    jelly.effects = {
+      version: 1,
+      effects: [{ type: 'rim', color: '#ffffff', power: 3, intensity: 1 }],
+    }
+    mockGet.mockResolvedValue({ data: { materials: [jelly] } })
+
+    const user = userEvent.setup()
+    renderWithProviders(<MaterialList />)
+    await screen.findByText('Wobbly Jelly')
+
+    await user.click(screen.getByTestId('material-tile'))
+    await user.click(screen.getByTestId('material-editor-save'))
+
+    await waitFor(() => expect(mockPut).toHaveBeenCalled())
+
+    const [url, body] = mockPut.mock.calls.at(-1) as [
+      string,
+      Record<string, unknown>,
+    ]
+    expect(url).toBe('/materials/1')
+    expect(body).not.toHaveProperty('effects')
   })
 
   it('refetches the list after a create so the new material appears', async () => {
@@ -171,5 +248,144 @@ describe('MaterialList', () => {
     await user.click(retry)
 
     expect(await screen.findByText('Brushed Brass')).toBeInTheDocument()
+  })
+})
+
+function dropdownPanel(): HTMLElement {
+  // PrimeReact keeps a closed panel mounted until its exit transition ends, so
+  // the open one is the most recently appended. Take the last.
+  const panels = document.querySelectorAll('.p-dropdown-panel')
+  const panel = panels[panels.length - 1]
+  if (!panel) throw new Error('dropdown panel not open')
+  return panel as HTMLElement
+}
+
+const jellyDocument = {
+  version: 1 as const,
+  effects: [
+    {
+      type: 'jelly_wobble' as const,
+      amplitude: 0.03,
+      frequency: 1.5,
+      waveScale: 4,
+      seed: 0,
+    },
+  ],
+}
+
+describe('MaterialList effects editor', () => {
+  it('offers only the effect types not already present, and shows preview inputs with effects', async () => {
+    // The add-effect list is a set of four one-shot types; re-offering one that
+    // is already in the document would let the user build an invalid document.
+    const wobbly = materialDto(1, 'Wobbly Jelly')
+    wobbly.effects = jellyDocument
+    mockGet.mockResolvedValue({ data: { materials: [wobbly] } })
+
+    const user = userEvent.setup()
+    renderWithProviders(<MaterialList />)
+    await screen.findByText('Wobbly Jelly')
+    await user.click(screen.getByTestId('material-tile'))
+
+    expect(screen.getByTestId('material-preview-inputs')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByTestId('material-add-effect'))
+    const panel = dropdownPanel()
+    expect(within(panel).queryByText('Jelly wobble')).not.toBeInTheDocument()
+    expect(within(panel).getByText('Rim glow')).toBeInTheDocument()
+    expect(within(panel).getByText('Translucency')).toBeInTheDocument()
+    expect(within(panel).getByText('Emission pulse')).toBeInTheDocument()
+  })
+
+  it('sends the full effects document when an effect is added, edited and driven', async () => {
+    // The changed case: the payload must carry the whole document, including
+    // the edited param and the driver binding, or the edit is silently lost.
+    const user = userEvent.setup()
+    renderWithProviders(<MaterialList />)
+    await screen.findByText('Brushed Brass')
+    await user.click(screen.getAllByTestId('material-tile')[0])
+
+    expect(
+      screen.queryByTestId('material-preview-inputs')
+    ).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByTestId('material-add-effect'))
+    fireEvent.click(within(dropdownPanel()).getByText('Jelly wobble'))
+
+    // One keyboard step on amplitude: 0.03 + 0.005.
+    fireEvent.keyDown(
+      within(screen.getByTestId('effect-jelly_wobble-amplitude-row')).getByRole(
+        'slider'
+      ),
+      { key: 'ArrowRight' }
+    )
+
+    // Bind amplitude to speed. A fresh binding must carry a scale that already
+    // moves the param: (0.5 - 0) * 0.5 / 20 = 0.0125.
+    fireEvent.click(screen.getByTestId('effect-jelly_wobble-amplitude-driver'))
+    fireEvent.click(within(dropdownPanel()).getByText('Speed'))
+    expect(
+      screen.getByTestId('effect-jelly_wobble-amplitude-scale')
+    ).toHaveValue('0.0125')
+
+    // Then set the per-unit scale by hand.
+    fireEvent.change(
+      screen.getByTestId('effect-jelly_wobble-amplitude-scale'),
+      { target: { value: '0.02' } }
+    )
+
+    expect(screen.getByTestId('material-preview-inputs')).toBeInTheDocument()
+
+    await user.click(screen.getByTestId('material-editor-save'))
+    await waitFor(() => expect(mockPut).toHaveBeenCalled())
+
+    const [, body] = mockPut.mock.calls.at(-1) as [
+      string,
+      {
+        effects?: {
+          version: number
+          effects: Array<{
+            type: string
+            amplitude: number
+            drivers?: Record<string, { input: string; scale: number }>
+          }>
+        }
+        clearEffects?: boolean
+      },
+    ]
+
+    expect(body).not.toHaveProperty('clearEffects')
+    expect(body.effects?.version).toBe(1)
+    const effects = body.effects?.effects ?? []
+    expect(effects).toHaveLength(1)
+    expect(effects[0].type).toBe('jelly_wobble')
+    expect(effects[0].amplitude).toBeCloseTo(0.035)
+    expect(effects[0].drivers?.amplitude).toEqual({
+      input: 'speed',
+      scale: 0.02,
+    })
+  })
+
+  it('sends clearEffects when every stored effect is removed', async () => {
+    // The cleared case: removing all the effects a material had is a delete,
+    // not an "empty document" that leaves the stored shader in place.
+    const wobbly = materialDto(1, 'Wobbly Jelly')
+    wobbly.effects = jellyDocument
+    mockGet.mockResolvedValue({ data: { materials: [wobbly] } })
+
+    const user = userEvent.setup()
+    renderWithProviders(<MaterialList />)
+    await screen.findByText('Wobbly Jelly')
+    await user.click(screen.getByTestId('material-tile'))
+
+    await user.click(screen.getByTestId('material-effect-jelly_wobble-remove'))
+    await user.click(screen.getByTestId('material-editor-save'))
+
+    await waitFor(() => expect(mockPut).toHaveBeenCalled())
+    const [, body] = mockPut.mock.calls.at(-1) as [
+      string,
+      Record<string, unknown>,
+    ]
+    expect(body.clearEffects).toBe(true)
+    expect(body).not.toHaveProperty('effects')
   })
 })

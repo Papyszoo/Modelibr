@@ -23,6 +23,9 @@ export class UpdateManager {
     openExternal = () => {},
     log = console.log,
     onChange,
+    // The "download updates automatically" option from the runtime config.
+    // Live-changeable through setAutoDownload(); installing is always explicit.
+    autoDownloadUpdates = false,
     // Awaited immediately before quitAndInstall - see install().
     prepareForInstall = async () => {},
   } = {}) {
@@ -31,6 +34,7 @@ export class UpdateManager {
     this.openExternal = openExternal
     this.log = log
     this.onChange = onChange
+    this.autoDownloadUpdates = autoDownloadUpdates === true
     this.prepareForInstall = prepareForInstall
     this.state = {
       // idle | checking | available | downloading | downloaded | up-to-date | error
@@ -53,6 +57,18 @@ export class UpdateManager {
     return this.state.releaseUrl || RELEASES_PAGE_URL
   }
 
+  /**
+   * Applies the desktop "download updates automatically" option. Safe before
+   * or after _wire(); only affects future checks - an update already surfaced
+   * is not downloaded until the next check, and installing stays explicit.
+   */
+  setAutoDownload(enabled) {
+    this.autoDownloadUpdates = enabled === true
+    if (this.autoUpdater) {
+      this.autoUpdater.autoDownload = this.autoDownloadUpdates
+    }
+  }
+
   _wire() {
     if (this._wired) {
       return
@@ -60,7 +76,9 @@ export class UpdateManager {
     this._wired = true
 
     // Opt-in: don't pull a build down or slip it in on quit behind the user.
-    this.autoUpdater.autoDownload = false
+    // autoDownload follows the desktop option (off by default); install-on-quit
+    // is never enabled.
+    this.autoUpdater.autoDownload = this.autoDownloadUpdates
     this.autoUpdater.autoInstallOnAppQuit = false
     this.autoUpdater.logger = {
       info: msg => this.log('[ModelibrDesktop][update]', msg),

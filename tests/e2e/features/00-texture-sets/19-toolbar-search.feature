@@ -23,5 +23,9 @@ Feature: Texture Set toolbar search
     And I create a universal texture set "search_other_uni" via API
     And I switch to the "Global Materials" kind tab
     And I narrow the toolbar search to "search_match"
-    Then I should see texture set "search_match_uni" in the grid
-    And I should not see texture set "search_other_uni" in the grid
+    # Both assertions run while the filter is applied: the "see" step below narrows the
+    # grid to the full unique name and clears the search afterwards so the name filter
+    # cannot mask later steps, which would leave this one asserting against an unfiltered
+    # grid - the card it forbids is exactly what clearing brings back.
+    Then I should not see texture set "search_other_uni" in the grid
+    And I should see texture set "search_match_uni" in the grid

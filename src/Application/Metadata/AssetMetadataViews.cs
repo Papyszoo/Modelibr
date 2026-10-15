@@ -1,3 +1,5 @@
+using Application.Models;
+
 namespace Application.Metadata;
 
 /// <summary>The schema as served to a caller: every family, every field.</summary>
@@ -65,4 +67,9 @@ public sealed record AssetMetadataResponse(
     int CurrentSchemaVersion,
     IReadOnlyList<AssetMetadataValue> Fields,
     AssetMetadataCompleteness Completeness,
-    string? CategoryKind = null);
+    string? CategoryKind = null,
+    // Clips and shape keys from the raw extraction payload, the same two fields the
+    // model DTO carries: clips as {name, durationSeconds, kinds} and shape keys as
+    // {meshName, names}. Null for families that record neither.
+    IReadOnlyList<ModelAnimationDto>? Animations = null,
+    IReadOnlyList<ModelShapeKeysDto>? ShapeKeys = null);

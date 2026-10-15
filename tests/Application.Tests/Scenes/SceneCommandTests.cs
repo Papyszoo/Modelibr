@@ -216,6 +216,47 @@ public class SceneCommandTests
     }
 
     [Fact]
+    public async Task PlaceAsset_With_Animation_And_ShapeKeys_Stores_And_Returns_Them()
+    {
+        // The MCP round trip: the same command place_asset wraps writes these fields, the
+        // node view hands them back, and the stored document - what get_scene re-reads -
+        // carries them unchanged.
+        var animation = new SceneAnimation("Wave", Loop: false, Speed: 1.5, TimeOffset: 0.25);
+        var shapeKeys = new Dictionary<string, double> { ["Squash"] = 0.8 };
+
+        var result = await Place.Handle(
+            new PlaceSceneAssetCommand(
+                SceneId, SceneAssetTypes.Model, ModelId, VersionId,
+                Animation: animation, ShapeKeys: shapeKeys),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(animation, result.Value.Node.Animation);
+        Assert.Equal(0.8, result.Value.Node.ShapeKeys!["Squash"]);
+
+        var stored = SceneDocumentCodec.Parse(_scene.DocumentJson);
+        Assert.True(stored.IsSuccess);
+        var node = Assert.Single(stored.Value.Nodes);
+        Assert.Equal(animation, node.Animation);
+        Assert.Equal(0.8, node.ShapeKeys!["Squash"]);
+    }
+
+    [Fact]
+    public async Task PlaceAsset_With_An_Out_Of_Range_Speed_Is_Refused_And_Writes_Nothing()
+    {
+        var result = await Place.Handle(
+            new PlaceSceneAssetCommand(
+                SceneId, SceneAssetTypes.Model, ModelId, VersionId,
+                Animation: new SceneAnimation("Wave", Speed: 9)),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("Scene.DocumentInvalid", result.Error.Code);
+        Assert.Contains("AnimationSpeedOutOfRange", result.Error.Message);
+        Assert.Equal(1, _scene.Revision);
+    }
+
+    [Fact]
     public async Task MoveNode_Returns_The_Transform_It_Replaced()
     {
         await Place.Handle(PlaceCommand(nodeId: "lamp", position: new Vec3(1, 2, 3)), CancellationToken.None);
@@ -983,6 +1024,28 @@ public class SceneCommandTests
         Assert.Equal("shelf", moved.Value.Node.Anchor!.OnNodeId);
     }
 
+    [Fact]
+    public async Task ReSeating_A_Node_On_The_Same_Surface_Does_Not_Drift()
+    {
+        // The offset a surface records is absolute - the vector from the target's reference
+        // point to the seat - not a nudge added to whatever offset the node already carried.
+        // Adding the prior offset double-counted it, so every repeat re-seated the node
+        // further away; the only tested case was the first seating, where the offset is zero.
+        GivenSurfaces(3.0, 1.5);
+        await Place.Handle(PlaceCommand(nodeId: "shelf", groundSnap: true), CancellationToken.None);
+        await Place.Handle(
+            new PlaceSceneAssetCommand(
+                SceneId, SceneAssetTypes.Model, ModelId, VersionId, "book",
+                AnchorTo: "shelf", OnSurface: 1),
+            CancellationToken.None);
+
+        var again = await new MoveSceneNodeCommandHandler(_writer, _facts.Object, _profiles.Object, _surfaces.Object).Handle(
+            new MoveSceneNodeCommand(SceneId, "book", OnSurface: 1), CancellationToken.None);
+
+        Assert.True(again.IsSuccess);
+        Assert.Equal(1.5, again.Value.Node.Footprint!.Value.Min.Y, 6);
+    }
+
     private PlaceSceneAssetsBatchCommandHandler Batch => new(_writer, _facts.Object, _profiles.Object, _surfaces.Object);
 
     private static ScenePlacementRequest BatchEntry(
@@ -1063,6 +1126,37 @@ public class SceneCommandTests
 
         Assert.True(result.IsSuccess);
         Assert.Equal(3, result.Value.Nodes.Select(n => n.NodeId).Distinct().Count());
+    }
+
+    [Fact]
+    public async Task PlaceAssetsBatch_Carries_Each_Entries_Animation_And_Shape_Keys()
+    {
+        // Two instances of one model, each with its own performance: the batch entry must
+        // speak the same animation vocabulary place_asset does.
+        var animation = new SceneAnimation("Wave", Speed: 2, TimeOffset: 0.5);
+        var shapeKeys = new Dictionary<string, double> { ["Squash"] = 0.8 };
+
+        var result = await Batch.Handle(
+            new PlaceSceneAssetsBatchCommand(SceneId, [
+                BatchEntry("dancer") with { Animation = animation },
+                BatchEntry("statue") with { ShapeKeys = shapeKeys },
+            ]),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+
+        var dancer = result.Value.Nodes.Single(n => n.NodeId == "dancer");
+        Assert.Equal(animation, dancer.Animation);
+        Assert.Null(dancer.ShapeKeys);
+
+        var statue = result.Value.Nodes.Single(n => n.NodeId == "statue");
+        Assert.Null(statue.Animation);
+        Assert.Equal(0.8, statue.ShapeKeys!["Squash"]);
+
+        var stored = SceneDocumentCodec.Parse(_scene.DocumentJson);
+        Assert.True(stored.IsSuccess);
+        Assert.Equal(animation, stored.Value.Nodes.Single(n => n.Id == "dancer").Animation);
+        Assert.Equal(0.8, stored.Value.Nodes.Single(n => n.Id == "statue").ShapeKeys!["Squash"]);
     }
 
     [Fact]

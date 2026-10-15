@@ -5,108 +5,114 @@ description: Modelibr asset-processor (Node.js worker) conventions - config.js d
 
 # Asset processor patterns (Node.js worker)
 
-ESM (`"type": "module"`), Vitest (NOT Jest - the frontend is the inverse),
-structured winston `logger` + `withJobContext(jobId)` - never `console.log`.
-Known debt + planned refactors: prompt 24 (folder grouping), 42 (client
-factory + hygiene) in `.claude/prompts/`.
+ESM (`"type": "module"`), Vitest (NOT Jest - the frontend is the inverse).
+Structured winston `logger` + `withJobContext(jobId)` - never `console.log`.
+Rendering must be offline-safe: local Three.js/Blender, no CDN imports.
 
 ## Configuration
-- ALL runtime config lives in `config.js` (rendering, orbit, encoding,
-  thumbnail storage, blender, …). Never read `process.env` elsewhere - known
-  violations (`POLL_INTERVAL_MS` in jobProcessor, Chrome paths in
-  puppeteerRenderer) are slated for prompt 42; don't add more. New env vars
-  also go in root `.env.example`.
-- Blender + thumbnail-render settings are refreshed FROM the backend API
-  (`refreshBlenderConfigFromApi` etc.) - user-editable settings flow through
-  the DB, not env.
-- ESLint enforces an architectural boundary: `config.js` must not import
-  business logic.
+
+- ALL runtime config lives in `config.js`; never read `process.env` elsewhere -
+  known violations (`POLL_INTERVAL_MS` in jobProcessor, Chrome paths in
+  puppeteerRenderer) are accepted debt. New env vars also go in root `.env.example`.
+- Blender + thumbnail-render settings refresh FROM the backend API
+  (`refreshBlenderConfigFromApi`) - user-editable settings flow through the DB, not env.
+- ESLint enforces an architectural boundary: `config.js` must not import business logic.
 
 ## Processor architecture
-- `ProcessorRegistry` (Strategy) maps `job.assetType` → processor.
-  Registered: `Model`, `Sound`, `TextureSet`, `EnvironmentMap`,
-  `MeshAnalysis` (stub - logs not-implemented; `meshProcessor.js` documents
-  the planned shape).
-- `BaseProcessor` is the template method: `execute(job, signal)` wraps your
-  `process()` with error handling, `withJobContext` logging, and
-  `JobApiClient` callbacks. New processor = extend it, implement
-  `get processorType()` + `async process(job, jobLogger, signal)`, register
-  in the registry constructor.
-- `jobProcessor.js` dispatch goes exclusively through `ProcessorRegistry` -
-  there is no other code path; don't add one.
 
-## Job lifecycle (how work arrives and runs)
-- Delivery is belt-and-braces: SignalR push notification → worker CLAIMS via
-  `POST /thumbnail-jobs/dequeue` (backend arbitrates racing workers) →
-  local queue (cap 50; full = drop notification, fallback polling sweeps
-  later) → up to `config.maxConcurrentJobs` (default 3) run concurrently.
-- The job timeout (`processQueue` in `jobProcessor.js`) actually cancels: it
-  aborts an `AbortController` whose `signal` flows into `process()`.
-  Renderer-backed processors (Thumbnail/TextureSet/EnvironmentMap) MUST arm
-  it right after acquiring: `disarmAbort = this._armRendererAbort(signal,
-  this.rendererPool, renderer, jobLogger)`, then call `disarmAbort()` in
-  `finally` before `release()`. Skipping this reintroduces slot starvation.
-  On abort it calls `rendererPool.forceReinit(renderer)` →
-  `PuppeteerRenderer.reinitialize()` (the crash-recovery path), so the slot
-  comes back usable instead of hung.
+- `ProcessorRegistry` (Strategy) maps `job.assetType` → processor. Registered:
+  `Model`, `Sound`, `TextureSet`, `EnvironmentMap`, `Scene`, `Vfx`.
+- `BaseProcessor` is the template method: `execute(job, signal)` wraps your
+  `process()` with error handling, `withJobContext` logging, and `JobApiClient`
+  callbacks. New processor = extend it, implement `get processorType()` +
+  `async process(job, jobLogger, signal)`, register in the registry constructor.
+- `jobProcessor.js` dispatch goes exclusively through `ProcessorRegistry` - no other path.
+- `Vfx` (animated effect thumbnails) follows the scene pattern: `vfxRenderer.js`
+  drives the app's own `?render=vfx` page, stepping its clock via
+  `window.__VFX_RENDER__.setTime(t)` - no real-time playback, one VFX renderer.
+  Frames are encoded to one looping WebP with `FrameEncoderService`
+  (`frameDelayMs`, `animatedOnly`); frame count/rate limits live in
+  `config.vfxRender`.
+
+## Job lifecycle
+
+- Delivery: SignalR push notification → worker CLAIMS via
+  `POST /thumbnail-jobs/dequeue` (backend arbitrates racing workers) → local
+  queue (cap 50; full = drop notification, fallback polling sweeps later) → up to
+  `config.maxConcurrentJobs` (default 3) concurrently.
+- The job timeout (`processQueue` in `jobProcessor.js`) aborts an
+  `AbortController` whose `signal` flows into `process()`. Renderer-backed
+  processors (Thumbnail/TextureSet/EnvironmentMap) MUST arm it right after
+  acquiring (`this._armRendererAbort(...)`), then call the returned `disarmAbort()`
+  in `finally` before `release()`. Skipping this reintroduces slot starvation. On
+  abort it calls `rendererPool.forceReinit(renderer)` →
+  `PuppeteerRenderer.reinitialize()`, so the slot returns usable instead of hung.
 - `BaseProcessor.execute()` checks `signal?.aborted` before calling
   `markCompleted`/`markFailed` - the backend has no double-finish guard
-  (`ThumbnailJob.MarkAsCompleted`/`MarkAsFailed` unconditionally overwrite
-  status), so a late result from an aborted job is discarded, not
-  re-reported.
-- Retry/dead-letter logic is backend-side (`FinishThumbnailJobCommand`) -
-  the worker just reports finish/fail honestly.
+  (`MarkAsCompleted`/`MarkAsFailed` unconditionally overwrite status), so a late
+  result from an aborted job is discarded.
+- Retry/dead-letter logic is backend-side (`FinishThumbnailJobCommand`) - the
+  worker reports finish/fail honestly.
 
 ## Puppeteer / RendererPool rules
-- One shared browser, one page per pool renderer (= isolated WebGL context
-  per concurrent job). Always `acquire()` / `release()` in try/finally.
+
+- ONE browser per worker (`browserManager.js`), shared by every renderer family
+  (model / texture-set / environment-map / extraction / scene / vfx). Launch is
+  lazy; a crashed/disconnected browser is relaunched on the next page request;
+  `browserManager.dispose()` closes it on shutdown. Never launch `puppeteer` from
+  a renderer - `import { browserManager }` and take a page from it.
+- A page belongs to a job: opened on first use, closed when the job releases its
+  slot (`RendererPool.release()` / scene+vfx `finally`). Between jobs no WebGL
+  context is held.
+- `MAX_CONCURRENT_RENDER_JOBS` (config `maxConcurrentRenderJobs`, default 1) caps
+  concurrent render jobs worker-wide; `browserManager.acquireSlot()`/`releaseSlot()`
+  enforce it. Renderer-backed processors still `acquire()` / `release()` in
+  try/finally (and arm `_armRendererAbort`).
+- Idle close: when the LAST render slot is released, `browserManager` starts a
+  `BROWSER_IDLE_TIMEOUT_MS` timer (default 60000; 0 disables) and closes the
+  shared Chromium if no job starts meanwhile - an idle browser holds ~3.7 GB.
+  The next job relaunches it lazily. It never closes while a slot is held, and a
+  job arriving during an in-flight close waits (`getBrowser` awaits `_closing`)
+  for a fresh browser. `acquireSlot()` cancels the timer; running render jobs
+  therefore never see their browser pulled out.
 - Pages crash (frame detach, OOM on 4K textures). `PuppeteerRenderer` has
-  `isPageUsable()` + `reinitialize()` - check/recover instead of assuming
-  the page survived; reuse this machinery, don't invent recovery.
-- The odd launch flags (`--disable-crashpad`, `--crash-dumps-dir=/tmp`, …)
-  are load-bearing container fixes - don't remove; macOS uses Metal
-  (swiftshader has no WebGL there).
-- External processes (Blender) via `execFile` with arg arrays - never
-  `exec`/shell strings.
+  `_isPageUsable()` + `reinitialize()` - check/recover instead of inventing recovery.
+- The odd launch flags (`--disable-crashpad`, `--crash-dumps-dir=/tmp`, …) are
+  load-bearing container fixes - don't remove; macOS uses Metal (swiftshader has
+  no WebGL there).
+- External processes (Blender) via `execFile` with arg arrays - never `exec`/shell strings.
 
 ## API clients (worker → backend)
-- TRAP - six hand-rolled axios clients exist and have drifted:
-  `jobEventService` sends NO `X-Api-Key`; coverage is inconsistent. Prompt
-  42 introduces one `createWorkerApiClient` factory. Until then: never
-  create another bare `axios.create` - reuse an existing keyed client, and
-  any new request surface must attach `X-Api-Key` from
-  `config.workerApiKey`.
-- Contract endpoints: `POST /thumbnail-jobs/dequeue`, `POST
-  /thumbnail-jobs/{id}/finish` (+ sound/texture-set/environment-map finish
-  variants). If backend endpoint shapes change, update the client to match
-  (and vice versa).
+
+- TRAP - six hand-rolled axios clients exist and have drifted: `jobEventService`
+  sends NO `X-Api-Key`; coverage is inconsistent. Never create another bare
+  `axios.create` - reuse an existing keyed client, and attach `X-Api-Key` from
+  `config.workerApiKey` on any new surface.
+- Contract endpoints: `POST /thumbnail-jobs/dequeue` and
+  `POST /thumbnail-jobs/{id}/finish` (+ sound/texture-set/environment-map
+  variants). Keep the client matching the backend shape.
 
 ## Shared cross-runtime code (single source of truth)
-Logic that must behave **identically** in more than one runtime - the
-frontend viewer, this worker's Puppeteer render (`render-template.html` +
-`page.evaluate`), demo mode - lives ONCE in `lib/`, never hand-copied.
-- **Shape:** dependency-light ESM that injects heavy deps as arguments
-  (`THREE`, `UTIF`) so one file runs in the Vite bundle AND the
-  classic-script page context; `window.modelibr*` side-effect for the page;
-  `.d.ts` sibling for the TS frontend.
-- **Modules:** `tiffDecode`, `stlMesh`, `sceneLighting`, `textureMaterial`,
-  `displacementNormal`, `textureChannels`. See `lib/README.md`.
-- `lib/` stays FLAT - frontend/demo import it by relative path; moving files
-  breaks cross-runtime consumers (prompt 24 explicitly excludes it).
-- Rule of thumb: writing render code whose output another runtime must
-  match? It's shared code - put it here first.
 
-## Offline-safe (product invariant)
-Rendering/processing must work with no external network: local Three.js
-assets, local Blender install, no CDN imports or hosted inference.
+Logic that must behave **identically** in the frontend viewer, this worker's
+Puppeteer render and demo mode lives ONCE in `lib/`, never hand-copied.
+
+- **Shape:** dependency-light ESM injecting heavy deps as arguments (`THREE`,
+  `UTIF`) so one file runs in the Vite bundle AND the classic-script page
+  context; `window.modelibr*` side-effect; `.d.ts` sibling for the TS frontend.
+- **Modules:** `displacementNormal`, `geometryHash`, `gltfResources`,
+  `materialStats`, `partPath`, `renderSignals`, `sceneGraph`, `sceneLighting`,
+  `stlMesh`, `textureChannels`, `textureMaterial`, `tiffDecode` (see `lib/README.md`).
+- `lib/` stays FLAT - frontend/demo import by relative path; moving files breaks
+  cross-runtime consumers.
 
 ## Testing
+
 - Vitest in `tests/*.test.js`. Meaningful tests: services, processors, queue
-  mechanics - not render pixels (visual parity is covered by other suites).
-- `tests/test-crashpad-fix.js`, `test-puppeteer.js`, `test-scene-cleanup.js`
-  are MANUAL debug scripts, not Vitest suites (prompt 42 relocates them) -
-  don't pattern-match new tests on them.
+  mechanics - not render pixels.
+- `tests/test-crashpad-fix.js`, `test-puppeteer.js`, `test-scene-cleanup.js` are
+  MANUAL debug scripts, not Vitest suites - don't pattern-match new tests on them.
 
 ## Verify
+
 `cd src/asset-processor && npm test && npm run lint && npm run format:check`
-(format:check is a required CI gate not covered by lint.)

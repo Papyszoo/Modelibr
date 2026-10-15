@@ -4,7 +4,7 @@ import type * as Preset from "@docusaurus/preset-classic";
 
 const config: Config = {
     title: "Modelibr",
-    tagline: "Self-hosted game asset library",
+    tagline: "Self-hosted 3D asset manager and game asset library",
     favicon: "img/favicon.ico",
 
     future: {
@@ -52,7 +52,17 @@ const config: Config = {
     ],
 
     themeConfig: {
-        image: "img/screenshots/model-viewer.png",
+        image: "img/og-modelibr.png",
+        metadata: [
+            { property: "og:site_name", content: "Modelibr" },
+            { property: "og:type", content: "website" },
+            {
+                property: "og:image:alt",
+                content:
+                    "The Modelibr 3D model viewer showing a model with its version history",
+            },
+            { name: "theme-color", content: "#0f172a" },
+        ],
         colorMode: {
             defaultMode: "dark",
             disableSwitch: false,
@@ -107,6 +117,18 @@ const config: Config = {
                             label: "Features",
                             to: "/docs/category/features",
                         },
+                        {
+                            label: "MCP Server for AI Agents",
+                            to: "/docs/features/mcp-server",
+                        },
+                        {
+                            label: "Blender and WebDAV",
+                            to: "/docs/features/webdav",
+                        },
+                        {
+                            label: "Changelog",
+                            to: "/docs/changelog",
+                        },
                     ],
                 },
                 {
@@ -115,6 +137,10 @@ const config: Config = {
                         {
                             label: "GitHub",
                             href: "https://github.com/Papyszoo/Modelibr",
+                        },
+                        {
+                            label: "Releases and Installers",
+                            href: "https://github.com/Papyszoo/Modelibr/releases",
                         },
                         {
                             label: "Discord",

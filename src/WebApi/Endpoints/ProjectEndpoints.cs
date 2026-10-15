@@ -119,6 +119,16 @@ public static class ProjectEndpoints
             .WithName("Remove Environment Map from Project")
             .WithSummary("Removes an environment map from the specified project")
             .WithOpenApi();
+
+        app.MapPost("/projects/{projectId}/vfx/{vfxId}", AddVfxToProject)
+            .WithName("Add VFX to Project")
+            .WithSummary("Adds a visual effect to the specified project")
+            .WithOpenApi();
+
+        app.MapDelete("/projects/{projectId}/vfx/{vfxId}", RemoveVfxFromProject)
+            .WithName("Remove VFX from Project")
+            .WithSummary("Removes a visual effect from the specified project")
+            .WithOpenApi();
     }
 
     private static async Task<IResult> GetAllProjects(
@@ -389,6 +399,26 @@ public static class ProjectEndpoints
         CancellationToken cancellationToken)
     {
         var result = await commandHandler.Handle(new AddEnvironmentMapToProjectCommand(projectId, environmentMapId), cancellationToken);
+        return result.IsSuccess ? Results.NoContent() : Results.BadRequest(result.Error);
+    }
+
+    private static async Task<IResult> AddVfxToProject(
+        int projectId,
+        int vfxId,
+        ICommandHandler<AddVfxToProjectCommand> commandHandler,
+        CancellationToken cancellationToken)
+    {
+        var result = await commandHandler.Handle(new AddVfxToProjectCommand(projectId, vfxId), cancellationToken);
+        return result.IsSuccess ? Results.NoContent() : Results.BadRequest(result.Error);
+    }
+
+    private static async Task<IResult> RemoveVfxFromProject(
+        int projectId,
+        int vfxId,
+        ICommandHandler<RemoveVfxFromProjectCommand> commandHandler,
+        CancellationToken cancellationToken)
+    {
+        var result = await commandHandler.Handle(new RemoveVfxFromProjectCommand(projectId, vfxId), cancellationToken);
         return result.IsSuccess ? Results.NoContent() : Results.BadRequest(result.Error);
     }
 

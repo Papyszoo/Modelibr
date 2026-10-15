@@ -1,5 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { type ReactNode } from 'react'
 
+import { restoreEntity } from '@/features/recycled-files/api/recycledApi'
 import {
   createScriptCategory,
   deleteScriptCategory,
@@ -7,6 +9,10 @@ import {
   updateScript,
   updateScriptCategory,
 } from '@/features/scripts/api/scriptApi'
+import {
+  recycleToastContent,
+  UNDO_TOAST_LIFE_MS,
+} from '@/shared/components/feedback/RecycleToastContent'
 import { useCategoryMutations } from '@/shared/hooks/useCategoryMutations'
 import { type ScriptCategoryDto } from '@/types'
 
@@ -14,8 +20,9 @@ interface ShowToast {
   (opts: {
     severity: string
     summary: string
-    detail: string
+    detail?: string
     life: number
+    content?: () => ReactNode
   }): void
 }
 
@@ -84,6 +91,34 @@ export function useScriptMutations({
     },
   })
 
+  /** Restores scripts just moved to the recycle bin, from the Undo toast. */
+  const handleUndoRecycle = async (scriptIds: number[]) => {
+    try {
+      await Promise.all(scriptIds.map(id => restoreEntity('script', id)))
+      setSelectedScriptIds(new Set())
+      setContextMenuTarget(null)
+      await loadScripts()
+      await queryClient.invalidateQueries({ queryKey: ['recycledFiles'] })
+      showToast({
+        severity: 'success',
+        summary: 'Restored',
+        detail:
+          scriptIds.length > 1
+            ? `${scriptIds.length} scripts restored`
+            : 'Script restored',
+        life: 3000,
+      })
+    } catch (error) {
+      console.error('Failed to restore scripts:', error)
+      showToast({
+        severity: 'error',
+        summary: 'Error',
+        detail: 'Failed to restore scripts',
+        life: 3000,
+      })
+    }
+  }
+
   const recycleScriptsMutation = useMutation({
     mutationFn: async (scriptIds: number[]) => {
       await Promise.all(scriptIds.map(id => softDeleteScript(id)))
@@ -92,11 +127,14 @@ export function useScriptMutations({
       showToast({
         severity: 'success',
         summary: 'Recycled',
-        detail:
-          scriptIds.length > 1
-            ? `${scriptIds.length} scripts moved to recycle bin`
-            : 'Script moved to recycle bin',
-        life: 3000,
+        life: UNDO_TOAST_LIFE_MS,
+        content: () =>
+          recycleToastContent(
+            scriptIds.length > 1
+              ? `${scriptIds.length} scripts moved to recycled files`
+              : 'Script moved to recycled files',
+            () => void handleUndoRecycle(scriptIds)
+          ),
       })
       setSelectedScriptIds(new Set())
       setContextMenuTarget(null)

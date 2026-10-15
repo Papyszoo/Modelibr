@@ -49,6 +49,22 @@ public static class SceneDocumentValidator
     public const int MaxRecommendationSummaryLength = 600;
 
     /// <summary>
+    /// Ceiling on shape-key weights on one node. The same "something has gone wrong" limit
+    /// the other caps are: a model with more keys than this is not one anyone authored sliders
+    /// for, it is an agent iterating over a morph-target dump.
+    /// </summary>
+    public const int MaxShapeKeys = 64;
+
+    /// <summary>
+    /// The playback-rate range a node's animation may declare. A rate of zero freezes the
+    /// node while claiming it is animated, and past 4x the clip is a flicker nobody asked to
+    /// see; both are refused rather than clamped so the caller learns what happened.
+    /// </summary>
+    public const double MinAnimationSpeed = 0.1;
+
+    public const double MaxAnimationSpeed = 4;
+
+    /// <summary>
     /// Smallest accepted absolute scale factor on any axis. A zero scale collapses geometry
     /// to nothing and reads as an invisible node rather than an error; a negative one mirrors
     /// it, which is legal but must be deliberate, so only the magnitude is floored.
@@ -210,9 +226,20 @@ public static class SceneDocumentValidator
                 for (var s = 0; s < slots.Count; s++)
                 {
                     var slotPath = $"{path}.materialSlots[{s}]";
-                    ValidateMaterialBinding(slots[s], slotPath, requireSlot: true, issues);
 
-                    var slotName = slots[s].Slot;
+                    // A null entry deserializes fine from `materialSlots:[null]`, and the
+                    // binding rules below dereference it. Reported like the other "entry is
+                    // null" cases rather than thrown, because this validator exists to say
+                    // what is wrong with a document, not to fail on it.
+                    if (slots[s] is not { } binding)
+                    {
+                        issues.Add(new SceneValidationIssue(slotPath, "MaterialSlotNull", "A materialSlots entry is null."));
+                        continue;
+                    }
+
+                    ValidateMaterialBinding(binding, slotPath, requireSlot: true, issues);
+
+                    var slotName = binding.Slot;
                     if (!string.IsNullOrWhiteSpace(slotName) && !seenSlots.Add(slotName.Trim()))
                     {
                         issues.Add(new SceneValidationIssue(
@@ -234,6 +261,16 @@ public static class SceneDocumentValidator
             if (node.Anchor is { } anchor)
             {
                 ValidateAnchor(node, anchor, $"{path}.anchor", issues);
+            }
+
+            if (node.Animation is { } animation)
+            {
+                ValidateAnimation(animation, $"{path}.animation", issues);
+            }
+
+            if (node.ShapeKeys is { Count: > 0 } shapeKeys)
+            {
+                ValidateShapeKeys(shapeKeys, $"{path}.shapeKeys", issues);
             }
 
             // Three answers to "what holds this up", and they contradict each other. Picking
@@ -515,6 +552,84 @@ public static class SceneDocumentValidator
         if (anchor.Offset is { } offset)
         {
             ValidateVec3(offset, $"{path}.offset", issues);
+        }
+    }
+
+    /// <summary>
+    /// A node's clip. The name is the whole contract - the renderer resolves it against the
+    /// referenced model's own clips - so a blank one is rejected here rather than becoming a
+    /// node that quietly plays nothing.
+    /// </summary>
+    private static void ValidateAnimation(
+        SceneAnimation animation,
+        string path,
+        List<SceneValidationIssue> issues)
+    {
+        if (string.IsNullOrWhiteSpace(animation.Clip))
+        {
+            issues.Add(new SceneValidationIssue(
+                $"{path}.clip",
+                "AnimationClipRequired",
+                "A node animation must name the clip to play, as the referenced model's 'animations' list spells it."));
+        }
+
+        if (!double.IsFinite(animation.Speed)
+            || animation.Speed < MinAnimationSpeed
+            || animation.Speed > MaxAnimationSpeed)
+        {
+            issues.Add(new SceneValidationIssue(
+                $"{path}.speed",
+                "AnimationSpeedOutOfRange",
+                FormattableString.Invariant(
+                    $"Animation speed {animation.Speed} is outside the accepted {MinAnimationSpeed}-{MaxAnimationSpeed} range. 1 is the original rate.")));
+        }
+
+        if (!double.IsFinite(animation.TimeOffset) || animation.TimeOffset < 0)
+        {
+            issues.Add(new SceneValidationIssue(
+                $"{path}.timeOffset",
+                "AnimationTimeOffsetInvalid",
+                "Animation timeOffset must be a finite number of seconds ≥ 0 - it is how far into the clip the node starts."));
+        }
+    }
+
+    /// <summary>
+    /// A node's shape-key weights. The names are matched against the model's own morph-target
+    /// names, so an unmatched one is not an error here - the library may not have been
+    /// extracted yet - but a weight outside 0-1 has no pose it could mean.
+    /// </summary>
+    private static void ValidateShapeKeys(
+        IReadOnlyDictionary<string, double> shapeKeys,
+        string path,
+        List<SceneValidationIssue> issues)
+    {
+        if (shapeKeys.Count > MaxShapeKeys)
+        {
+            issues.Add(new SceneValidationIssue(
+                path,
+                "TooManyShapeKeys",
+                $"A node may set at most {MaxShapeKeys} shape-key weights; this one sets {shapeKeys.Count}."));
+        }
+
+        foreach (var (name, weight) in shapeKeys)
+        {
+            if (string.IsNullOrWhiteSpace(name))
+            {
+                issues.Add(new SceneValidationIssue(
+                    path,
+                    "ShapeKeyNameMissing",
+                    "A shape-key weight must name the key it sets; a blank name matches no morph target."));
+                continue;
+            }
+
+            if (!double.IsFinite(weight) || weight < 0 || weight > 1)
+            {
+                issues.Add(new SceneValidationIssue(
+                    $"{path}['{name}']",
+                    "ShapeKeyWeightOutOfRange",
+                    FormattableString.Invariant(
+                        $"Shape key '{name}' has weight {weight}; weights run from 0 (unposed) to 1 (fully posed).")));
+            }
         }
     }
 

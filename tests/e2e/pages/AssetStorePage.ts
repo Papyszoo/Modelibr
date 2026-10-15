@@ -16,6 +16,10 @@ export class AssetStorePage {
     readonly passwordInput: Locator;
     readonly submitButton: Locator;
     readonly userChip: Locator;
+    readonly signInButton: Locator;
+    readonly loginForm: Locator;
+    readonly loginBackButton: Locator;
+    readonly detailSignInButton: Locator;
 
     constructor(page: Page) {
         this.page = page;
@@ -24,6 +28,10 @@ export class AssetStorePage {
         this.passwordInput = page.getByTestId("asset-store-password");
         this.submitButton = page.getByTestId("asset-store-login-submit");
         this.userChip = page.getByTestId("asset-store-user");
+        this.signInButton = page.getByTestId("asset-store-sign-in");
+        this.loginForm = page.getByTestId("asset-store-login");
+        this.loginBackButton = page.getByTestId("asset-store-login-back");
+        this.detailSignInButton = page.getByTestId("asset-store-detail-sign-in");
     }
 
     async navigateTo(): Promise<void> {
@@ -33,6 +41,12 @@ export class AssetStorePage {
     }
 
     async signIn(email: string, password: string): Promise<void> {
+        // The tab browses the store's public catalog when signed out, so the
+        // form is reached through the header's Sign in action.
+        await expect(this.signInButton).toBeVisible({ timeout: 15000 });
+        await this.signInButton.click();
+        await expect(this.loginForm).toBeVisible({ timeout: 15000 });
+
         await this.emailInput.fill(email);
         await this.passwordInput.fill(password);
         // Scope the wait to the exact login call so a slow fixture start

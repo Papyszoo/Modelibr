@@ -6,6 +6,7 @@ import { MultiSelect } from 'primereact/multiselect'
 import { type MouseEvent as ReactMouseEvent } from 'react'
 
 import {
+  ListSelectionBar,
   ListToolbar,
   ListToolbarActions,
   ListToolbarButton,
@@ -13,9 +14,6 @@ import {
   ListToolbarPanel,
   ListToolbarRow,
   ListToolbarSearchInput,
-  ListToolbarSelectionActions,
-  ListToolbarSelectionBar,
-  ListToolbarSelectionSummary,
   OptionsButton,
 } from '@/shared/components/list-toolbar'
 import { type PackDto, type ProjectDto, TextureType } from '@/types'
@@ -148,8 +146,6 @@ export function TexturesFilters({
     selectedTagNames.length > 0,
   ].filter(Boolean).length
 
-  const selectedCountLabel = `${selectedCount} ${unitLabel}${selectedCount === 1 ? '' : 's'}`
-
   return (
     <ListToolbar>
       <ListToolbarRow>
@@ -192,10 +188,10 @@ export function TexturesFilters({
           />
           <ListToolbarButton
             icon="pi pi-plus"
-            label="Create Set"
+            label="Create Texture Set"
             onClick={onCreateClick}
             tooltip="Create a new texture set"
-            ariaLabel="Create Set"
+            ariaLabel="Create Texture Set"
           />
           <ListToolbarButton
             icon="pi pi-refresh"
@@ -223,37 +219,21 @@ export function TexturesFilters({
         />
       </ListToolbarRow>
 
-      {selectedCount > 0 ? (
-        <ListToolbarSelectionBar>
-          <ListToolbarSelectionSummary>
-            {selectedCountLabel} selected.
-          </ListToolbarSelectionSummary>
-          <ListToolbarSelectionActions>
-            <ListToolbarButton
-              icon="pi pi-list-check"
-              label="Bulk actions"
-              active
-              onClick={onBulkActionsClick}
-              ariaLabel={`Bulk actions for ${selectedCountLabel}`}
-            />
-            <ListToolbarButton
-              label="Select All"
-              onClick={onSelectAllClick}
-              disabled={visibleCount === 0 || selectedCount >= visibleCount}
-            />
-            <ListToolbarButton
-              label="Deselect All"
-              onClick={onDeselectAllClick}
-            />
-          </ListToolbarSelectionActions>
-        </ListToolbarSelectionBar>
-      ) : null}
+      <ListSelectionBar
+        count={selectedCount}
+        visibleCount={visibleCount}
+        unitLabel={unitLabel}
+        onBulkActionsClick={onBulkActionsClick}
+        onSelectAllClick={onSelectAllClick}
+        onDeselectAllClick={onDeselectAllClick}
+      />
 
       <ListToolbarPanel id="texture-set-grid-search-panel" open={isSearchOpen}>
         <ListToolbarSearchInput
           value={searchQuery}
           onChange={onSearchChange}
           placeholder="Search texture sets..."
+          autoFocus={isSearchOpen}
         />
       </ListToolbarPanel>
 

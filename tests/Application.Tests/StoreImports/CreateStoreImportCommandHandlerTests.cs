@@ -18,14 +18,20 @@ public class CreateStoreImportCommandHandlerTests
     private readonly Mock<IStoreImportQueue> _queue = new();
     private readonly Mock<IDateTimeProvider> _clock = new();
     private readonly Mock<IUnitOfWork> _unitOfWork = new();
+    private readonly Mock<IStoreBaseUrlProvider> _storeBaseUrls = new();
 
     public CreateStoreImportCommandHandlerTests()
     {
         _clock.Setup(x => x.UtcNow).Returns(new DateTime(2026, 7, 16, 0, 0, 0, DateTimeKind.Utc));
+        // No override in these tests: the client-supplied URL is used as-is, as the real
+        // provider does when its test-only override is unset.
+        _storeBaseUrls
+            .Setup(p => p.ResolveStoreBaseUrl(It.IsAny<string>()))
+            .Returns((string url) => url);
     }
 
     private CreateStoreImportCommandHandler CreateHandler()
-        => new(_jobRepository.Object, _queue.Object, _clock.Object, _unitOfWork.Object);
+        => new(_jobRepository.Object, _queue.Object, _clock.Object, _unitOfWork.Object, _storeBaseUrls.Object);
 
     [Fact]
     public async Task Handle_When_ValidRequest_PersistsJobWithoutToken_And_EnqueuesTokenInMemoryOnly()

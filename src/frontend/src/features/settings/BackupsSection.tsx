@@ -1,3 +1,4 @@
+import { useQueryClient } from '@tanstack/react-query'
 import { confirmDialog } from 'primereact/confirmdialog'
 import { type JSX, useCallback, useEffect, useState } from 'react'
 
@@ -13,6 +14,10 @@ import {
   listBackups,
   stageRestore,
 } from './api/backupsApi'
+import { useSettingsQuery } from './api/queries'
+import { updateSetting } from './api/settingsApi'
+import { SettingNumberField } from './SettingNumberField'
+import { SettingToggle } from './SettingToggle'
 
 function formatBytes(bytes: number): string {
   if (bytes === 0) return '0 B'
@@ -102,8 +107,10 @@ function CreateBackupModal({
             </span>
           </label>
           <span className="settings-help backups-modal-help">
-            Auto-generated thumbnails can be regenerated, but custom-uploaded
-            thumbnails cannot - include this if you've uploaded custom ones.
+            Leave this off to keep the archive smaller: thumbnails are
+            regenerated automatically after a restore. Include it to keep the
+            current thumbnails in the archive and skip that regeneration -
+            useful if you have uploaded custom ones.
           </span>
 
           {projected != null && (
@@ -137,6 +144,8 @@ function CreateBackupModal({
 }
 
 export function BackupsSection(): JSX.Element {
+  const queryClient = useQueryClient()
+  const settingsQuery = useSettingsQuery()
   const [backups, setBackups] = useState<BackupSummary[]>([])
   const [storage, setStorage] = useState<BackupStorageInfo | null>(null)
   const [estimate, setEstimate] = useState<BackupSizeEstimate | null>(null)
@@ -145,6 +154,20 @@ export function BackupsSection(): JSX.Element {
   const [showCreate, setShowCreate] = useState(false)
   const [isCreating, setIsCreating] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
+  const [savingSettingKey, setSavingSettingKey] = useState<string | null>(null)
+
+  const saveSetting = async (key: string, value: string): Promise<void> => {
+    setSavingSettingKey(key)
+    setError(null)
+    try {
+      await updateSetting(key, value)
+      await queryClient.invalidateQueries({ queryKey: ['settings'] })
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save setting')
+    } finally {
+      setSavingSettingKey(null)
+    }
+  }
 
   const refresh = useCallback(async () => {
     try {
@@ -253,6 +276,50 @@ export function BackupsSection(): JSX.Element {
         </div>
       )}
       {info && <div className="settings-success">{info}</div>}
+
+      <div className="backups-settings">
+        <h4 className="backups-settings-heading">Retention &amp; safety</h4>
+
+        <SettingToggle
+          id="preMigrationBackupEnabled"
+          label="Back up before updates"
+          help="Take a database snapshot before database updates are applied. MODELIBR_SKIP_PREMIGRATION_BACKUP overrides this."
+          isOn={settingsQuery.data?.preMigrationBackupEnabled ?? true}
+          disabled={!settingsQuery.data}
+          saving={savingSettingKey === 'PreMigrationBackupEnabled'}
+          onChange={next =>
+            void saveSetting('PreMigrationBackupEnabled', String(next))
+          }
+        />
+
+        <SettingNumberField
+          id="preMigrationBackupRetention"
+          label="Pre-update backups to keep"
+          help="How many automatic pre-update snapshots to keep before older ones are pruned."
+          value={settingsQuery.data?.preMigrationBackupRetention ?? 3}
+          min={1}
+          max={10}
+          disabled={!settingsQuery.data}
+          saving={savingSettingKey === 'PreMigrationBackupRetention'}
+          onCommit={next =>
+            void saveSetting('PreMigrationBackupRetention', String(next))
+          }
+        />
+
+        <SettingNumberField
+          id="cleanRecycledFilesAfterDays"
+          label="Keep recycled files for (days)"
+          help="Recycled items older than this are deleted permanently once a day. 0 keeps them until you delete them yourself."
+          value={settingsQuery.data?.cleanRecycledFilesAfterDays ?? 0}
+          min={0}
+          max={365}
+          disabled={!settingsQuery.data}
+          saving={savingSettingKey === 'CleanRecycledFilesAfterDays'}
+          onCommit={next =>
+            void saveSetting('CleanRecycledFilesAfterDays', String(next))
+          }
+        />
+      </div>
 
       <div className="backups-toolbar">
         <button

@@ -1,4 +1,4 @@
-import { screen, waitFor } from '@testing-library/react'
+import { fireEvent, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
 import { ApiClientError } from '@/lib/apiBase'
@@ -120,7 +120,9 @@ describe('SceneList - creating a scene', () => {
     await userEvent.click(create)
 
     held.resolve(sceneView(9) as never)
-    await waitFor(() => expect(onOpenScene).toHaveBeenCalledWith(9))
+    await waitFor(() =>
+      expect(onOpenScene).toHaveBeenCalledWith(9, 'Rundown city street')
+    )
     expect(scenes.createScene).toHaveBeenCalledTimes(1)
   })
 
@@ -137,7 +139,9 @@ describe('SceneList - creating a scene', () => {
     await userEvent.type(nameField, '{Enter}{Enter}{Enter}')
 
     held.resolve(sceneView(9) as never)
-    await waitFor(() => expect(onOpenScene).toHaveBeenCalledWith(9))
+    await waitFor(() =>
+      expect(onOpenScene).toHaveBeenCalledWith(9, 'Rundown city street')
+    )
     expect(scenes.createScene).toHaveBeenCalledTimes(1)
   })
 
@@ -148,6 +152,45 @@ describe('SceneList - creating a scene', () => {
     await userEvent.type(screen.getByLabelText('Name'), '{Enter}')
 
     expect(scenes.createScene).not.toHaveBeenCalled()
+  })
+
+  it('opens with the name field focused and no validation error', async () => {
+    // Regression: PrimeReact's Dialog focuses its close button when it shows,
+    // which blurred the auto-focused name field and marked it touched - so the
+    // dialog declared "Name is required." the moment it opened, before the
+    // user had typed anything.
+    renderWithProviders(<SceneList onOpenScene={onOpenScene} />)
+    await userEvent.click(await screen.findByTestId('scene-list-new'))
+
+    expect(screen.getByLabelText('Name')).toHaveFocus()
+    expect(screen.queryByTestId('scene-name-error')).not.toBeInTheDocument()
+  })
+
+  it('shows an inline reason when the name is left empty', async () => {
+    // Regression: the Create button was simply disabled with no explanation of
+    // why, so an empty name read as a broken button.
+    renderWithProviders(<SceneList onOpenScene={onOpenScene} />)
+    await userEvent.click(await screen.findByTestId('scene-list-new'))
+
+    await userEvent.click(screen.getByLabelText('Name'))
+    await userEvent.tab()
+
+    expect(await screen.findByTestId('scene-name-error')).toHaveTextContent(
+      'Name is required.'
+    )
+  })
+
+  it('clears the draft name when the dialog is cancelled', async () => {
+    // Regression: a cancelled "New scene" kept its text, so reopening showed
+    // the previous draft's name.
+    renderWithProviders(<SceneList onOpenScene={onOpenScene} />)
+    await userEvent.click(await screen.findByTestId('scene-list-new'))
+    await userEvent.type(screen.getByLabelText('Name'), 'Stale draft')
+
+    await userEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+    await userEvent.click(screen.getByTestId('scene-list-new'))
+
+    expect(screen.getByLabelText('Name')).toHaveValue('')
   })
 
   it('does not create a second scene when Enter is pressed while the link is in flight', async () => {
@@ -167,7 +210,9 @@ describe('SceneList - creating a scene', () => {
     await userEvent.click(screen.getByTestId('scene-create-confirm'))
 
     heldLink.resolve({ sceneId: 9, projectId: 4, revision: 2 } as never)
-    await waitFor(() => expect(onOpenScene).toHaveBeenCalledWith(9))
+    await waitFor(() =>
+      expect(onOpenScene).toHaveBeenCalledWith(9, 'Rundown city street')
+    )
     expect(scenes.createScene).toHaveBeenCalledTimes(1)
   })
 
@@ -212,7 +257,9 @@ describe('SceneList - creating a scene', () => {
     // The retry links scene 9 - it does not create scene 10.
     await userEvent.click(screen.getByTestId('scene-create-confirm'))
 
-    await waitFor(() => expect(onOpenScene).toHaveBeenCalledWith(9))
+    await waitFor(() =>
+      expect(onOpenScene).toHaveBeenCalledWith(9, 'Rundown city street')
+    )
     expect(scenes.createScene).toHaveBeenCalledTimes(1)
     expect(scenes.setSceneProject).toHaveBeenCalledTimes(2)
     expect(scenes.setSceneProject).toHaveBeenLastCalledWith(9, 4)
@@ -229,7 +276,7 @@ describe('SceneList - creating a scene', () => {
 
     await userEvent.click(screen.getByTestId('scene-create-skip-link'))
 
-    expect(onOpenScene).toHaveBeenCalledWith(9)
+    expect(onOpenScene).toHaveBeenCalledWith(9, 'Rundown city street')
     expect(scenes.createScene).toHaveBeenCalledTimes(1)
   })
 
@@ -237,7 +284,9 @@ describe('SceneList - creating a scene', () => {
     await openDialog()
     await userEvent.click(screen.getByTestId('scene-create-confirm'))
 
-    await waitFor(() => expect(onOpenScene).toHaveBeenCalledWith(9))
+    await waitFor(() =>
+      expect(onOpenScene).toHaveBeenCalledWith(9, 'Rundown city street')
+    )
     expect(scenes.setSceneProject).not.toHaveBeenCalled()
   })
 
@@ -331,7 +380,7 @@ describe('SceneList - creating a scene', () => {
 
     await userEvent.click(screen.getByTestId('scene-create-skip-link'))
 
-    expect(onOpenScene).toHaveBeenCalledWith(9)
+    expect(onOpenScene).toHaveBeenCalledWith(9, 'Rundown city street')
     expect(scenes.createScene).toHaveBeenCalledTimes(1)
     // Still exactly one attempt: opening is a read, not a second write.
     expect(scenes.setSceneProject).toHaveBeenCalledTimes(1)
@@ -375,7 +424,7 @@ describe('SceneList - creating a scene', () => {
     await userEvent.click(screen.getByTestId('scene-create-skip-link'))
 
     expect(scenes.setSceneProject).toHaveBeenCalledTimes(1)
-    expect(onOpenScene).toHaveBeenCalledWith(9)
+    expect(onOpenScene).toHaveBeenCalledWith(9, 'Rundown city street')
   })
 
   it('refuses a second link write while one is unresolved, even if something asks for it', async () => {
@@ -397,5 +446,83 @@ describe('SceneList - creating a scene', () => {
     expect(useSceneLinkHoldStore.getState().tryBegin(9, 'link')).toBe(false)
     // And the unresolved record is untouched by the attempt.
     expect(useSceneLinkHoldStore.getState().holds[9]?.phase).toBe('reconciling')
+  })
+})
+
+describe('SceneList - deleting a scene', () => {
+  let onOpenScene: jest.Mock
+
+  beforeEach(() => {
+    jest.clearAllMocks()
+    onOpenScene = jest.fn()
+    projects.getAllProjects.mockResolvedValue([] as never)
+    scenes.getScenes.mockResolvedValue([sceneView(9)] as never)
+    scenes.deleteScene.mockResolvedValue(undefined as never)
+  })
+
+  async function openDeleteDialog() {
+    renderWithProviders(<SceneList onOpenScene={onOpenScene} />)
+    const tile = await screen.findByTestId('scene-tile')
+    fireEvent.contextMenu(tile)
+    // Right-click opens the shared context menu; Delete is a menu item that only
+    // then opens the confirmation dialog.
+    await userEvent.click(await screen.findByText('Delete'))
+    return screen.findByRole('button', { name: 'Delete' })
+  }
+
+  // Regression: right-click used to open the delete confirmation directly, so a
+  // right-click could delete a scene with one more click and no access to the
+  // other card actions.
+  it('right-click opens the shared menu instead of the delete dialog', async () => {
+    renderWithProviders(<SceneList onOpenScene={onOpenScene} />)
+    const tile = await screen.findByTestId('scene-tile')
+    fireEvent.contextMenu(tile)
+
+    expect(await screen.findByText('Open')).toBeInTheDocument()
+    expect(
+      screen.queryByText(/only the composition is removed/)
+    ).not.toBeInTheDocument()
+  })
+
+  // Regression: the delete rejection was unhandled, so the dialog stayed with
+  // no message and the failure was silent.
+  it('shows an inline error and keeps the dialog when a delete fails', async () => {
+    scenes.deleteScene.mockRejectedValue(
+      new ApiClientError('That scene could not be deleted.', {
+        status: 500,
+        isNetworkError: false,
+        isTimeout: false,
+        isOffline: false,
+      })
+    )
+
+    const confirm = await openDeleteDialog()
+    await userEvent.click(confirm)
+
+    expect(await screen.findByTestId('scene-delete-error')).toHaveTextContent(
+      'That scene could not be deleted.'
+    )
+    expect(screen.getByRole('button', { name: 'Delete' })).toBeInTheDocument()
+  })
+
+  it('closes the dialog without an error when the scene is already gone', async () => {
+    scenes.deleteScene.mockRejectedValue(
+      new ApiClientError('not found', {
+        status: 404,
+        isNetworkError: false,
+        isTimeout: false,
+        isOffline: false,
+      })
+    )
+
+    const confirm = await openDeleteDialog()
+    await userEvent.click(confirm)
+
+    await waitFor(() =>
+      expect(
+        screen.queryByText(/only the composition is removed/)
+      ).not.toBeInTheDocument()
+    )
+    expect(screen.queryByTestId('scene-delete-error')).not.toBeInTheDocument()
   })
 })

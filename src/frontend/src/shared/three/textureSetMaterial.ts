@@ -16,6 +16,7 @@ import {
   ensureAoMapUv2,
   resolveTextureMaterialConfig,
 } from '../../../../asset-processor/lib/textureMaterial.js'
+import { mergeMaterialChannelsPerMesh } from './mergeMaterialChannels'
 import {
   addSharedDisplacementNormal,
   applyDispNormalDisplacement,
@@ -28,7 +29,7 @@ export type MaterialTextureSets = Record<string, TextureSetDto>
 export const KEY_SEP = '::'
 
 /** Get the material names from a mesh (handles arrays). */
-function getMeshMaterialNames(mesh: THREE.Mesh): string[] {
+export function getMeshMaterialNames(mesh: THREE.Mesh): string[] {
   const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material]
   return mats.map(m => m?.name ?? '').filter(Boolean)
 }
@@ -131,20 +132,25 @@ export function applyMaterialTextures(
   })
 
   clonedModel.traverse(child => {
-    if (!child.isMesh) return
     const mesh = child as THREE.Mesh
+    if (!mesh.isMesh) return
     mesh.castShadow = true
     mesh.receiveShadow = true
 
+    // Captured before the replacement below: a mesh that already wears a
+    // Modelibr material still needs the channel values it carried.
+    const originalMaterial = mesh.material
+
     const meshMatNames = getMeshMaterialNames(mesh)
 
-    // Find matching material: check mesh material names against our map
+    // Find matching material: check mesh material names against our map. The
+    // built material is a template, never worn directly - see the per-mesh copy
+    // below.
     let matched = false
-    let appliedMaterial: THREE.MeshPhysicalMaterial | null = null
+    let template: THREE.MeshPhysicalMaterial | null = null
     for (const meshMatName of meshMatNames) {
       if (meshMatName in builtMaterials) {
-        appliedMaterial = builtMaterials[meshMatName]
-        mesh.material = appliedMaterial
+        template = builtMaterials[meshMatName]
         matched = true
         break
       }
@@ -152,32 +158,51 @@ export function applyMaterialTextures(
 
     // Fallback: use wildcard "" material (applies to all unmatched meshes)
     if (!matched && hasWildcard && texturesReady) {
-      appliedMaterial = builtMaterials['']
+      template = builtMaterials['']
+    }
+
+    if (template) {
+      // One material per mesh. `builtMaterials` is shared across every mesh in
+      // the same slot, and the merge writes into the material it is given, so
+      // wearing the template directly would let the first mesh's maps win for
+      // all the rest (the default '' binding is where that shows most).
+      const appliedMaterial = mergeMaterialChannelsPerMesh(
+        originalMaterial,
+        template,
+        mesh.geometry
+      )
       mesh.material = appliedMaterial
+
+      // AO maps sample the second UV set. Without uv2 the AO term collapses to
+      // ~0 and kills ALL indirect light (ambient + environment IBL) while direct
+      // lights still work - which made the ambient/environment controls look
+      // inert. Copy uv -> uv2 like the worker thumbnail does.
+      if (appliedMaterial.aoMap) {
+        ensureAoMapUv2(mesh.geometry)
+      }
+
+      // Add the shared-displacement-normal attribute when this mesh is about
+      // to be displaced. The shader uses this attribute as the push direction
+      // so hard-edged meshes (game-asset cubes etc.) stay watertight along
+      // seams while keeping their original per-face UVs / normals intact for
+      // color shading. Idempotent: skipped if the attribute already exists.
+      if (appliedMaterial.displacementMap) {
+        addSharedDisplacementNormal(mesh.geometry)
+      }
+      return
     }
 
     // Strip embedded materials from unmatched meshes to match worker behavior
     if (!matched && !hasWildcard) {
       mesh.material = fallbackMaterial
     }
-
-    // AO maps sample the second UV set. Without uv2 the AO term collapses to
-    // ~0 and kills ALL indirect light (ambient + environment IBL) while direct
-    // lights still work - which made the ambient/environment controls look
-    // inert. Copy uv -> uv2 like the worker thumbnail does.
-    if (appliedMaterial?.aoMap) {
-      ensureAoMapUv2(mesh.geometry)
-    }
-
-    // Add the shared-displacement-normal attribute when this mesh is about
-    // to be displaced. The shader uses this attribute as the push direction
-    // so hard-edged meshes (game-asset cubes etc.) stay watertight along
-    // seams while keeping their original per-face UVs / normals intact for
-    // color shading. Idempotent: skipped if the attribute already exists.
-    if (appliedMaterial?.displacementMap) {
-      addSharedDisplacementNormal(mesh.geometry)
-    }
   })
+
+  // The templates were cloned per mesh above and are never worn, so they hold
+  // no GPU resources - dispose them so a rebuild does not leak one per slot.
+  for (const template of Object.values(builtMaterials)) {
+    template.dispose()
+  }
 }
 
 // Texture types in apply order, each with its fallback when the primary is

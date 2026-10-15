@@ -1168,6 +1168,11 @@ export class PuppeteerRenderer {
                   ? child.material[0]?.name || ''
                   : child.material?.name || ''
 
+                // Kept so the merge below can carry over every channel the
+                // texture set does not set (and COLOR_0). Captured before the
+                // replacement, while this is still the loaded model's material.
+                const originalMaterial = child.material
+
                 // Material config from the shared gating rule (metalness/
                 // roughness/specular keyed on their own maps, not the base-color
                 // map). Same source of truth as the viewer.
@@ -1238,6 +1243,16 @@ export class PuppeteerRenderer {
                     }
                   }
                 }
+
+                // A texture set overrides only the channels it sets; every
+                // other glTF map and COLOR_0 stays on the mesh. Same shared
+                // rule as the viewer
+                // (asset-processor/lib/materialChannels.js).
+                window.modelibrMaterialChannels.mergeMaterialChannels(
+                  originalMaterial,
+                  child.material,
+                  child.geometry
+                )
               }
             })
 
@@ -1369,6 +1384,177 @@ export class PuppeteerRenderer {
         framesCompleted: frames.length,
       })
       throw error
+    }
+  }
+
+  /**
+   * Read the animation clips the loaded model carries.
+   *
+   * The first clip is the one the thumbnail plays; a model with no clips keeps
+   * the orbit path. Read through the page (the model lives there), with the same
+   * page-usable guard every other read uses.
+   *
+   * @returns {Promise<{hasAnimation: boolean, clipCount: number, name: string|null, duration: number}>}
+   */
+  async getAnimationClipInfo() {
+    if (!this.page || this.page.isClosed() || !(await this._isPageUsable())) {
+      logger.warn(
+        'Renderer page is not available - cannot read animation clips'
+      )
+      return { hasAnimation: false, clipCount: 0, name: null, duration: 0 }
+    }
+
+    try {
+      return await this.page.evaluate(() => {
+        const model = window.modelRenderer?.model
+        const clips = Array.isArray(model?.animations) ? model.animations : []
+        return {
+          hasAnimation: clips.length > 0,
+          clipCount: clips.length,
+          name: clips[0]?.name ?? null,
+          duration: clips[0]?.duration ?? 0,
+        }
+      })
+    } catch (error) {
+      logger.warn('Failed to read animation clips', {
+        error: error.message,
+      })
+      return { hasAnimation: false, clipCount: 0, name: null, duration: 0 }
+    }
+  }
+
+  /**
+   * Render the first animation clip at the instants in `plan`.
+   *
+   * Each frame is drawn at an explicit mixer time - never real-time playback -
+   * so a slow software-GL host and a fast GPU produce the same thumbnail. The
+   * camera is fixed on the orbit's first angle and framed on the union of the
+   * model's bounds across the whole clip (setupModelAnimation in
+   * render-template.html), so the motion stays in frame. Looping is left to the
+   * encoder (infinite).
+   *
+   * @param {Object} [jobLogger]
+   * @param {AbortSignal} [signal] - Stops between frames when the queue times the job out.
+   * @param {{times: number[], frameCount: number, frameDelayMs: number}} plan
+   * @returns {Promise<{frames: Array, clipName: string|null, clipDuration: number, frameCount: number, frameDelayMs: number}>}
+   */
+  async renderAnimationFrames(jobLogger = logger, signal, plan) {
+    if (!this.page) {
+      throw new Error('Renderer not initialized')
+    }
+    if (!plan || !Array.isArray(plan.times) || plan.times.length === 0) {
+      throw new Error('Animation render needs a frame plan')
+    }
+
+    await this.setViewport(
+      config.rendering.outputWidth,
+      config.rendering.outputHeight
+    )
+
+    const isReady = await this.page.evaluate(() => window.modelRenderer.isReady)
+    if (!isReady) {
+      throw new Error('No model loaded')
+    }
+
+    const setup = await this.page.evaluate(
+      (baseDistance, sampleCount, coverage) =>
+        window.setupModelAnimation(baseDistance, sampleCount, coverage),
+      config.rendering.cameraDistance,
+      config.animationClip.boundingSamples,
+      config.animationClip.framingCoverage
+    )
+
+    if (!setup?.hasAnimation) {
+      throw new Error('No animation clip on the loaded model')
+    }
+
+    // Fixed camera: the orbit's first instant, framed on the union of motion.
+    await this.page.evaluate(
+      (distance, angle, elevation) =>
+        window.positionCamera(angle, distance, elevation),
+      setup.distance,
+      config.orbit.startAngle,
+      config.orbit.cameraHeight
+    )
+
+    jobLogger.info('Rendering animation frames with Puppeteer', {
+      clipName: setup.name,
+      clipDuration: setup.duration,
+      frameCount: plan.frameCount,
+      frameDelayMs: plan.frameDelayMs,
+      cameraDistance: setup.distance,
+    })
+
+    const frames = []
+    const startTime = Date.now()
+
+    for (let i = 0; i < plan.times.length; i++) {
+      if (signal?.aborted) {
+        throw new Error('Animation render aborted by job timeout')
+      }
+
+      const result = await this.page.evaluate(async time => {
+        try {
+          window.setAnimationTime(time)
+          const rendered = await window.renderScene()
+          if (!rendered) {
+            return { success: false, error: 'Rendering failed' }
+          }
+          const dataUrl = window.getCanvasDataURL()
+          if (!dataUrl) {
+            return { success: false, error: 'Failed to get canvas data' }
+          }
+          return { success: true, dataUrl }
+        } catch (error) {
+          console.error('Animation render error:', error)
+          return { success: false, error: error.message }
+        }
+      }, plan.times[i])
+
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to render animation frame')
+      }
+
+      const base64Data = result.dataUrl.replace(/^data:image\/\w+;base64,/, '')
+      const buffer = Buffer.from(base64Data, 'base64')
+
+      frames.push({
+        index: i,
+        angle: config.orbit.startAngle,
+        time: plan.times[i],
+        width: config.rendering.outputWidth,
+        height: config.rendering.outputHeight,
+        pixels: buffer,
+        size: buffer.length,
+        timestamp: Date.now(),
+        simulated: false,
+        renderSettings: {
+          backgroundColor: config.rendering.backgroundColor,
+          antialiasing: config.rendering.enableAntialiasing,
+        },
+      })
+
+      if ((i + 1) % 10 === 0 || i === plan.times.length - 1) {
+        jobLogger.info('Animation rendering progress', {
+          framesCompleted: i + 1,
+          totalFrames: plan.times.length,
+        })
+      }
+    }
+
+    const renderTime = Date.now() - startTime
+    jobLogger.info('Animation frame rendering completed with Puppeteer', {
+      frameCount: frames.length,
+      renderTimeMs: renderTime,
+      averageTimePerFrameMs: Math.round(renderTime / frames.length),
+    })
+
+    return {
+      frames,
+      clipName: setup.name,
+      clipDuration: setup.duration,
+      frameCount: frames.length,
+      frameDelayMs: plan.frameDelayMs,
     }
   }
 
@@ -1625,7 +1811,10 @@ export class PuppeteerRenderer {
 
   /**
    * Extract material names and technical mesh stats from the currently loaded model.
-   * @returns {Promise<{materialNames: string[], triangleCount: number, vertexCount: number, meshCount: number, materialCount: number}>}
+   * Clips travel as `{name, durationSeconds, kinds}` (kinds derived by the shared
+   * sceneGraph lib, exposed to this page context as window.modelibrAnimationKinds)
+   * and shape keys as `{meshName, shapeKeys}` per morph-capable mesh.
+   * @returns {Promise<{materialNames: string[], triangleCount: number, vertexCount: number, meshCount: number, materialCount: number, animations: Array<{name: string, durationSeconds: number, kinds: string[]}>, shapeKeys: Array<{meshName: string, shapeKeys: string[]}>}>}
    */
   async extractTechnicalMetadata() {
     if (!this.page || this.page.isClosed()) {
@@ -1676,12 +1865,35 @@ export class PuppeteerRenderer {
           }
         })
 
-        const animations = Array.isArray(model.animations)
-          ? model.animations
-          : []
-        const animationNames = animations.map(
-          (clip, index) => clip.name || `Animation ${index + 1}`
-        )
+        // What a clip animates, from the single shared rule in lib/sceneGraph.js
+        // (exposed as window.modelibrAnimationKinds). Empty when the page predates
+        // the binding; the names/durations still travel.
+        const animationKinds =
+          typeof window.modelibrAnimationKinds === 'function'
+            ? window.modelibrAnimationKinds
+            : () => []
+        const animations = (
+          Array.isArray(model.animations) ? model.animations : []
+        ).map((clip, index) => ({
+          name: clip.name || `Animation ${index + 1}`,
+          durationSeconds:
+            typeof clip.duration === 'number' ? clip.duration : 0,
+          kinds: animationKinds(clip),
+        }))
+        const animationNames = animations.map(animation => animation.name)
+
+        // One entry per morph-capable mesh, so the metadata can say which mesh
+        // owns "Squash" and "Stretch" rather than listing shape keys globally.
+        const shapeKeys = []
+        model.traverse(child => {
+          if (!child.isMesh) return
+          const names = child.morphTargetDictionary
+            ? Object.keys(child.morphTargetDictionary)
+            : []
+          if (names.length > 0) {
+            shapeKeys.push({ meshName: child.name || '', shapeKeys: names })
+          }
+        })
 
         const originalSize = window.modelRenderer.originalSize || null
 
@@ -1698,6 +1910,8 @@ export class PuppeteerRenderer {
           animationCount: animations.length,
           animationNames,
           boneCount,
+          animations,
+          shapeKeys,
         }
       })
 
@@ -1787,8 +2001,25 @@ export class PuppeteerRenderer {
   }
 
   /**
+   * Close the job's page, leaving the browser for the next job. Called by
+   * RendererPool.release() so a job's WebGL scene does not outlive its job;
+   * the next use recreates the page through _reinitialize().
+   */
+  async closePage() {
+    if (!this.page) return
+
+    try {
+      await this.page.close()
+    } catch (error) {
+      logger.debug('Error closing renderer page', { error: error.message })
+    }
+    this.page = null
+  }
+
+  /**
    * Clean up resources.
-   * In shared-browser mode, only the page is closed (the browser is managed by RendererPool).
+   * In shared-browser mode, only the page is closed (the browser is managed
+   * worker-wide by browserManager). Standalone renderers still own theirs.
    */
   async dispose() {
     logger.debug('Disposing Puppeteer renderer', {
@@ -1796,10 +2027,7 @@ export class PuppeteerRenderer {
     })
 
     try {
-      if (this.page) {
-        await this.page.close()
-        this.page = null
-      }
+      await this.closePage()
 
       if (this._ownsBrowser && this.browser) {
         await this.browser.close()
@@ -1812,5 +2040,42 @@ export class PuppeteerRenderer {
         error: error.message,
       })
     }
+  }
+}
+
+/**
+ * Which instants of an animation clip to render, and how long to hold each.
+ *
+ * Frames are spread evenly over the whole clip - `i * duration / count` - so the
+ * loop shows every moment and its last frame leads straight back into the first.
+ * `targetFps` sets the density; `maxFrames` bounds the file for long clips by
+ * lowering the rate (each frame held for duration / frames, so the loop still
+ * takes the clip's real time). A clip always yields at least `minFrames` frames
+ * so even a very short one reads as an animation rather than a still.
+ *
+ * @param {number} clipDuration - Clip length in seconds.
+ * @param {{targetFps: number, maxFrames: number, minFrames: number}} limits
+ * @returns {{frameCount: number, times: number[], frameDelayMs: number}}
+ */
+export function planAnimationFrames(
+  clipDuration,
+  { targetFps, maxFrames, minFrames }
+) {
+  if (!Number.isFinite(clipDuration) || clipDuration <= 0) {
+    throw new Error(
+      `The animation clip reported an unusable duration: ${clipDuration}`
+    )
+  }
+
+  const frameCount = Math.min(
+    maxFrames,
+    Math.max(minFrames, Math.ceil(clipDuration * targetFps))
+  )
+  const step = clipDuration / frameCount
+
+  return {
+    frameCount,
+    times: Array.from({ length: frameCount }, (_, index) => index * step),
+    frameDelayMs: (clipDuration * 1000) / frameCount,
   }
 }

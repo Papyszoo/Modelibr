@@ -1,4 +1,4 @@
-import { useLoader, useThree } from '@react-three/fiber'
+import { useFrame, useLoader, useThree } from '@react-three/fiber'
 import {
   type JSX,
   Suspense,
@@ -13,14 +13,15 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader'
 import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader'
 import { STLLoader } from 'three/examples/jsm/loaders/STLLoader'
 
-import { applyParameterMaterials } from '@/shared/three/parameterMaterial'
+import { disposeClonedMaterials } from '@/shared/three/disposeClonedMaterials'
+import { advanceMaterialEffects } from '@/shared/three/materialEffects'
 import { createResourceManager } from '@/shared/three/safeLoadingManager'
 import {
-  applyMaterialTextures,
   type MaterialTextureSets,
   usePerMaterialTextures,
 } from '@/shared/three/textureSetMaterial'
 
+import { usePlacedModel } from '../hooks/usePlacedModel'
 import type { SceneAssetSource } from '../hooks/useSceneAssetSources'
 import type { NodeDressing } from '../hooks/useSceneMaterials'
 import { boundsOffset } from '../lib/sceneGeometry'
@@ -97,6 +98,14 @@ interface SceneNodeObjectProps {
    * is unchanged.
    */
   onLoadSettled?: (nodeId: string, loaded: boolean) => void
+  /**
+   * The render page's deterministic time, in seconds. Set only in the
+   * `?render=scene` bootstrap: animated nodes are then posed at exactly this
+   * time instead of advancing by the real frame delta, so the same scene
+   * photographed twice is the same picture. Undefined is the editor, where
+   * clips run on the live clock.
+   */
+  renderTime?: number
 }
 
 export function SceneNodeObject({
@@ -112,6 +121,7 @@ export function SceneNodeObject({
   undecided = false,
   onLoadError,
   onLoadSettled,
+  renderTime,
 }: SceneNodeObjectProps): JSX.Element | null {
   if (!node.visible) {
     return null
@@ -157,6 +167,9 @@ export function SceneNodeObject({
           originConvention={originConvention}
           originInBounds={originInBounds}
           dressing={dressing}
+          animation={node.animation}
+          shapeKeys={node.shapeKeys}
+          renderTime={renderTime}
           onLoadError={onLoadError}
           onLoadSettled={onLoadSettled}
         />
@@ -199,6 +212,9 @@ function SceneNodeAsset({
   originConvention,
   originInBounds,
   dressing,
+  animation,
+  shapeKeys,
+  renderTime,
   onLoadError,
   onLoadSettled,
 }: {
@@ -208,6 +224,9 @@ function SceneNodeAsset({
   originConvention: string | null
   originInBounds: Vec3 | null
   dressing?: NodeDressing
+  animation?: SceneNode['animation']
+  shapeKeys?: SceneNode['shapeKeys']
+  renderTime?: number
   onLoadError: (nodeId: string, message: string) => void
   onLoadSettled?: (nodeId: string, loaded: boolean) => void
 }): JSX.Element {
@@ -245,11 +264,15 @@ function SceneNodeAsset({
         }
       >
         <SceneAssetMesh
+          nodeId={nodeId}
           source={source}
           bounds={bounds}
           originConvention={originConvention}
           originInBounds={originInBounds}
           dressing={dressing}
+          animation={animation}
+          shapeKeys={shapeKeys}
+          renderTime={renderTime}
           onReady={onReady}
         />
         {/*
@@ -401,18 +424,26 @@ type LoaderConstructor =
 
 /** Dispatches to the loader for the asset's format. Props only - see the note above. */
 function SceneAssetMesh({
+  nodeId,
   source,
   bounds,
   originConvention,
   originInBounds,
   dressing,
+  animation,
+  shapeKeys,
+  renderTime,
   onReady,
 }: {
+  nodeId: string
   source?: SceneAssetSource
   bounds: Vec3 | null
   originConvention: string | null
   originInBounds: Vec3 | null
   dressing?: NodeDressing
+  animation?: SceneNode['animation']
+  shapeKeys?: SceneNode['shapeKeys']
+  renderTime?: number
   /** Called once this node is compiled and on screen; see `SceneNodeAsset`. */
   onReady: () => void
 }): JSX.Element | null {
@@ -442,32 +473,54 @@ function SceneAssetMesh({
     case 'gltf':
       return (
         <GltfMesh
+          nodeId={nodeId}
           url={source.url}
           resources={source.resources}
           dressing={dressing}
+          animation={animation}
+          shapeKeys={shapeKeys}
+          renderTime={renderTime}
           onReady={onReady}
         />
       )
     case 'fbx':
       return (
         <FbxMesh
+          nodeId={nodeId}
           url={source.url}
           resources={source.resources}
           dressing={dressing}
+          animation={animation}
+          shapeKeys={shapeKeys}
+          renderTime={renderTime}
           onReady={onReady}
         />
       )
     case 'obj':
       return (
         <ObjMesh
+          nodeId={nodeId}
           url={source.url}
           resources={source.resources}
           dressing={dressing}
+          animation={animation}
+          shapeKeys={shapeKeys}
+          renderTime={renderTime}
           onReady={onReady}
         />
       )
     case 'stl':
-      return <StlMesh url={source.url} dressing={dressing} onReady={onReady} />
+      return (
+        <StlMesh
+          nodeId={nodeId}
+          url={source.url}
+          dressing={dressing}
+          animation={animation}
+          shapeKeys={shapeKeys}
+          renderTime={renderTime}
+          onReady={onReady}
+        />
+      )
     default:
       // A format the viewer cannot load is shown as its bounds rather than
       // dropped - a node missing from the canvas reads as a failed placement.
@@ -486,14 +539,22 @@ function SceneAssetMesh({
 }
 
 function GltfMesh({
+  nodeId,
   url,
   resources,
   dressing,
+  animation,
+  shapeKeys,
+  renderTime,
   onReady,
 }: {
+  nodeId: string
   url: string
   resources: Record<string, string>
   dressing?: NodeDressing
+  animation?: SceneNode['animation']
+  shapeKeys?: SceneNode['shapeKeys']
+  renderTime?: number
   onReady: () => void
 }): JSX.Element {
   // A loose .gltf stores its buffers and textures as relative URIs. They resolve
@@ -510,22 +571,35 @@ function GltfMesh({
   return (
     <PlacedObject
       object={gltf.scene}
+      clips={gltf.animations}
+      animation={animation}
+      shapeKeys={shapeKeys}
+      renderTime={renderTime}
       dressing={dressing}
       flipY={false}
+      nodeId={nodeId}
       onReady={onReady}
     />
   )
 }
 
 function FbxMesh({
+  nodeId,
   url,
   resources,
   dressing,
+  animation,
+  shapeKeys,
+  renderTime,
   onReady,
 }: {
+  nodeId: string
   url: string
   resources: Record<string, string>
   dressing?: NodeDressing
+  animation?: SceneNode['animation']
+  shapeKeys?: SceneNode['shapeKeys']
+  renderTime?: number
   onReady: () => void
 }): JSX.Element {
   // An FBX names its textures the way the artist's machine had them
@@ -538,34 +612,71 @@ function FbxMesh({
   const fbx = useLoader(FBXLoader, url, loader => {
     loader.manager = manager
   })
-  return <PlacedObject object={fbx} dressing={dressing} onReady={onReady} />
+  return (
+    <PlacedObject
+      object={fbx}
+      clips={fbx.animations}
+      animation={animation}
+      shapeKeys={shapeKeys}
+      renderTime={renderTime}
+      dressing={dressing}
+      nodeId={nodeId}
+      onReady={onReady}
+    />
+  )
 }
 
 function ObjMesh({
+  nodeId,
   url,
   resources,
   dressing,
+  animation,
+  shapeKeys,
+  renderTime,
   onReady,
 }: {
+  nodeId: string
   url: string
   resources: Record<string, string>
   dressing?: NodeDressing
+  animation?: SceneNode['animation']
+  shapeKeys?: SceneNode['shapeKeys']
+  renderTime?: number
   onReady: () => void
 }): JSX.Element {
   const manager = useMemo(() => createResourceManager(resources), [resources])
   const obj = useLoader(OBJLoader, url, loader => {
     loader.manager = manager
   })
-  return <PlacedObject object={obj} dressing={dressing} onReady={onReady} />
+  return (
+    <PlacedObject
+      object={obj}
+      animation={animation}
+      shapeKeys={shapeKeys}
+      renderTime={renderTime}
+      dressing={dressing}
+      nodeId={nodeId}
+      onReady={onReady}
+    />
+  )
 }
 
 function StlMesh({
+  nodeId,
   url,
   dressing,
+  animation,
+  shapeKeys,
+  renderTime,
   onReady,
 }: {
+  nodeId: string
   url: string
   dressing?: NodeDressing
+  animation?: SceneNode['animation']
+  shapeKeys?: SceneNode['shapeKeys']
+  renderTime?: number
   onReady: () => void
 }): JSX.Element {
   const geometry = useLoader(STLLoader, url)
@@ -588,7 +699,17 @@ function StlMesh({
     [geometry]
   )
 
-  return <PlacedObject object={mesh} dressing={dressing} onReady={onReady} />
+  return (
+    <PlacedObject
+      object={mesh}
+      animation={animation}
+      shapeKeys={shapeKeys}
+      renderTime={renderTime}
+      dressing={dressing}
+      nodeId={nodeId}
+      onReady={onReady}
+    />
+  )
 }
 
 /**
@@ -602,13 +723,26 @@ function StlMesh({
  */
 function PlacedObject({
   object,
+  clips,
+  animation,
+  shapeKeys,
   dressing,
   flipY = true,
+  nodeId,
+  renderTime,
   onReady,
 }: {
   object: THREE.Object3D
+  /** The clips the loaded model carries, for the node's `animation` to name. */
+  clips?: THREE.AnimationClip[]
+  animation?: SceneNode['animation']
+  shapeKeys?: SceneNode['shapeKeys']
   dressing?: NodeDressing
   flipY?: boolean
+  /** The scene node's id; the one-time "clip not found" warning is keyed by it. */
+  nodeId: string
+  /** The render page's deterministic time; undefined in the editor (live clock). */
+  renderTime?: number
   onReady: () => void
 }): JSX.Element | null {
   const { gl: renderer, scene, camera } = useThree()
@@ -627,39 +761,20 @@ function PlacedObject({
     flipY
   )
 
-  const clone = useMemo(() => {
-    const copy = object.clone(true)
-    copy.traverse(child => {
-      if ((child as THREE.Mesh).isMesh) {
-        child.castShadow = true
-        child.receiveShadow = true
-      }
-    })
-
-    if (Object.keys(materialTextureSets).length > 0) {
-      // Until the channels load this leaves the source materials in place, so a
-      // node fades into its bound material rather than flashing untextured.
-      applyMaterialTextures(
-        copy,
-        materialTextureSets,
-        loadedTextures,
-        texturesReady
-      )
-    }
-
-    // Second, so the two layer predictably on a node that uses both: a tiling
-    // material on the frame, a colour on the cushions. Parameter materials need
-    // nothing loaded, so they appear on the first frame.
-    applyParameterMaterials(copy, slotMaterials)
-
-    return copy
-  }, [
+  // Cloning, dressing, shape keys and the mixer are one lifecycle; see
+  // `usePlacedModel`. Keeping the shape-key influence out of the clone memo is
+  // what stops a slider drag from rebuilding the node and restarting its clip.
+  const { clone, nodeAnimation } = usePlacedModel({
     object,
+    clips,
+    animation,
+    shapeKeys,
     materialTextureSets,
     slotMaterials,
     loadedTextures,
     texturesReady,
-  ])
+    nodeId,
+  })
 
   // applyMaterialTextures allocates fresh materials on every rebuild, so the
   // superseded ones are released here. Only materials this clone introduced:
@@ -667,6 +782,28 @@ function PlacedObject({
   // the source object, so disposing indiscriminately would blank the original -
   // and with it every other placement of the same asset, plus any open viewer.
   useEffect(() => () => disposeClonedMaterials(clone, object), [clone, object])
+
+  // In the editor this is the live clock. In a render (`renderTime` set) the
+  // mixer is posed at exactly that time every frame - never advanced by the
+  // wall clock - so the same scene rendered twice is the same picture and
+  // `t = 0` shows the node's configured start-offset pose.
+  useFrame((state, delta) => {
+    // Effect time follows the same rule as clip time: explicit in a render,
+    // the live clock in the editor. Runs even when the node has no animation.
+    const effectTime =
+      renderTime !== undefined ? renderTime : state.clock.elapsedTime
+    advanceMaterialEffects(clone, effectTime)
+
+    if (!nodeAnimation) {
+      return
+    }
+
+    if (renderTime !== undefined) {
+      nodeAnimation.setTime(renderTime)
+    } else {
+      nodeAnimation.advance(delta)
+    }
+  })
 
   // Compiled before it is mounted, not on the frame that first draws it.
   //
@@ -718,34 +855,6 @@ function PlacedObject({
   }, [camera, clone, onReady, renderer, scene])
 
   return compiled === clone ? <primitive object={clone} /> : null
-}
-
-function collectMaterials(root: THREE.Object3D): Set<THREE.Material> {
-  const materials = new Set<THREE.Material>()
-  root.traverse(child => {
-    const mesh = child as THREE.Mesh
-    if (!mesh.isMesh) return
-    for (const material of Array.isArray(mesh.material)
-      ? mesh.material
-      : [mesh.material]) {
-      if (material) {
-        materials.add(material)
-      }
-    }
-  })
-  return materials
-}
-
-function disposeClonedMaterials(
-  clone: THREE.Object3D,
-  source: THREE.Object3D
-): void {
-  const shared = collectMaterials(source)
-  for (const material of collectMaterials(clone)) {
-    if (!shared.has(material)) {
-      material.dispose()
-    }
-  }
 }
 
 /**

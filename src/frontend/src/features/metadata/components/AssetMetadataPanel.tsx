@@ -3,12 +3,12 @@ import './AssetMetadataPanel.css'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Button } from 'primereact/button'
 import { Checkbox } from 'primereact/checkbox'
-import { InputNumber } from 'primereact/inputnumber'
 import { InputText } from 'primereact/inputtext'
 import { InputTextarea } from 'primereact/inputtextarea'
 import { type JSX, useEffect, useMemo, useState } from 'react'
 
 import { TextureSetKind } from '@/features/texture-set/types'
+import { NumberInput } from '@/shared/components'
 import { TagInput } from '@/shared/components/tags/TagInput'
 
 import { setAssetMetadata } from '../api/metadataApi'
@@ -166,6 +166,23 @@ export function AssetMetadataPanel({
           />
         </div>
       </div>
+
+      {/*
+        Inline, because `showToast` is optional and a host may not mount one: a
+        failed save used to show nothing at all while the draft quietly stayed
+        on screen, which reads as "saved".
+      */}
+      {save.isError ? (
+        <p
+          className="asset-metadata-note asset-metadata-error"
+          role="alert"
+          data-testid="asset-metadata-error"
+        >
+          {save.error instanceof Error
+            ? save.error.message
+            : 'The metadata could not be saved.'}
+        </p>
+      ) : null}
 
       {GROUP_ORDER.map(group => {
         const groupFields = fields.filter(field => field.group === group)
@@ -326,12 +343,19 @@ function Editor({
     case 'integer':
     case 'number':
       return (
-        <InputNumber
-          inputId={id}
+        <NumberInput
+          id={id}
+          className="asset-metadata-number"
           disabled={disabled}
           value={typeof value === 'number' ? value : null}
-          maxFractionDigits={field.type === 'integer' ? 0 : 3}
-          onValueChange={event => onChange(event.value ?? null)}
+          allowEmpty
+          onChange={next =>
+            onChange(
+              next !== null && field.type === 'integer'
+                ? Math.round(next)
+                : next
+            )
+          }
         />
       )
 

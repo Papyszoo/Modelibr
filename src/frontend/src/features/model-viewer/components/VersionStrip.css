@@ -311,6 +311,35 @@
   font-size: 0.75rem !important;
 }
 
+/*
+ * Phone width: the version dropdown and the file strip share one 390px row,
+ * and the card's 140px floor pushed it past the right edge. Let the strip
+ * shrink into the space left and a lone card shrink with its name ellipsized
+ * instead of being cut. A strip with many files still scrolls.
+ */
+@media (max-width: 767px) {
+  /* The strip is a flex item with an automatic min-width of its content, so
+     without this it never shrinks below the dropdown plus a full card and
+     overflows the header. */
+  .version-strip {
+    min-width: 0;
+  }
+
+  .file-list-scroll {
+    min-width: 0;
+  }
+
+  .file-strip-card:only-child {
+    flex-shrink: 1;
+    min-width: 0;
+  }
+
+  .file-strip-meta {
+    min-width: 0;
+    overflow: hidden;
+  }
+}
+
 /* Dark mode adjustments */
 @media (prefers-color-scheme: dark) {
   .version-dropdown-menu {

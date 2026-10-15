@@ -16,6 +16,7 @@ import { ContainerScriptsTab } from '@/shared/components/container-tabs/Containe
 import { ContainerSoundsTab } from '@/shared/components/container-tabs/ContainerSoundsTab'
 import { ContainerSpritesTab } from '@/shared/components/container-tabs/ContainerSpritesTab'
 import { ContainerTextureSetsTab } from '@/shared/components/container-tabs/ContainerTextureSetsTab'
+import { ContainerVfxTab } from '@/shared/components/container-tabs/ContainerVfxTab'
 import { ErrorState, LoadingState } from '@/shared/components/feedback'
 import { useContainerData } from '@/shared/hooks/useContainerData'
 import { type ContainerAdapter } from '@/shared/types/ContainerTypes'
@@ -218,6 +219,16 @@ export function ContainerViewer({ adapter, tabId }: ContainerViewerProps) {
                 ? { packId: adapter.containerId }
                 : { projectId: adapter.containerId })}
               onTotalCountChange={setModelTotalCount}
+              renderCardAccessory={
+                adapter.renderAssetAccessory
+                  ? model =>
+                      adapter.renderAssetAccessory?.({
+                        type: 'model',
+                        id: Number(model.id),
+                        name: model.name,
+                      })
+                  : undefined
+              }
             />
           </TabPanel>
 
@@ -322,6 +333,25 @@ export function ContainerViewer({ adapter, tabId }: ContainerViewerProps) {
               onTotalCountChange={setEnvironmentMapTotalCount}
             />
           </TabPanel>
+
+          {/* Last, so a pack (which holds no effects) keeps every tab index. */}
+          {adapter.addVfx ? (
+            <TabPanel
+              header="VFX"
+              headerTemplate={renderTabHeader(
+                'pi-sparkles',
+                'VFX',
+                container.vfxCount ?? container.vfx?.length ?? 0
+              )}
+            >
+              <ContainerVfxTab
+                adapter={adapter}
+                container={container}
+                refetchContainer={refetchContainer}
+                showToast={showToast}
+              />
+            </TabPanel>
+          ) : null}
         </TabView>
       </div>
     </div>

@@ -37,4 +37,17 @@ describe('useModelFilters - client name search only', () => {
     // All four models pass through untouched despite category 9 being active.
     expect(result.current.filterModels(models)).toHaveLength(4)
   })
+
+  // Regression: collapsing the search bar kept the query filtering invisibly.
+  it('clears the search when the search bar is collapsed', () => {
+    const { result } = renderHook(() => useModelFilters({}))
+
+    act(() => result.current.setIsSearchOpen(true))
+    act(() => result.current.setSearchQuery('gob'))
+    expect(result.current.searchQuery).toBe('gob')
+
+    act(() => result.current.setIsSearchOpen(false))
+    expect(result.current.searchQuery).toBe('')
+    expect(result.current.filterModels(models)).toHaveLength(4)
+  })
 })

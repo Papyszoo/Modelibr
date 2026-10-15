@@ -41,7 +41,11 @@ h1 {
   line-height: 1.1;
 }
 
-button:not(.p-button):not(.p-component):not(.p-link) {
+/* The theme-card exclusion: the Settings appearance picker's cards are
+ * <button>s with their own component styles (.theme-card in Settings.css).
+ * Without this, this generic rule's higher specificity (0,3,1) silently beat
+ * `.theme-card.selected` and flattened the cards into plain buttons. */
+button:not(.p-button):not(.p-component):not(.p-link):not(.theme-card) {
   border-radius: 8px;
   border: 1px solid var(--surface-border, transparent);
   padding: 0.6em 1.2em;
@@ -59,12 +63,14 @@ button:not(.p-button):not(.p-component):not(.p-link) {
     color 0.25s,
     box-shadow 0.25s;
 }
-button:not(.p-button):not(.p-component):not(.p-link):hover {
+button:not(.p-button):not(.p-component):not(.p-link):not(.theme-card):hover {
   border-color: var(--primary-color, #646cff);
   background-color: var(--surface-hover, var(--surface-card, transparent));
 }
-button:not(.p-button):not(.p-component):not(.p-link):focus,
-button:not(.p-button):not(.p-component):not(.p-link):focus-visible {
+button:not(.p-button):not(.p-component):not(.p-link):not(.theme-card):focus,
+button:not(.p-button):not(.p-component):not(.p-link):not(
+    .theme-card
+  ):focus-visible {
   outline: none;
   box-shadow: 0 0 0 3px rgba(var(--primary-color-rgb, 100, 108, 255), 0.16);
 }

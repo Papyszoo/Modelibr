@@ -21,6 +21,16 @@ internal static class SettingValidator
             SettingKeys.BlenderPath => ValidateBlenderPath(value),
             SettingKeys.BlenderEnabled => ValidateBlenderEnabled(value),
             SettingKeys.DuplicateNamePolicy => ValidateDuplicateNamePolicy(value),
+            SettingKeys.AutoAssignOnImport => ValidateBoolean(value, SettingKeys.AutoAssignOnImport),
+            SettingKeys.CleanRecycledFilesAfterDays => ValidateCleanRecycledFilesAfterDays(value),
+            SettingKeys.PreMigrationBackupEnabled => ValidateBoolean(value, SettingKeys.PreMigrationBackupEnabled),
+            SettingKeys.PreMigrationBackupRetention => ValidatePreMigrationBackupRetention(value),
+            SettingKeys.SkipDuplicateThumbnails => ValidateBoolean(value, SettingKeys.SkipDuplicateThumbnails),
+            SettingKeys.McpEnabled => ValidateBoolean(value, SettingKeys.McpEnabled),
+            SettingKeys.McpWriteEnabled => ValidateBoolean(value, SettingKeys.McpWriteEnabled),
+            SettingKeys.McpDestructiveEnabled => ValidateBoolean(value, SettingKeys.McpDestructiveEnabled),
+            SettingKeys.ThumbnailBackground => ValidateThumbnailBackground(value),
+            SettingKeys.BlenderOperationTimeoutMinutes => ValidateBlenderOperationTimeoutMinutes(value),
             _ => Result.Success() // Unknown keys are allowed for extensibility
         };
     }
@@ -130,6 +140,64 @@ internal static class SettingValidator
     {
         if (value is not ("Reject" or "AutoRename" or "Allow"))
             return Result.Failure(new Error("InvalidSetting", "DuplicateNamePolicy must be 'Reject', 'AutoRename', or 'Allow'."));
+
+        return Result.Success();
+    }
+
+    private static Result ValidateBoolean(string value, string key)
+    {
+        if (!bool.TryParse(value, out _))
+            return Result.Failure(new Error("InvalidSetting", $"{key} must be 'true' or 'false'."));
+
+        return Result.Success();
+    }
+
+    private static Result ValidateCleanRecycledFilesAfterDays(string value)
+    {
+        if (!int.TryParse(value, out var days))
+            return Result.Failure(new Error("InvalidSetting", "CleanRecycledFilesAfterDays must be a valid integer."));
+
+        if (days < 0)
+            return Result.Failure(new Error("InvalidSetting", "Recycled file retention must be 0 (never) or a number of days."));
+
+        if (days > 365)
+            return Result.Failure(new Error("InvalidSetting", "Recycled file retention cannot exceed 365 days."));
+
+        return Result.Success();
+    }
+
+    private static Result ValidatePreMigrationBackupRetention(string value)
+    {
+        if (!int.TryParse(value, out var count))
+            return Result.Failure(new Error("InvalidSetting", "PreMigrationBackupRetention must be a valid integer."));
+
+        if (count < 1)
+            return Result.Failure(new Error("InvalidSetting", "Pre-migration backup retention must be at least 1."));
+
+        if (count > 10)
+            return Result.Failure(new Error("InvalidSetting", "Pre-migration backup retention cannot exceed 10."));
+
+        return Result.Success();
+    }
+
+    private static Result ValidateThumbnailBackground(string value)
+    {
+        if (!SettingResolution.IsValidThumbnailBackground(value))
+            return Result.Failure(new Error("InvalidSetting", "ThumbnailBackground must be 'transparent' or a #RRGGBB colour."));
+
+        return Result.Success();
+    }
+
+    private static Result ValidateBlenderOperationTimeoutMinutes(string value)
+    {
+        if (!int.TryParse(value, out var minutes))
+            return Result.Failure(new Error("InvalidSetting", "BlenderOperationTimeoutMinutes must be a valid integer."));
+
+        if (minutes < 1)
+            return Result.Failure(new Error("InvalidSetting", "Blender operation timeout must be at least 1 minute."));
+
+        if (minutes > 240)
+            return Result.Failure(new Error("InvalidSetting", "Blender operation timeout cannot exceed 240 minutes."));
 
         return Result.Success();
     }

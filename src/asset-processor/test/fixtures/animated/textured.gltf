@@ -1,0 +1,147 @@
+{
+  "asset": {
+    "version": "2.0",
+    "generator": "Modelibr animated fixture generator"
+  },
+  "scene": 0,
+  "scenes": [
+    {
+      "nodes": [
+        0
+      ]
+    }
+  ],
+  "meshes": [
+    {
+      "name": "Box",
+      "primitives": [
+        {
+          "attributes": {
+            "POSITION": 0,
+            "NORMAL": 1,
+            "TEXCOORD_0": 2
+          },
+          "indices": 3,
+          "material": 0
+        }
+      ]
+    }
+  ],
+  "materials": [
+    {
+      "name": "BoxMat",
+      "pbrMetallicRoughness": {
+        "baseColorTexture": {
+          "index": 0
+        },
+        "metallicFactor": 0,
+        "roughnessFactor": 0.8
+      },
+      "normalTexture": {
+        "index": 1
+      }
+    }
+  ],
+  "textures": [
+    {
+      "source": 0,
+      "sampler": 0
+    },
+    {
+      "source": 1,
+      "sampler": 0
+    }
+  ],
+  "images": [
+    {
+      "name": "BoxBaseColor",
+      "uri": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAYAAACp8Z5+AAAAG0lEQVR4nGN4MdHmv1NM138YzYDMAdEMBFUAAB/rJtkWlYOPAAAAAElFTkSuQmCC"
+    },
+    {
+      "name": "BoxNormal",
+      "uri": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAYAAACp8Z5+AAAAEklEQVR4nGNoaPj/HxkzkC4AAEx+L+F03Np8AAAAAElFTkSuQmCC"
+    }
+  ],
+  "samplers": [
+    {
+      "magFilter": 9729,
+      "minFilter": 9729,
+      "wrapS": 33071,
+      "wrapT": 33071
+    }
+  ],
+  "nodes": [
+    {
+      "name": "Box",
+      "mesh": 0
+    }
+  ],
+  "buffers": [
+    {
+      "byteLength": 328,
+      "uri": "data:application/octet-stream;base64,AAAAvwAAAL8AAAC/AAAAPwAAAL8AAAC/AAAAPwAAAD8AAAC/AAAAvwAAAD8AAAC/AAAAvwAAAL8AAAA/AAAAPwAAAL8AAAA/AAAAPwAAAD8AAAA/AAAAvwAAAD8AAAA/RrYTv0a2E79GthO/RrYTP0a2E79GthO/RrYTP0a2Ez9GthO/RrYTv0a2Ez9GthO/RrYTv0a2E79GthM/RrYTP0a2E79GthM/RrYTP0a2Ez9GthM/RrYTv0a2Ez9GthM/AAAAAAAAAAAAAIA/AAAAAAAAgD8AAIA/AAAAAAAAgD8AAAAAAAAAAAAAgD8AAAAAAACAPwAAgD8AAAAAAACAPwAAAQACAAAAAgADAAQABgAFAAQABwAGAAAABAAFAAAABQABAAMAAgAGAAMABgAHAAAAAwAHAAAABwAEAAEABQAGAAEABgACAA=="
+    }
+  ],
+  "bufferViews": [
+    {
+      "buffer": 0,
+      "byteOffset": 0,
+      "byteLength": 96,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteOffset": 96,
+      "byteLength": 96,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteOffset": 192,
+      "byteLength": 64,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteOffset": 256,
+      "byteLength": 72,
+      "target": 34963
+    }
+  ],
+  "accessors": [
+    {
+      "bufferView": 0,
+      "componentType": 5126,
+      "count": 8,
+      "type": "VEC3",
+      "min": [
+        -0.5,
+        -0.5,
+        -0.5
+      ],
+      "max": [
+        0.5,
+        0.5,
+        0.5
+      ]
+    },
+    {
+      "bufferView": 1,
+      "componentType": 5126,
+      "count": 8,
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 2,
+      "componentType": 5126,
+      "count": 8,
+      "type": "VEC2"
+    },
+    {
+      "bufferView": 3,
+      "componentType": 5123,
+      "count": 36,
+      "type": "SCALAR"
+    }
+  ]
+}

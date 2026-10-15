@@ -22,7 +22,34 @@ internal sealed class SceneRepository : ISceneRepository
         // the write paths take this same read.
         return await _context.Scenes
             .Include(s => s.Project)
+            .Include(s => s.ProjectLevel)
             .FirstOrDefaultAsync(s => s.Id == id, cancellationToken);
+    }
+
+    public async Task<Scene?> GetPrimaryByLevelAsync(
+        int levelId,
+        CancellationToken cancellationToken = default)
+        => await _context.Scenes
+            .Include(s => s.Project)
+            .Include(s => s.ProjectLevel)
+            .FirstOrDefaultAsync(
+                s => s.ProjectLevelId == levelId && s.IsPrimaryLevelScene,
+                cancellationToken);
+
+    public async Task<IReadOnlyList<Scene>> GetByLevelsAsync(
+        IReadOnlyCollection<int> levelIds,
+        CancellationToken cancellationToken = default)
+    {
+        if (levelIds.Count == 0)
+        {
+            return Array.Empty<Scene>();
+        }
+
+        // Tracked on purpose: the delete handlers unlink these before the level row
+        // goes, so the UPDATE must be flushed rather than thrown away by AsNoTracking.
+        return await _context.Scenes
+            .Where(s => s.ProjectLevelId != null && levelIds.Contains(s.ProjectLevelId.Value))
+            .ToListAsync(cancellationToken);
     }
 
     public async Task<IEnumerable<Scene>> GetAllAsync(CancellationToken cancellationToken = default)
@@ -30,6 +57,7 @@ internal sealed class SceneRepository : ISceneRepository
         return await _context.Scenes
             .AsNoTracking()
             .Include(s => s.Project)
+            .Include(s => s.ProjectLevel)
             .OrderByDescending(s => s.UpdatedAt)
             .ToListAsync(cancellationToken);
     }

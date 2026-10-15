@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Application.Abstractions;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
@@ -6,6 +7,7 @@ using Application.EnvironmentMaps;
 using Application.Metadata;
 using Application.Models;
 using Application.Packs;
+using Application.Projects;
 using Application.Scenes;
 using Application.Sounds;
 using Application.Sprites;
@@ -54,6 +56,7 @@ public class AgentOperationReverserTests
     private readonly Mock<ICommandHandler<RestoreSceneRecommendationsCommand, SceneRecommendationsResponse>> _restoreSceneRecommendations = new();
     private readonly Mock<ICommandHandler<SetSceneProjectCommand, SetSceneProjectResponse>> _setSceneProject = new();
     private readonly Mock<ICommandHandler<SetAssetMetadataCommand, AssetMetadataResponse>> _setAssetMetadata = new();
+    private readonly Mock<ICommandHandler<RemoveAssetFromProjectCommand>> _removeFromProject = new();
 
     private readonly FakeUnitOfWork _unitOfWork = new();
 
@@ -68,7 +71,8 @@ public class AgentOperationReverserTests
             _deleteSprite.Object, _deleteEnvironmentMap.Object, _deleteTextureSet.Object,
             _removeSceneNode.Object, _restoreSceneNode.Object, _moveSceneNode.Object, _setSceneLight.Object,
             _applySceneMaterial.Object, _updateSceneDocument.Object, _setSceneStage.Object, _deleteScene.Object, _createScene.Object, _restoreSceneLights.Object, _restoreSceneSlot.Object,
-            _restoreSceneRecommendations.Object, _setSceneProject.Object, _setAssetMetadata.Object);
+            _restoreSceneRecommendations.Object, _setSceneProject.Object, _setAssetMetadata.Object,
+            _removeFromProject.Object);
 
         // The default: this caller wins the reversal claim, applies the inverse, and
         // records it afterwards. The claim and the record are two calls now, because they
@@ -95,7 +99,7 @@ public class AgentOperationReverserTests
     /// payload without one is not reversible at all.
     /// </summary>
     private const string DeletedSceneBefore =
-        """{"name":"Kitchen","description":null,"document":"{\"schemaVersion\":1,\"nodes\":[],\"lights\":[]}"}""";
+        """{"name":"Kitchen","description":null,"document":{"schemaVersion":1,"nodes":[],"lights":[]}}""";
 
     /// <summary>The scene the inverse creates - a new id, which is the point of the case.</summary>
     private static SceneView RecreatedScene() => new(
@@ -231,6 +235,45 @@ public class AgentOperationReverserTests
         Assert.True(result.Value.Single().Reversed);
         _removeFromPack.Verify(
             h => h.Handle(It.IsAny<RemoveModelFromPackCommand>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task AddToProject_Is_Reversed_By_Removing_The_Asset_It_Added()
+    {
+        var entry = Completed(
+            "key-p1", "add-to-project", "vfx", 4,
+            before: "{\"projectId\":9,\"wasMember\":false}",
+            after: "{\"projectId\":9,\"assetType\":\"vfx\",\"assetId\":4}");
+        Records(entry);
+        RemoveAssetFromProjectCommand? applied = null;
+        _removeFromProject.Setup(h => h.Handle(It.IsAny<RemoveAssetFromProjectCommand>(), It.IsAny<CancellationToken>()))
+            .Callback<RemoveAssetFromProjectCommand, CancellationToken>((c, _) => applied = c)
+            .ReturnsAsync(Result.Success());
+
+        var plan = await _reverser.PlanAsync("key-p1", null);
+        var result = await _reverser.ApplyAsync(plan.Value);
+
+        Assert.True(result.Value.Single().Reversed);
+        Assert.Equal(new RemoveAssetFromProjectCommand(9, "vfx", 4), applied);
+    }
+
+    [Fact]
+    public async Task AddToProject_Of_An_Existing_Member_Is_Reversed_Without_Removing_It()
+    {
+        // The asset was in the project before the agent's add, so undoing the add must not
+        // take out a membership the user made.
+        var entry = Completed(
+            "key-p2", "add-to-project", "model", 7,
+            before: "{\"projectId\":9,\"wasMember\":true}",
+            after: "{\"projectId\":9,\"assetType\":\"model\",\"assetId\":7}");
+        Records(entry);
+
+        var plan = await _reverser.PlanAsync("key-p2", null);
+        var result = await _reverser.ApplyAsync(plan.Value);
+
+        Assert.True(result.Value.Single().Reversed);
+        _removeFromProject.Verify(
+            h => h.Handle(It.IsAny<RemoveAssetFromProjectCommand>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]
@@ -450,6 +493,32 @@ public class AgentOperationReverserTests
         }
 
         Assert.Equal(1, created);
+    }
+
+    /// <summary>
+    /// The happy path the object-shaped payload was breaking. The writer records the scene
+    /// document as an object, so reading it with a string reader returned null for every real
+    /// row and the undo always answered NoPriorState instead of recreating the scene.
+    /// </summary>
+    [Fact]
+    public async Task Undoing_A_Delete_Scene_Recreates_It_From_The_Recorded_Document()
+    {
+        var entry = Completed("key-27", "delete-scene", "Scene", 4, before: DeletedSceneBefore);
+        Records(entry);
+        CreateSceneCommand? recreated = null;
+        _createScene.Setup(h => h.Handle(It.IsAny<CreateSceneCommand>(), It.IsAny<CancellationToken>()))
+            .Callback<CreateSceneCommand, CancellationToken>((command, _) => recreated = command)
+            .ReturnsAsync(Result.Success(RecreatedScene()));
+
+        var plan = await _reverser.PlanAsync("key-27", null);
+        var result = await _reverser.ApplyAsync(plan.Value);
+
+        Assert.True(result.Value.Single().Reversed);
+        Assert.NotNull(recreated);
+        Assert.Equal("Kitchen", recreated!.Name);
+        Assert.NotNull(recreated.DocumentJson);
+        Assert.Contains("\"nodes\"", recreated.DocumentJson!);
+        Assert.Contains("Recreated deleted scene", result.Value.Single().Detail);
     }
 
     /// <summary>
@@ -900,6 +969,31 @@ public class AgentOperationReverserTests
         Assert.Null(applied.Name);
     }
 
+    [Fact]
+    public async Task Reversing_A_Slot_Write_Hands_The_Restore_What_The_Write_Produced()
+    {
+        // The restore refuses to overwrite a slot that is no longer the one the write left,
+        // so the recorded "produced" fingerprint has to survive the audit payload and reach
+        // the command. This pins that round trip, not just the handler's use of it.
+        Records(Completed("key-slot", "resolve-slot", "Scene", 3,
+            before: """
+            {"slotId":"streetlight","slot":{"Id":"streetlight","Candidates":[{"Id":"A"},{"Id":"B"}],"ChosenCandidateId":"B","ResolvedBy":"agent"},"node":{"NodeId":"lamp-1"},"produced":{"CandidateIds":["A","B"],"ChosenCandidateId":"B","ResolvedBy":"agent"}}
+            """));
+        RestoreSceneSlotCommand? applied = null;
+        _restoreSceneSlot.Setup(h => h.Handle(It.IsAny<RestoreSceneSlotCommand>(), It.IsAny<CancellationToken>()))
+            .Callback<RestoreSceneSlotCommand, CancellationToken>((c, _) => applied = c)
+            .ReturnsAsync(Result.Success(new SceneSummary(3, "Street", null, 1, 1, 0, 0, Now, Now)));
+
+        var plan = await _reverser.PlanAsync("key-slot", null);
+        var result = await _reverser.ApplyAsync(plan.Value);
+
+        Assert.True(result.Value.Single().Reversed);
+        Assert.NotNull(applied);
+        Assert.NotNull(applied!.Produced);
+        Assert.Equal(new[] { "A", "B" }, applied.Produced!.CandidateIds);
+        Assert.Equal("B", applied.Produced.ChosenCandidateId);
+    }
+
     // ---- set-scene-project and set-asset-metadata -------------------------------------
     // Both tools advertised "undoable with reverse_operation" in their own descriptions and
     // both recorded a before-state, but neither had a case here, so reverse_operation
@@ -1066,6 +1160,74 @@ public class AgentOperationReverserTests
         Assert.False(applied.Value[0].Reversed);
         _setAssetMetadata.Verify(h => h.Handle(
             It.IsAny<SetAssetMetadataCommand>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Reversing_A_Metadata_Write_That_Changed_The_Category_Restores_The_Category_Id()
+    {
+        // The merged set_asset_metadata sets tags and category, so its inverse has to be
+        // able to restore both. The read side reports category as {id, name} for a picker,
+        // while the write takes the id - without the conversion the undo built a patch the
+        // write refuses.
+        const string before = """
+            {"assetType":"Model","assetId":9,"fields":[
+              {"key":"category","readOnly":false,"value":{"id":3,"name":"Props"}},
+              {"key":"tags","readOnly":false,"value":["wood"]}]}
+            """;
+        const string after = """
+            {"assetType":"Model","assetId":9,"fields":[
+              {"key":"category","readOnly":false,"value":{"id":8,"name":"Weapons"}},
+              {"key":"tags","readOnly":false,"value":["wood"]}]}
+            """;
+        Records(Completed("k1", "set-asset-metadata", "Model", 9, before: before, after: after));
+        _setAssetMetadata
+            .Setup(h => h.Handle(It.IsAny<SetAssetMetadataCommand>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result.Success(new AssetMetadataResponse(
+                "Model", 9, "chair", 1, 1, Array.Empty<AssetMetadataValue>(),
+                new AssetMetadataCompleteness(0, 0, Array.Empty<string>()))));
+
+        var applied = await _reverser.ApplyAsync((await _reverser.PlanAsync("k1", null)).Value);
+
+        Assert.True(applied.Value[0].Reversed);
+        _setAssetMetadata.Verify(h => h.Handle(
+            It.Is<SetAssetMetadataCommand>(c =>
+                c.Fields.Count == 1
+                && c.Fields["category"].ValueKind == JsonValueKind.Number
+                && c.Fields["category"].GetInt32() == 3
+                // tags did not change, so the undo leaves them alone
+                && !c.Fields.ContainsKey("tags")),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Reversing_A_Metadata_Write_That_Cleared_The_Category_Restores_The_Previous_Id()
+    {
+        // Clearing a category reads back as the object with a null id; the inverse has to
+        // put the previous id back, not the object.
+        const string before = """
+            {"assetType":"Model","assetId":9,"fields":[
+              {"key":"category","readOnly":false,"value":{"id":3,"name":"Props"}}]}
+            """;
+        const string after = """
+            {"assetType":"Model","assetId":9,"fields":[
+              {"key":"category","readOnly":false}]}
+            """;
+        Records(Completed("k1", "set-asset-metadata", "Model", 9, before: before, after: after));
+        _setAssetMetadata
+            .Setup(h => h.Handle(It.IsAny<SetAssetMetadataCommand>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result.Success(new AssetMetadataResponse(
+                "Model", 9, "chair", 1, 1, Array.Empty<AssetMetadataValue>(),
+                new AssetMetadataCompleteness(0, 0, Array.Empty<string>()))));
+
+        var applied = await _reverser.ApplyAsync((await _reverser.PlanAsync("k1", null)).Value);
+
+        Assert.True(applied.Value[0].Reversed);
+        _setAssetMetadata.Verify(h => h.Handle(
+            It.Is<SetAssetMetadataCommand>(c =>
+                c.Fields.Count == 1
+                && c.Fields["category"].ValueKind == JsonValueKind.Number
+                && c.Fields["category"].GetInt32() == 3),
+            It.IsAny<CancellationToken>()), Times.Once);
     }
 
     /// <summary>

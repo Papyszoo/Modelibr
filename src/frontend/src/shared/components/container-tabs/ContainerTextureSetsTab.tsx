@@ -189,7 +189,7 @@ export function ContainerTextureSetsTab({
           <ListToolbarSearchInput
             value={localSearch}
             onChange={setLocalSearch}
-            placeholder={`Search ${assetLabel}s…`}
+            placeholder={`Search ${assetLabel}s...`}
           />
         </ListToolbarPanel>
       </ListToolbar>
@@ -208,6 +208,11 @@ export function ContainerTextureSetsTab({
                 <AssetTile
                   key={textureSet.id}
                   name={textureSet.name}
+                  accessory={adapter.renderAssetAccessory?.({
+                    type: 'textureSet',
+                    id: textureSet.id,
+                    name: textureSet.name,
+                  })}
                   dataAttributes={{ 'data-texture-set-id': textureSet.id }}
                   media={
                     albedoUrl ? (

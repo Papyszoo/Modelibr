@@ -1,5 +1,10 @@
 import type { SceneDocument, SceneNode } from '../../types'
-import { nextLightId, nextNodeId, nextPlacementX } from '../sceneNodeIds'
+import {
+  type DraftNodeBounds,
+  nextLightId,
+  nextNodeId,
+  nextPlacementX,
+} from '../sceneNodeIds'
 
 /**
  * Id generation and the placement default for hand-built scenes.
@@ -89,5 +94,86 @@ describe('nextPlacementX', () => {
 
   it('falls back to a metre when the asset has no derived width', () => {
     expect(nextPlacementX(documentWith(['a', 'b']), null)).toBe(2)
+  })
+
+  it('places a new node past the right edge of the one already there', () => {
+    // Regression: the step was count × new width only, so a narrow box added
+    // beside a wide model landed inside it and the server reported an overlap
+    // the user did not create. The right edge comes from the server's own
+    // footprint, the same box the overlap check uses.
+    const document = documentWith(['a'])
+    const facts = new Map([
+      [
+        'a',
+        {
+          footprint: {
+            min: { x: -2, y: 0, z: -2 },
+            max: { x: 2, y: 1, z: 2 },
+          },
+        },
+      ],
+    ]) as never
+
+    expect(nextPlacementX(document, 1, facts)).toBe(2.5)
+  })
+
+  it('accounts for a measured origin so a corner-origin asset still clears the neighbour', () => {
+    // A model whose origin sits at its own right edge (fraction 1) has to be
+    // placed by that fraction or its body still overlaps the node before it:
+    // placing at 2 would put the box at -0..2, over the existing 2.
+    const document = documentWith(['a'])
+    const facts = new Map([
+      [
+        'a',
+        {
+          footprint: {
+            min: { x: -2, y: 0, z: -2 },
+            max: { x: 2, y: 1, z: 2 },
+          },
+        },
+      ],
+    ]) as never
+
+    expect(nextPlacementX(document, 2, facts, 1)).toBe(4)
+  })
+
+  it('places a box past a model that only exists in the draft, from its measured width', () => {
+    // Regression: a model placed in this session lives only in the draft, so
+    // the server has no footprint for it. Placement fell back to the node
+    // count and dropped the 1 m box at x=1, overlapping the 2 m model at x=0
+    // (its -1..1 box spans 0.5..1.5). The measured dimensions the editor
+    // fetched when it placed the model give the same right edge the server
+    // would derive on save.
+    const document = documentWith(['model-1-1'])
+    const draftBounds: ReadonlyMap<string, DraftNodeBounds> = new Map([
+      [
+        'model-1-1',
+        {
+          sourceDimensions: { x: 2, y: 2, z: 2 },
+          originConvention: null,
+          originInBounds: null,
+        },
+      ],
+    ])
+
+    expect(nextPlacementX(document, 1, undefined, null, draftBounds)).toBe(1.5)
+  })
+
+  it('places past a blockout box that only exists in the draft', () => {
+    // The same draft problem from the other side: a primitive's size is in the
+    // document itself, so no fetch is needed to measure it. A 10 m box at x=0
+    // occupies -5..5; the box that follows goes half its own width past 5.
+    const box: SceneNode = {
+      ...makeNode('box-1'),
+      asset: null,
+      primitive: { shape: 'box', size: { x: 10, y: 1, z: 1 } },
+    }
+    const document: SceneDocument = {
+      schemaVersion: 1,
+      nodes: [box],
+      lights: [],
+    }
+
+    expect(nextPlacementX(document, 1)).toBe(5.5)
   })
 })

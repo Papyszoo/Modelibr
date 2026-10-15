@@ -9,11 +9,13 @@ import {
 
 const mockPost = client.post as jest.Mock
 const mockDelete = client.delete as jest.Mock
+const mockGet = client.get as jest.Mock
 
 beforeEach(() => {
   jest.clearAllMocks()
   mockPost.mockResolvedValue({ data: {} })
   mockDelete.mockResolvedValue({ data: {} })
+  mockGet.mockResolvedValue({ data: {} })
 })
 
 describe('backups api', () => {

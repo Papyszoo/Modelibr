@@ -61,10 +61,8 @@ services:
             - MCP_WRITE_ENABLED=${MCP_WRITE_ENABLED:-false}
             - MCP_DESTRUCTIVE_ENABLED=${MCP_DESTRUCTIVE_ENABLED:-false}
             - MCP_TOKENS=${MCP_TOKENS:-}
-            # The Asset Store the MCP store tools read. Unset here and the container
-            # cannot see the store at all, whatever the browser's VITE_STORE_URL says -
-            # they are two different clients on two different sides.
-            - STORE_URL=${STORE_URL:-}
+            # The Asset Store is built in (one fixed address shared by the browser, the
+            # catalog tools and the importer); only its catalog read timeout is tunable.
             - STORE_CATALOG_HTTP_TIMEOUT_SECONDS=${STORE_CATALOG_HTTP_TIMEOUT_SECONDS:-10}
         ports:
             - "${HTTPS_PORT:-8443}:${HTTPS_PORT:-8443}"
@@ -94,11 +92,6 @@ services:
                 asset-processor: ./src/asset-processor
             args:
                 VITE_API_BASE_URL: ${VITE_API_BASE_URL}
-                # `-` and not `:-`: an explicitly EMPTY VITE_STORE_URL means "no
-                # store", and the Asset Store tab renders its unconfigured state.
-                # With `:-` the empty value fell through to the hosted default,
-                # so opting out of the online surface silently opted back in.
-                VITE_STORE_URL: ${VITE_STORE_URL-https://store.modelibr.com}
         container_name: frontend
         networks:
             - modelibr

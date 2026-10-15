@@ -2,6 +2,7 @@ using System.Reflection;
 using System.Text.Json;
 using Application.Abstractions.Services;
 using Application.Agents;
+using Microsoft.Extensions.Logging;
 
 namespace WebApi.Infrastructure;
 
@@ -201,7 +202,7 @@ public sealed class AgentUploadTicketFilter : IEndpointFilter
         var (succeeded, value) = Inspect(result);
         if (succeeded)
         {
-            await audit.CompleteAsync(
+            var recorded = await audit.CompleteAsync(
                 ticket.IdempotencyKey,
                 claimToken,
                 ticket.AssetType,
@@ -209,6 +210,17 @@ public sealed class AgentUploadTicketFilter : IEndpointFilter
                 Describe(value),
                 null,
                 CancellationToken.None);
+
+            if (!recorded)
+            {
+                // The upload outlived its claim lease and the row was taken over, so the
+                // outcome is real but the log no longer speaks for it. Reported rather than
+                // silently discarded - the same verdict McpWriteGuard answers as LostClaim.
+                services.GetRequiredService<ILogger<AgentUploadTicketFilter>>().LogWarning(
+                    "Upload ticket {TicketId} applied but its idempotency claim had lapsed; the outcome was not recorded.",
+                    ticket.TicketId);
+            }
+
             await tickets.SettleAsync(
                 ticket.TicketId, succeeded: true, ExtractAssetId(value, ticket.AssetType), CancellationToken.None);
         }

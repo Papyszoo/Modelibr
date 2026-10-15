@@ -18,6 +18,11 @@ export interface ProjectEnvironmentMapDto {
   name: string
 }
 
+export interface ProjectVfxDto {
+  id: number
+  name: string
+}
+
 export interface ProjectDto {
   id: number
   name: string
@@ -42,6 +47,10 @@ export interface ProjectDto {
 }
 
 export interface ProjectConceptImageDto {
+  /** Association id used by level-scoped reference updates and image notes. */
+  id?: number
+  projectLevelId?: number | null
+  title?: string | null
   fileId: number
   fileName: string
   previewUrl: string
@@ -51,6 +60,8 @@ export interface ProjectConceptImageDto {
 
 export interface ProjectDetailDto extends ProjectDto {
   conceptImages: ProjectConceptImageDto[]
+  vfxCount?: number
+  vfx?: ProjectVfxDto[]
 }
 
 export interface GetAllProjectsResponse {

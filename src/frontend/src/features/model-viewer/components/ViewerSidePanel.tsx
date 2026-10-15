@@ -1,4 +1,7 @@
-import { AssetMetadataPanel } from '@/features/metadata'
+import { Toast } from 'primereact/toast'
+import { useRef } from 'react'
+
+import { AssetMetadataPanel, useAssetMetadataToast } from '@/features/metadata'
 import { useModelHierarchy } from '@/features/model-viewer/hooks/useModelHierarchy'
 import { useModelObject } from '@/features/model-viewer/hooks/useModelObject'
 import { type Model } from '@/utils/fileUtils'
@@ -46,6 +49,8 @@ export function ViewerSidePanel({
 }: ViewerSidePanelProps) {
   const { modelObject } = useModelObject()
   const hierarchy = useModelHierarchy(modelObject)
+  const toast = useRef<Toast>(null)
+  const showToast = useAssetMetadataToast(toast)
 
   if (!content) return null
 
@@ -72,7 +77,14 @@ export function ViewerSidePanel({
       // The same schema-driven panel every family gets. What a model can say
       // about itself is one contract, not one per asset page.
       return model ? (
-        <AssetMetadataPanel assetType="Model" assetId={Number(model.id)} />
+        <>
+          <Toast ref={toast} />
+          <AssetMetadataPanel
+            assetType="Model"
+            assetId={Number(model.id)}
+            showToast={showToast}
+          />
+        </>
       ) : null
     case 'uvMap':
       return <UVMapScene />

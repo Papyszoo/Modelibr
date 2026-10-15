@@ -4,6 +4,7 @@ using Application.Agents;
 using Application.EnvironmentMaps;
 using Application.Models;
 using Application.Sounds;
+using Application.Sprites;
 using Application.TextureSets;
 using Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -89,10 +90,13 @@ public class McpAssetFamilyImportIntegrationTests : IClassFixture<ModelibrWebFac
         using (var scope = _factory.Services.CreateScope())
         {
             var sp = scope.ServiceProvider;
-            var result = await AssetImportMcpTools.ImportSound(
+            var result = await AssetImportMcpTools.ImportAsset(
                 sp.GetRequiredService<ICommandHandler<CreateSoundWithFileCommand, CreateSoundWithFileResponse>>(),
+                sp.GetRequiredService<ICommandHandler<CreateSpriteWithFileCommand, CreateSpriteWithFileResponse>>(),
+                sp.GetRequiredService<ICommandHandler<CreateEnvironmentMapWithFileCommand, CreateEnvironmentMapWithFileResponse>>(),
                 sp.GetRequiredService<IAgentAudit>(),
                 McpCallerContext.Unauthenticated(),
+                "Sound",
                 path,
                 key,
                 name);
@@ -117,10 +121,13 @@ public class McpAssetFamilyImportIntegrationTests : IClassFixture<ModelibrWebFac
         using (var scope = _factory.Services.CreateScope())
         {
             var sp = scope.ServiceProvider;
-            var retry = await AssetImportMcpTools.ImportSound(
+            var retry = await AssetImportMcpTools.ImportAsset(
                 sp.GetRequiredService<ICommandHandler<CreateSoundWithFileCommand, CreateSoundWithFileResponse>>(),
+                sp.GetRequiredService<ICommandHandler<CreateSpriteWithFileCommand, CreateSpriteWithFileResponse>>(),
+                sp.GetRequiredService<ICommandHandler<CreateEnvironmentMapWithFileCommand, CreateEnvironmentMapWithFileResponse>>(),
                 sp.GetRequiredService<IAgentAudit>(),
                 McpCallerContext.Unauthenticated(),
+                "Sound",
                 path,
                 key,
                 name);

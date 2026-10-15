@@ -44,8 +44,10 @@ public sealed class ImportLibraryPrompts
 
         4. CATEGORIZE
            - For each imported model call `get_asset` and read `suggestedCategories`.
-           - Pick or create the matching category, then `set_category(modelId, categoryId, ...)`.
-           - Optionally `set_tags` for extra searchable terms.
+           - Pick or create the matching category, then set it with
+             `set_asset_metadata(assetType: "Model", assetId, fields: { category: <categoryId> })`.
+           - Optionally add extra searchable terms with
+             `set_asset_metadata(assetType: "Model", assetId, fields: { tags: ["..."] })`.
 
         5. VERIFY
            - `search_assets` for a few conceptual terms (e.g. a category word) and confirm

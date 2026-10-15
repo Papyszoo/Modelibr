@@ -48,7 +48,10 @@ internal class AddTextureToSetWithFileCommandHandler
         AddTextureToSetWithFileCommand command,
         CancellationToken cancellationToken)
     {
-        var fileTypeResult = FileType.ValidateForUpload(command.FileUpload.FileName);
+        // Same texture-set context as CreateTextureSetWithFileCommand: a WebP or KTX2
+        // uploaded as a channel of a set is a texture, not the sprite the global
+        // extension map would make of it.
+        var fileTypeResult = FileType.ValidateForTextureUpload(command.FileUpload.FileName);
         if (fileTypeResult.IsFailure)
         {
             return Result.Failure<AddTextureToTextureSetResponse>(fileTypeResult.Error);

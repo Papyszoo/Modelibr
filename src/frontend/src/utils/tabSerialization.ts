@@ -2,14 +2,32 @@ import { getEnvironmentMapById } from '@/features/environment-map/api/environmen
 import { getModelById } from '@/features/models/api/modelApi'
 import { getPackById } from '@/features/pack/api/packApi'
 import { getProjectById } from '@/features/project/api/projectApi'
+import { getSceneById } from '@/features/scenes/api/scenesApi'
 import { getScriptById } from '@/features/scripts/api/scriptApi'
-import { getStageById } from '@/features/stage-editor/api/stageApi'
 import { getTextureSetById } from '@/features/texture-set/api/textureSetApi'
+import { getVfx } from '@/features/vfx/api/vfxApi'
 import { createTab } from '@/stores/navigationStore'
 import { type Tab } from '@/types'
 
 // Re-export getTabLabel from its canonical location for backward compatibility
 export { getTabLabel } from '@/stores/navigationStore'
+
+/**
+ * Tab kinds removed from the app. A session saved before the removal still
+ * names them, so both parsers drop those entries and keep the rest of the
+ * session instead of failing the whole parse (which would silently replace
+ * every open tab with the default layout).
+ */
+const REMOVED_TAB_TYPES = new Set(['stageList', 'stageEditor'])
+
+const REMOVED_TAB_PREFIXES = ['stage-']
+
+function isRemovedTabId(tabId: string): boolean {
+  return (
+    REMOVED_TAB_TYPES.has(tabId) ||
+    REMOVED_TAB_PREFIXES.some(prefix => tabId.startsWith(prefix))
+  )
+}
 
 // Helper function to parse compact tab format
 export function parseCompactTabFormat(
@@ -23,12 +41,14 @@ export function parseCompactTabFormat(
     try {
       const parsed = JSON.parse(value)
       if (!Array.isArray(parsed)) return defaultValue
-      // Ensure legacy tabs have the new required fields
-      return parsed.map((t: Partial<Tab>) => ({
-        ...t,
-        params: t.params ?? {},
-        internalUiState: t.internalUiState ?? {},
-      })) as Tab[]
+      // Ensure legacy tabs have the new required fields, and drop removed kinds.
+      return parsed
+        .filter((t: Partial<Tab>) => !REMOVED_TAB_TYPES.has(t.type as string))
+        .map((t: Partial<Tab>) => ({
+          ...t,
+          params: t.params ?? {},
+          internalUiState: t.internalUiState ?? {},
+        })) as Tab[]
     } catch {
       return defaultValue
     }
@@ -42,6 +62,9 @@ export function parseCompactTabFormat(
     for (const tabId of value.split(',')) {
       if (seen.has(tabId)) continue
       seen.add(tabId)
+
+      // A session from before the Stages removal - drop the entry, keep the rest.
+      if (isRemovedTabId(tabId)) continue
 
       if (tabId.startsWith('model-')) {
         tabs.push(createTab('modelViewer', tabId.substring(6)))
@@ -63,12 +86,16 @@ export function parseCompactTabFormat(
         tabs.push(createTab('projectViewer', tabId.substring(8)))
         continue
       }
-      if (tabId.startsWith('stage-')) {
-        tabs.push(createTab('stageEditor', tabId.substring(6)))
-        continue
-      }
       if (tabId.startsWith('script-')) {
         tabs.push(createTab('scriptViewer', tabId.substring(7)))
+        continue
+      }
+      if (tabId.startsWith('scene-')) {
+        tabs.push(createTab('sceneEditor', tabId.substring(6)))
+        continue
+      }
+      if (tabId.startsWith('vfx-')) {
+        tabs.push(createTab('vfxEditor', tabId.substring(4)))
         continue
       }
 
@@ -93,9 +120,10 @@ export function parseCompactTabFormat(
           'sprites',
           'sounds',
           'scripts',
-          'stageList',
-          'stageEditor',
           'scenes',
+          'sceneEditor',
+          'vfxList',
+          'vfxEditor',
           'assetStore',
           'history',
           'settings',
@@ -126,11 +154,13 @@ export async function parseCompactTabFormatAsync(
     try {
       const parsed = JSON.parse(value)
       if (!Array.isArray(parsed)) return defaultValue
-      return parsed.map((t: Partial<Tab>) => ({
-        ...t,
-        params: t.params ?? {},
-        internalUiState: t.internalUiState ?? {},
-      })) as Tab[]
+      return parsed
+        .filter((t: Partial<Tab>) => !REMOVED_TAB_TYPES.has(t.type as string))
+        .map((t: Partial<Tab>) => ({
+          ...t,
+          params: t.params ?? {},
+          internalUiState: t.internalUiState ?? {},
+        })) as Tab[]
     } catch {
       return defaultValue
     }
@@ -144,6 +174,9 @@ export async function parseCompactTabFormatAsync(
     for (const tabId of value.split(',')) {
       if (seen.has(tabId)) continue
       seen.add(tabId)
+
+      // A session from before the Stages removal - drop the entry, keep the rest.
+      if (isRemovedTabId(tabId)) continue
 
       if (tabId.startsWith('model-')) {
         const modelId = tabId.substring(6)
@@ -218,19 +251,6 @@ export async function parseCompactTabFormatAsync(
         continue
       }
 
-      if (tabId.startsWith('stage-')) {
-        const stageId = tabId.substring(6)
-        let stageName: string | undefined
-        try {
-          const stage = await getStageById(Number(stageId))
-          stageName = stage.name
-        } catch {
-          /* fall back to ID-based label */
-        }
-        tabs.push(createTab('stageEditor', stageId, stageName))
-        continue
-      }
-
       if (tabId.startsWith('script-')) {
         const scriptId = tabId.substring(7)
         let scriptName: string | undefined
@@ -241,6 +261,32 @@ export async function parseCompactTabFormatAsync(
           /* fall back to ID-based label */
         }
         tabs.push(createTab('scriptViewer', scriptId, scriptName))
+        continue
+      }
+
+      if (tabId.startsWith('scene-')) {
+        const sceneId = tabId.substring(6)
+        let sceneName: string | undefined
+        try {
+          const scene = await getSceneById(Number(sceneId))
+          sceneName = scene.scene.name
+        } catch {
+          /* fall back to ID-based label */
+        }
+        tabs.push(createTab('sceneEditor', sceneId, sceneName))
+        continue
+      }
+
+      if (tabId.startsWith('vfx-')) {
+        const vfxId = tabId.substring(4)
+        let vfxName: string | undefined
+        try {
+          const vfx = await getVfx(Number(vfxId))
+          vfxName = vfx.name
+        } catch {
+          /* fall back to ID-based label */
+        }
+        tabs.push(createTab('vfxEditor', vfxId, vfxName))
         continue
       }
 
@@ -265,9 +311,10 @@ export async function parseCompactTabFormatAsync(
           'sprites',
           'sounds',
           'scripts',
-          'stageList',
-          'stageEditor',
           'scenes',
+          'sceneEditor',
+          'vfxList',
+          'vfxEditor',
           'assetStore',
           'history',
           'settings',

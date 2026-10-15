@@ -45,6 +45,10 @@ public class GetVersionThumbnailQueryHandler : IQueryHandler<GetVersionThumbnail
                 null));
         }
 
+        // Paths are returned exactly as stored (relative to the uploads root), the
+        // same contract as GetThumbnailStatusQueryResponse. Read sites that open
+        // the file rebase them against the current root; returning an absolute
+        // path here made the serving endpoints resolve an already-resolved value.
         return Result.Success(new GetVersionThumbnailQueryResponse(
             thumbnail.Status,
             thumbnail.ThumbnailPath,

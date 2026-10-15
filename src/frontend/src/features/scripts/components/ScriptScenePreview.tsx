@@ -18,6 +18,7 @@ import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader'
 import * as TSL from 'three/tsl'
 import * as THREE_GPU from 'three/webgpu'
 
+import { cloneSkinnedModel } from '@/shared/three/cloneSkinnedModel'
 import { safeLoadingManager } from '@/shared/three/safeLoadingManager'
 import { type PreviewGeometry } from '@/stores/scriptPreviewStore'
 import { useViewerSettingsStore } from '@/stores/viewerSettingsStore'
@@ -181,7 +182,7 @@ function ModelMesh({
 
   const object = useMemo(() => {
     const raw = loaded as unknown as { scene?: THREE_CORE.Object3D }
-    const root = (raw.scene ?? (loaded as THREE_CORE.Object3D)).clone()
+    const root = cloneSkinnedModel(raw.scene ?? (loaded as THREE_CORE.Object3D))
 
     // Apply the user material to every mesh.
     root.traverse(child => {

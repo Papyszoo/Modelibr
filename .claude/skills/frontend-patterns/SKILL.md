@@ -5,107 +5,94 @@ description: Modelibr frontend conventions - feature modules, apiBase/axios rout
 
 # Frontend patterns (React 19 + TypeScript + Vite)
 
-Known debt + planned refactors live in `.claude/prompts/` (13, 18, 20, 26,
-33–38). Before reworking query keys, feature boundaries, Settings, the demo
-handlers, or anything per-asset-type, read the matching prompt - don't
-half-implement it as a side effect.
-
 ## API layer
-- All HTTP goes through feature-local API modules under `features/*/api/`
-  using the shared axios client `src/lib/apiBase.ts`. No raw `fetch()`, no
-  hardcoded base URLs (asset URLs via `resolveApiAssetUrl`).
+
+- All HTTP goes through feature-local modules under `features/*/api/` using the
+  shared axios client `src/lib/apiBase.ts`. No raw `fetch()`, no hardcoded base
+  URLs (asset URLs via `resolveApiAssetUrl`).
 - apiBase rejects with a normalized `ApiClientError` (status, code, details,
-  isNetworkError/isTimeout/isOffline) - catch that, not `AxiosError`.
-  Backend statuses are currently unreliable (400-for-everything in places;
-  prompt 26 fixes) - branch on error `code`/`message`, not status, for
-  not-found/conflict semantics.
-- `services/ApiClient.ts` is a deprecated re-export facade slated for
-  deletion (prompt 34) - never add to it.
-- TRAP - file/preview URL helpers (`getFileUrl`, `getFilePreviewUrl`)
-  currently live in `features/models/api/modelApi.ts` and are imported
-  cross-feature. Known wart (prompt 34 moves them to shared) - import them,
-  don't duplicate them.
+  isNetworkError/isTimeout/isOffline) - catch that, not `AxiosError`. Backend
+  statuses are unreliable (400-for-everything in places) - branch on error
+  `code`/`message`, not status, for not-found/conflict.
+- `services/ApiClient.ts` is a deprecated re-export facade slated for deletion -
+  never add to it.
+- TRAP - `getFileUrl`/`getFilePreviewUrl` live in
+  `features/models/api/modelApi.ts` and are imported cross-feature; import them,
+  don't duplicate them (they will move to shared).
 
 ## Code placement (two trees exist - know the rule)
+
 - `features/{name}/` - feature-specific code: `api/` ({feature}Api.ts +
   `queries.ts`), `components/`, `hooks/`, `types/`, `index.ts`.
-- `src/shared/` - anything reusable across features (components, hooks,
-  utils, validation, styles/tokens, three, thumbnail). **New shared code
-  goes here**, never in the legacy root `src/components|hooks|utils` trees
-  (prompt 36 merges those; app shell = `components/layout` + `contexts` +
-  tab system stays put until then).
-- TRAP - the Settings UI is a 1,774-line monolith at
-  `components/tabs/Settings.tsx`, NOT in `features/settings` (which holds
-  only its api/). Prompt 35 fixes; meanwhile extract the section you touch.
+- `src/shared/` - anything reusable across features. **New shared code goes
+  here**, never in the legacy root `src/components|hooks|utils` trees (queued for
+  merging; the app shell + tab system stay put).
+- TRAP - the Settings UI is a large monolith at `components/tabs/Settings.tsx`,
+  NOT in `features/settings` (which holds only its api/). Extract the section you
+  touch rather than growing it.
 
 ## State split (strict)
+
 - **Server state** → React Query only. **UI state** → Zustand stores in
   `src/stores/` (small, single-purpose). **Ephemeral** → `useState`.
-- Query keys are inline string arrays with NO factory (prompt 33) and mixed
-  naming (`['models']` vs `['model-tags']`). A mismatched key silently stops
-  invalidating - **grep for the exact existing key before writing any
-  `useQuery`/`invalidateQueries`; reuse it verbatim; never invent a
-  variant.**
+- Query keys are inline string arrays with NO factory and mixed naming
+  (`['models']` vs `['model-tags']`). A mismatched key silently stops
+  invalidating - **grep the exact existing key before writing any
+  `useQuery`/`invalidateQueries`; reuse it verbatim; never invent a variant.**
 - Mutations invalidate related keys on success; optimistic updates where the
   neighbors do.
 
 ## Styling
-- Full rules live in narrower skills - token vocabulary and density in
-  **`design-tokens`**, the shared-primitive catalog and visual identity in
-  **`ui-primitives`**, gallery/themes in **`storybook-stories`**. Read the
-  relevant one before writing any CSS or UI component. Highlights:
-- Design tokens: `src/shared/styles/tokens.css` - use `var(--token)`; no new
-  hardcoded colors (a sweep + lint gate is prompt 20; don't add to the pile).
-- Component CSS files are **global scope** - prefix class names with the
-  component name; check for collisions.
-- Shared UI = small dumb composable primitives, not type-aware
-  mega-components; the Models tab is the design identity other tabs follow.
-- **New asset type? STOP - read prompt 18.** Do not copy an existing
-  `XList.tsx` (650–850 lines each) as a template; that's the six-clone
-  problem being actively dismantled.
 
-## Forms
-`react-hook-form` + `zodResolver`; composable Zod schemas in
+- Token vocabulary/density: `design-tokens`; shared primitives/visual identity:
+  `ui-primitives`; gallery/themes: `storybook-stories`. Read the relevant one
+  before writing CSS/UI.
+- `src/shared/styles/tokens.css` - use `var(--token)`; no new hardcoded colors.
+- Component CSS is **global scope** - prefix class names with the component name.
+- Shared UI = small dumb composable primitives, not type-aware mega-components;
+  the Models tab is the design identity other tabs follow.
+- **New asset type? STOP - do not copy an existing `XList.tsx`;** that's the
+  six-clone problem being dismantled.
+
+Forms use `react-hook-form` + `zodResolver`; composable Zod schemas in
 `src/shared/validation/formSchemas.ts`.
 
 ## Demo mode
+
 - `VITE_DEMO_MODE=true` (`.env.demo`); MSW intercepts - static mocks in
-  `src/mocks/handlers.ts`, interactive in `dynamicDemoHandlers.ts` (4k-line
-  monolith; prompt 38 splits it); data persists in IndexedDB
-  (`src/mocks/db/demoDb.ts`).
-- **When backend API shape/endpoints change, update demo handlers to match**
-  and validate `npm run build:demo` for demo-visible changes.
+  `src/mocks/handlers.ts`, interactive in `dynamicDemoHandlers.ts`, data persists
+  in IndexedDB (`src/mocks/db/demoDb.ts`).
+- **When backend API shape/endpoints change, update demo handlers to match** and
+  validate `npm run build:demo` for demo-visible changes.
 
 ## SignalR
-Real-time via `services/ThumbnailSignalRService.ts` (singleton); events:
-`ThumbnailStatusChanged`, `ActiveVersionChanged`. Demo mode stubs the SignalR
-endpoints in `dynamicDemoHandlers.ts` (prevents 405s).
+
+`services/ThumbnailSignalRService.ts` (singleton) emits `ThumbnailStatusChanged`,
+`ActiveVersionChanged`, `EnvironmentMapThumbnailStatusChanged`; demo mode stubs
+those endpoints in `dynamicDemoHandlers.ts` (prevents 405s).
 
 ## Tabs
-New tab type = six places: the `TabType` union in `src/shared/types/ui.ts`,
-a case in `TabContent.tsx`, a tile in `NewTabPage.tsx` (TILES +
-`RECENT_TAB_ICON`), icon + tooltip cases in `DraggableTab.tsx`, a label case
-in `navigationStore.ts` `getTabLabel`, and BOTH allowlists in
-`tabSerialization.ts` (missing there = the tab type is rejected when a saved
-session restores). Ripple: docs-audit checks the union against
-`user-interface.md` (add a `tabLabels` entry in `scripts/docs-audit/index.mjs`).
 
-## Shared viewer/worker logic (don't duplicate)
-Three.js / geometry / pixel-decode logic that the worker's thumbnail render
-or demo mode must reproduce **identically** (STL mesh build, TIFF decode,
-displacement-normal shader, …) lives once in `src/asset-processor/lib/` as
-injected-dep ESM, imported by relative path. See `asset-processor-patterns`,
-"Shared cross-runtime code".
+New tab type = six places: the `TabType` union in `src/shared/types/ui.ts`, a case
+in `TabContent.tsx`, a tile in `NewTabPage.tsx` (TILES), a glyph of its own in
+`components/layout/tabIcons.ts` (shared by the dock and the New Tab page) plus a
+tooltip case in `DraggableTab.tsx`, a label case in `navigationStore.ts`
+`getTabLabel`, and BOTH allowlists in `tabSerialization.ts` (missing there = the
+tab type is rejected on session restore). The main pages pinned in the left dock
+are `PINNED_TAB_TYPES` in `dock-panel/pinnedTabs.ts`. Ripple: docs-audit checks the union
+against `user-interface.md` (`tabLabels` entry in `scripts/docs-audit/index.mjs`).
+
+Three.js / geometry / pixel-decode logic the worker render or demo mode must
+reproduce **identically** lives once in `src/asset-processor/lib/` (injected-dep
+ESM, relative import) - see `asset-processor-patterns`.
 
 ## Testing
+
 - **Jest** (not Vitest) + `@testing-library/react` + `user-event`; files
-  `__tests__/*.test.ts(x)`. Full conventions - tiers, mock infrastructure,
-  the "must be able to fail" rule - live in the **`frontend-test-authoring`**
-  skill; read it before writing any test.
-- When editing a 500+ line component, extract + test the section you touch -
-  don't grow it.
+  `__tests__/*.test.ts(x)`. Conventions live in **`frontend-test-authoring`**;
+  read it before writing any test.
+- When editing a 500+ line component, extract + test the section you touch.
 
 ## Verify
+
 `cd src/frontend && npm test && npm run lint && npm run format:check && npm run build`
-(format:check is a required CI gate NOT covered by lint - Markdown/JSON/CSS
-drift passes lint but fails CI; `npm run format` auto-fixes.)

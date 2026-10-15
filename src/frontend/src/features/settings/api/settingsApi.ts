@@ -11,6 +11,16 @@ export async function getSettings(): Promise<{
   blenderPath: string
   blenderEnabled: boolean
   duplicateNamePolicy: string
+  autoAssignOnImport: boolean
+  cleanRecycledFilesAfterDays: number
+  preMigrationBackupEnabled: boolean
+  preMigrationBackupRetention: number
+  skipDuplicateThumbnails: boolean
+  mcpEnabled: boolean
+  mcpWriteEnabled: boolean
+  mcpDestructiveEnabled: boolean
+  thumbnailBackground: string
+  blenderOperationTimeoutMinutes: number
   createdAt: string
   updatedAt: string
 }> {
@@ -38,12 +48,6 @@ export async function updateSettings(settings: {
 }> {
   const response = await client.put('/settings', settings)
   return response.data
-}
-
-export function refreshCache(type?: 'models' | 'textureSets' | 'packs'): void {
-  // Legacy apiCacheStore hook removed. React Query is now responsible for caching.
-  // This function is kept (no-op) to avoid breaking imports if any appear later.
-  void type
 }
 
 // ── Blender Installation Management ───────────────────────────────────

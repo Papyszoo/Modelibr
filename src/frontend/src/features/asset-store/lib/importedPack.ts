@@ -1,6 +1,6 @@
 import { usePacksQuery } from '@/features/pack/api/queries'
 
-import { getConfiguredStoreUrl, normalizeStoreUrl } from './storeConfig'
+import { normalizeStoreUrl, STORE_URL } from './storeConfig'
 
 /** The local pack imported from a store asset, or `null` when there is none. */
 export type ImportedPackId = number | null
@@ -21,7 +21,7 @@ export function useImportedPackIdResolver(): (
   assetId: string
 ) => ImportedPackId | undefined {
   const { data: packs } = usePacksQuery()
-  const storeUrl = normalizeStoreUrl(getConfiguredStoreUrl())
+  const storeUrl = normalizeStoreUrl(STORE_URL)
   return (assetId: string) => {
     if (!packs) return undefined
     const pack = packs.find(

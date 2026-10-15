@@ -49,8 +49,7 @@ export function CreateTextureSetDialog({
     register,
     handleSubmit,
     reset,
-    watch,
-    formState: { errors },
+    formState: { errors, isValid },
   } = useForm<TextureSetNameFormValues>({
     resolver: zodResolver(textureSetNameFormSchema),
     mode: 'onChange',
@@ -58,8 +57,6 @@ export function CreateTextureSetDialog({
       name: '',
     },
   })
-
-  const nameValue = watch('name') || ''
 
   useEffect(() => {
     if (!visible) {
@@ -99,7 +96,9 @@ export function CreateTextureSetDialog({
         icon="pi pi-check"
         onClick={handleSubmit(handleValidSubmit)}
         loading={submitting}
-        disabled={!nameValue.trim() || submitting}
+        // The caption promises 2-200 characters; gate on the schema instead of
+        // "not empty", which let a single character through.
+        disabled={!isValid || submitting}
       />
     </div>
   )
@@ -127,13 +126,15 @@ export function CreateTextureSetDialog({
           maxLength={200}
           autoFocus
           onKeyDown={e => {
-            if (e.key === 'Enter' && nameValue.trim() && !submitting) {
+            if (e.key === 'Enter' && isValid && !submitting) {
               void handleSubmit(handleValidSubmit)()
             }
           }}
         />
         {errors.name && (
-          <small className="p-error">{errors.name.message}</small>
+          <small className="p-error" role="alert">
+            {errors.name.message}
+          </small>
         )}
         <small className="p-text-secondary">
           Choose a descriptive name for your texture set (2-200 characters)

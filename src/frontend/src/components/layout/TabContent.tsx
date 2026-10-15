@@ -79,19 +79,24 @@ const ScriptViewer = lazy(() =>
     default: module.ScriptViewer,
   }))
 )
-const StageList = lazy(() =>
-  import('@/features/stage-editor').then(module => ({
-    default: module.StageList,
-  }))
-)
-const StageEditor = lazy(() =>
-  import('@/features/stage-editor').then(module => ({
-    default: module.StageEditor,
-  }))
-)
 const ScenesTab = lazy(() =>
   import('@/features/scenes').then(module => ({
     default: module.ScenesTab,
+  }))
+)
+const SceneEditorTab = lazy(() =>
+  import('@/features/scenes').then(module => ({
+    default: module.SceneEditorTab,
+  }))
+)
+const VfxList = lazy(() =>
+  import('@/features/vfx').then(module => ({
+    default: module.VfxList,
+  }))
+)
+const VfxEditor = lazy(() =>
+  import('@/features/vfx').then(module => ({
+    default: module.VfxEditor,
   }))
 )
 const RecycledFilesList = lazy(() =>
@@ -231,14 +236,17 @@ export function TabContent({ tab }: TabContentProps): JSX.Element {
         }
         return <ScriptViewer scriptId={parseInt(tab.scriptId)} tabId={tab.id} />
 
-      case 'stageList':
-        return <StageList />
-
-      case 'stageEditor':
-        return <StageEditor stageId={tab.stageId} />
-
       case 'scenes':
         return <ScenesTab />
+
+      case 'sceneEditor':
+        return <SceneEditorTab sceneId={tab.sceneId} />
+
+      case 'vfxList':
+        return <VfxList />
+
+      case 'vfxEditor':
+        return <VfxEditor vfxId={Number(tab.params.vfxId)} />
 
       case 'assetStore':
         return <AssetStorePage />

@@ -31,17 +31,20 @@ internal sealed class CreateStoreImportCommandHandler : ICommandHandler<CreateSt
     private readonly IStoreImportQueue _queue;
     private readonly IDateTimeProvider _dateTimeProvider;
     private readonly IUnitOfWork _unitOfWork;
+    private readonly IStoreBaseUrlProvider _storeBaseUrls;
 
     public CreateStoreImportCommandHandler(
         IStoreImportJobRepository jobRepository,
         IStoreImportQueue queue,
         IDateTimeProvider dateTimeProvider,
-        IUnitOfWork unitOfWork)
+        IUnitOfWork unitOfWork,
+        IStoreBaseUrlProvider storeBaseUrls)
     {
         _jobRepository = jobRepository;
         _queue = queue;
         _dateTimeProvider = dateTimeProvider;
         _unitOfWork = unitOfWork;
+        _storeBaseUrls = storeBaseUrls;
     }
 
     public async Task<Result<CreateStoreImportResponse>> Handle(CreateStoreImportCommand command, CancellationToken cancellationToken)
@@ -53,7 +56,11 @@ internal sealed class CreateStoreImportCommandHandler : ICommandHandler<CreateSt
         if (string.IsNullOrWhiteSpace(command.AssetId))
             return Result.Failure<CreateStoreImportResponse>(new Error("StoreImport.MissingAssetId", "Asset id is required."));
 
-        var storeUrl = StoreUrlCanonicalizer.Canonicalize(command.StoreUrl);
+        // The companion Asset Store has one fixed address. A client-supplied URL is
+        // canonicalized and, in the e2e stack only, remapped to the local store fixture;
+        // that remap supplies the address used for the download AND the provenance row,
+        // so the two can never disagree.
+        var storeUrl = _storeBaseUrls.ResolveStoreBaseUrl(command.StoreUrl);
         var assetId = command.AssetId.Trim();
 
         StoreImportJob job;

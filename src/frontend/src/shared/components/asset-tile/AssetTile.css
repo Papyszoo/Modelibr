@@ -150,6 +150,15 @@
   box-shadow: var(--mod-shadow-sm);
 }
 
+/* ── Optional accessory corner (top-left) ──────────────────────── */
+
+.asset-tile-accessory {
+  position: absolute;
+  top: var(--mod-space-xs);
+  left: var(--mod-space-xs);
+  z-index: 10;
+}
+
 /* ── Add tile - dashed "Add X" call-to-action ──────────────────── */
 
 .asset-tile-add {

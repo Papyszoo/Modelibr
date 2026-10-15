@@ -333,16 +333,16 @@ Then(
     },
 );
 
-// ── Grid + navigation ─────────────────────────────────────────────
+// ── Section nav + navigation ──────────────────────────────────────
 
-Then("the settings grid should be visible", async ({ page }) => {
+Then("the settings section nav should be visible", async ({ page }) => {
     const settingsPage = new SettingsPage(page);
-    const onGrid = await settingsPage.isOnGrid();
-    expect(onGrid).toBe(true);
+    const navVisible = await settingsPage.isNavVisible();
+    expect(navVisible).toBe(true);
 });
 
 Then(
-    "the grid should show the following section cards:",
+    "the section nav should show the following sections:",
     async (
         { page },
         // playwright-bdd's data tables expose raw() => string[][]
@@ -350,9 +350,9 @@ Then(
     ) => {
         const settingsPage = new SettingsPage(page);
         const expectedLabels = dataTable.raw().map((row) => row[0].trim());
-        const actualLabels = await settingsPage.getAllCardLabels();
+        const actualLabels = await settingsPage.getSectionLabels();
         for (const expected of expectedLabels) {
-            expect(actualLabels, `card "${expected}" missing`).toContain(
+            expect(actualLabels, `nav item "${expected}" missing`).toContain(
                 expected,
             );
         }
@@ -360,7 +360,7 @@ Then(
 );
 
 When(
-    "I open the {string} section card",
+    "I select the {string} settings section",
     async ({ page }, label: string) => {
         const settingsPage = new SettingsPage(page);
         await settingsPage.openSection(sectionKey(label));
@@ -375,11 +375,6 @@ Then(
         expect(inSection).toBe(true);
     },
 );
-
-When("I click the back button", async ({ page }) => {
-    const settingsPage = new SettingsPage(page);
-    await settingsPage.clickBack();
-});
 
 When("I click discard", async ({ page }) => {
     const settingsPage = new SettingsPage(page);
@@ -443,19 +438,19 @@ Then(
 );
 
 Then(
-    "the dimmed card labels should include {string}",
+    "the dimmed section labels should include {string}",
     async ({ page }, expectedLabel: string) => {
         const settingsPage = new SettingsPage(page);
-        const dimmed = await settingsPage.getDimmedCardLabels();
+        const dimmed = await settingsPage.getDimmedSectionLabels();
         expect(dimmed).toContain(expectedLabel);
     },
 );
 
 Then(
-    "the dimmed card labels should not include {string}",
+    "the dimmed section labels should not include {string}",
     async ({ page }, label: string) => {
         const settingsPage = new SettingsPage(page);
-        const dimmed = await settingsPage.getDimmedCardLabels();
+        const dimmed = await settingsPage.getDimmedSectionLabels();
         expect(dimmed).not.toContain(label);
     },
 );

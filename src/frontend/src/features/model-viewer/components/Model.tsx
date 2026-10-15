@@ -9,7 +9,11 @@ import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader'
 import { STLLoader } from 'three/examples/jsm/loaders/STLLoader'
 
 import { LoadingPlaceholder } from '@/components/LoadingPlaceholder'
+import { useModelAnimationController } from '@/features/model-viewer/animation/ModelAnimationContext'
 import { useModelObject } from '@/features/model-viewer/hooks/useModelObject'
+import { cloneSkinnedModel } from '@/shared/three/cloneSkinnedModel'
+import { disposeClonedMaterials } from '@/shared/three/disposeClonedMaterials'
+import { advanceMaterialEffects } from '@/shared/three/materialEffects'
 import {
   createResourceManager,
   safeLoadingManager,
@@ -26,29 +30,41 @@ import { buildStlModel } from '../../../../../asset-processor/lib/stlMesh.js'
  */
 function useRenderedModel(
   model: THREE.Object3D | undefined | null,
+  animations: THREE.AnimationClip[] | undefined,
   rotationSpeed: number,
   preserveMaterials: boolean
 ) {
   const meshRef = useRef<THREE.Group>(null)
   const { setModelObject } = useModelObject()
+  const animation = useModelAnimationController()
   const scaledRef = useRef(false)
 
   // Rotate the model with configurable speed
-  useFrame(() => {
+  useFrame(state => {
     if (meshRef.current && rotationSpeed > 0) {
       meshRef.current.rotation.y += rotationSpeed
     }
+    // A viewed model usually wears its own embedded materials, which carry no
+    // effects and skip this traversal without allocating. If a library
+    // material ever reached this clone (buildParameterMaterial installs its
+    // effects), this is the component that advances them.
+    if (meshRef.current) {
+      advanceMaterialEffects(meshRef.current, state.clock.elapsedTime)
+    }
   })
 
-  // Reset the scaled flag when the model changes
+  // Reset the scaled flag when the model changes. `preserveMaterials` is a
+  // dependency too: it is read inside the build below, and without it here the
+  // flag stayed true across a toggle, so the effect re-ran but its `!scaledRef`
+  // guard skipped the rebuild and the toggle did nothing.
   useEffect(() => {
     scaledRef.current = false
-  }, [model])
+  }, [model, preserveMaterials])
 
   useEffect(() => {
     if (model && !scaledRef.current) {
       // Clone the model to prevent scene conflicts when same model is used in multiple panels
-      const clonedModel = model.clone()
+      const clonedModel = cloneSkinnedModel(model)
 
       // Apply a basic TSL-style material with enhanced properties
       clonedModel.traverse(child => {
@@ -91,15 +107,24 @@ function useRenderedModel(
 
       // Store the cloned model in the ref
       if (meshRef.current) {
+        // Release the materials the last build introduced before dropping it -
+        // a model change otherwise leaks one MeshStandardMaterial per mesh for
+        // the life of the session. Materials the clone shares with the source
+        // (preserveMaterials) are left alone.
+        disposeClonedMaterials(meshRef.current, model)
         // Clear previous children
         meshRef.current.clear()
         // Add cloned model
         meshRef.current.add(clonedModel)
       }
 
+      // Hand the rendered clone (not the cached original) to the animation
+      // controller so the single mixer drives exactly what is on screen.
+      animation?.setRoot(clonedModel, animations)
+
       scaledRef.current = true
     }
-  }, [model, preserveMaterials])
+  }, [model, animations, preserveMaterials, animation])
 
   useEffect(() => {
     if (model) {
@@ -127,7 +152,12 @@ function OBJModel({
   const model = useLoader(OBJLoader, modelUrl, loader => {
     loader.manager = manager
   })
-  const meshRef = useRenderedModel(model, rotationSpeed, preserveMaterials)
+  const meshRef = useRenderedModel(
+    model,
+    undefined,
+    rotationSpeed,
+    preserveMaterials
+  )
 
   return <group ref={meshRef} />
 }
@@ -151,6 +181,7 @@ function GLTFModel({
   })
   const meshRef = useRenderedModel(
     gltf?.scene,
+    gltf?.animations,
     rotationSpeed,
     preserveMaterials
   )
@@ -176,7 +207,12 @@ function FBXModel({
   const model = useLoader(FBXLoader, modelUrl, loader => {
     loader.manager = manager
   })
-  const meshRef = useRenderedModel(model, rotationSpeed, preserveMaterials)
+  const meshRef = useRenderedModel(
+    model,
+    model?.animations,
+    rotationSpeed,
+    preserveMaterials
+  )
 
   return <group ref={meshRef} />
 }
@@ -199,7 +235,12 @@ function STLModel({
   // and surfaces any binary-STL vertex colors. The material only survives in
   // "Embedded" mode - the default path overrides it in useRenderedModel.
   const model = useMemo(() => buildStlModel(THREE, geometry), [geometry])
-  const meshRef = useRenderedModel(model, rotationSpeed, preserveMaterials)
+  const meshRef = useRenderedModel(
+    model,
+    undefined,
+    rotationSpeed,
+    preserveMaterials
+  )
 
   return <group ref={meshRef} />
 }
@@ -216,7 +257,12 @@ function ThreeMFModel({
   const model = useLoader(ThreeMFLoader, modelUrl, loader => {
     loader.manager = safeLoadingManager
   })
-  const meshRef = useRenderedModel(model, rotationSpeed, preserveMaterials)
+  const meshRef = useRenderedModel(
+    model,
+    undefined,
+    rotationSpeed,
+    preserveMaterials
+  )
 
   return <group ref={meshRef} />
 }

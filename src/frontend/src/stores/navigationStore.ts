@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { createJSONStorage, persist } from 'zustand/middleware'
 
+import { generateId } from '@/shared/utils/generateId'
 import { type Tab, type TabType } from '@/types'
 
 // ─── Constants ────────────────────────────────────────────────────────
@@ -100,6 +101,21 @@ export function migrateNavigationState(
   }
 }
 
+/**
+ * The left panel's next active tab after `closedId` leaves it: its left
+ * neighbour, else the next left tab, else none. Picked among left-panel tabs
+ * only - the flat list also holds the right panel's tabs.
+ */
+function nextActiveLeftTabId(tabs: Tab[], closedId: string): string | null {
+  const left = tabs.filter(t => t.params?.panel !== 'right')
+  const closedIndex = left.findIndex(t => t.id === closedId)
+  const remaining = left.filter(t => t.id !== closedId)
+  if (remaining.length === 0) return null
+  return remaining[
+    Math.min(closedIndex > 0 ? closedIndex - 1 : 0, remaining.length - 1)
+  ].id
+}
+
 /** Messages sent over BroadcastChannel */
 export type NavigationBroadcast =
   | { type: 'TAB_CLOSED'; windowId: string; tab: Tab }
@@ -133,6 +149,17 @@ export interface NavigationStore {
 
   // ── Actions: tab management ────────────────────────────────────────
   openTab: (windowId: string, side: 'left' | 'right', tab: Tab) => void
+  /**
+   * Activate `tab` in whichever panel already holds it, or open it in the left
+   * panel. Unlike `openTab`, an existing right-panel tab is focused on the
+   * right instead of being made the left panel's active id.
+   */
+  focusOrOpenTab: (windowId: string, tab: Tab) => void
+  /**
+   * Collapse an empty left panel: when only the right panel holds tabs, they
+   * move left so the window shows one full-width panel with the main dock.
+   */
+  collapseEmptyLeftPanel: (windowId: string) => void
   closeTab: (windowId: string, tabId: string) => void
   setActiveTab: (windowId: string, activeTabId: string) => void
   setActiveRightTab: (windowId: string, activeRightTabId: string) => void
@@ -166,6 +193,14 @@ export interface NavigationStore {
     key: string,
     value: unknown
   ) => void
+  /**
+   * Relabels a tab in place.
+   *
+   * A rename must not recreate the tab: that would drop the tab's internal UI
+   * state with it, and a scene editor tab holds the id of the scene whose draft
+   * belongs to it.
+   */
+  setTabLabel: (windowId: string, tabId: string, label: string) => void
   getTabUiState: (windowId: string, tabId: string, key: string) => unknown
 
   // ── Actions: splitter ──────────────────────────────────────────────
@@ -186,15 +221,15 @@ export function getTabLabel(
     environmentMapId?: string
     packId?: string
     projectId?: string
-    stageId?: string
     scriptId?: string
+    sceneId?: string
     modelName?: string
     setName?: string
     environmentMapName?: string
     packName?: string
     projectName?: string
-    stageName?: string
     scriptName?: string
+    sceneName?: string
   } = {}
 ): string {
   const {
@@ -203,15 +238,15 @@ export function getTabLabel(
     environmentMapId,
     packId,
     projectId,
-    stageId,
     scriptId,
+    sceneId,
     modelName,
     setName,
     environmentMapName,
     packName,
     projectName,
-    stageName,
     scriptName,
+    sceneName,
   } = options
   switch (type) {
     case 'newTab':
@@ -221,6 +256,10 @@ export function getTabLabel(
     case 'modelViewer':
       if (modelName) return modelName
       return modelId ? `Model ${modelId}` : 'Model Viewer'
+    case 'vfxList':
+      return 'VFX'
+    case 'vfxEditor':
+      return 'Effect'
     case 'globalMaterials':
       return 'Global Materials'
     case 'pbrMaterials':
@@ -256,13 +295,11 @@ export function getTabLabel(
     case 'scriptViewer':
       if (scriptName) return scriptName
       return scriptId ? `Script ${scriptId}` : 'Script'
-    case 'stageList':
-      return 'Stages'
-    case 'stageEditor':
-      if (stageName) return stageName
-      return stageId ? `Stage ${stageId}` : 'Stage Editor'
     case 'scenes':
       return 'Scenes'
+    case 'sceneEditor':
+      if (sceneName) return sceneName
+      return sceneId ? `Scene ${sceneId}` : 'Scene Editor'
     case 'assetStore':
       return 'Asset Store'
     case 'history':
@@ -307,13 +344,17 @@ export function createTab(
         tabId = `project-${id}`
         params.projectId = id
         break
-      case 'stageEditor':
-        tabId = `stage-${id}`
-        params.stageId = id
-        break
       case 'scriptViewer':
         tabId = `script-${id}`
         params.scriptId = id
+        break
+      case 'sceneEditor':
+        tabId = `scene-${id}`
+        params.sceneId = id
+        break
+      case 'vfxEditor':
+        tabId = `vfx-${id}`
+        params.vfxId = id
         break
     }
   }
@@ -329,16 +370,16 @@ export function createTab(
         environmentMapId: type === 'environmentMapViewer' ? id : undefined,
         packId: type === 'packViewer' ? id : undefined,
         projectId: type === 'projectViewer' ? id : undefined,
-        stageId: type === 'stageEditor' ? id : undefined,
         scriptId: type === 'scriptViewer' ? id : undefined,
+        sceneId: type === 'sceneEditor' ? id : undefined,
         modelName: type === 'modelViewer' && name ? name : undefined,
         setName: type === 'textureSetViewer' && name ? name : undefined,
         environmentMapName:
           type === 'environmentMapViewer' && name ? name : undefined,
         packName: type === 'packViewer' && name ? name : undefined,
         projectName: type === 'projectViewer' && name ? name : undefined,
-        stageName: type === 'stageEditor' && name ? name : undefined,
         scriptName: type === 'scriptViewer' && name ? name : undefined,
+        sceneName: type === 'sceneEditor' && name ? name : undefined,
       }),
     params,
     internalUiState,
@@ -348,8 +389,8 @@ export function createTab(
     environmentMapId: params.environmentMapId,
     packId: params.packId,
     projectId: params.projectId,
-    stageId: params.stageId,
     scriptId: params.scriptId,
+    sceneId: params.sceneId,
   }
 }
 
@@ -516,27 +557,75 @@ export const useNavigationStore = create<NavigationStore>()(
         })
       },
 
+      focusOrOpenTab: (windowId, tab) => {
+        set(state => {
+          const ws = state.activeWindows[windowId]
+          if (!ws) return state
+
+          const existing = ws.tabs.find(t => t.id === tab.id)
+          const update = !existing
+            ? { tabs: [...ws.tabs, tab], activeTabId: tab.id }
+            : existing.params?.panel === 'right'
+              ? { activeRightTabId: existing.id }
+              : { activeTabId: existing.id }
+
+          return {
+            activeWindows: {
+              ...state.activeWindows,
+              [windowId]: {
+                ...ws,
+                ...update,
+                lastActiveAt: new Date().toISOString(),
+              },
+            },
+          }
+        })
+      },
+
+      collapseEmptyLeftPanel: windowId => {
+        set(state => {
+          const ws = state.activeWindows[windowId]
+          if (!ws) return state
+
+          const rightTabs = ws.tabs.filter(t => t.params?.panel === 'right')
+          if (rightTabs.length === 0 || rightTabs.length !== ws.tabs.length) {
+            return state
+          }
+
+          const tabs = ws.tabs.map(t => {
+            const { panel: _, ...params } = t.params
+            return { ...t, params }
+          })
+          const activeTabId = tabs.some(t => t.id === ws.activeRightTabId)
+            ? ws.activeRightTabId
+            : tabs[0].id
+
+          return {
+            activeWindows: {
+              ...state.activeWindows,
+              [windowId]: {
+                ...ws,
+                tabs,
+                activeTabId,
+                activeRightTabId: null,
+              },
+            },
+          }
+        })
+      },
+
       closeTab: (windowId, tabId) => {
         set(state => {
           const ws = state.activeWindows[windowId]
           if (!ws) return state
 
           const closedTab = ws.tabs.find(t => t.id === tabId)
-          const closedIndex = ws.tabs.findIndex(t => t.id === tabId)
           const newTabs = ws.tabs.filter(t => t.id !== tabId)
 
-          let newActiveTabId = ws.activeTabId
-          if (ws.activeTabId === tabId) {
-            if (newTabs.length > 0) {
-              const newIndex = Math.min(
-                closedIndex > 0 ? closedIndex - 1 : 0,
-                newTabs.length - 1
-              )
-              newActiveTabId = newTabs[newIndex].id
-            } else {
-              newActiveTabId = null
-            }
-          }
+          const newActiveTabId =
+            ws.activeTabId === tabId
+              ? nextActiveLeftTabId(ws.tabs, tabId)
+              : ws.activeTabId
 
           // Also handle right panel active tab
           let newActiveRightTabId = ws.activeRightTabId ?? null
@@ -634,20 +723,11 @@ export const useNavigationStore = create<NavigationStore>()(
           const ws = state.activeWindows[windowId]
           if (!ws) return state
 
-          const removedIndex = ws.tabs.findIndex(t => t.id === tabId)
           const newTabs = ws.tabs.filter(t => t.id !== tabId)
-          let newActiveTabId = ws.activeTabId
-          if (ws.activeTabId === tabId) {
-            if (newTabs.length > 0) {
-              const newIndex = Math.min(
-                removedIndex > 0 ? removedIndex - 1 : 0,
-                newTabs.length - 1
-              )
-              newActiveTabId = newTabs[newIndex].id
-            } else {
-              newActiveTabId = null
-            }
-          }
+          const newActiveTabId =
+            ws.activeTabId === tabId
+              ? nextActiveLeftTabId(ws.tabs, tabId)
+              : ws.activeTabId
 
           // Also handle right panel active tab
           let newActiveRightTabId = ws.activeRightTabId ?? null
@@ -750,6 +830,25 @@ export const useNavigationStore = create<NavigationStore>()(
 
       // ── Tab internal UI state ───────────────────────────────────────
 
+      setTabLabel: (windowId, tabId, label) => {
+        set(state => {
+          const ws = state.activeWindows[windowId]
+          if (!ws) return state
+
+          return {
+            activeWindows: {
+              ...state.activeWindows,
+              [windowId]: {
+                ...ws,
+                // Only `label` moves. The id, the params and the internal UI state
+                // are what make this tab this tab, and a rename that recreated
+                // any of them would take a scene's unsaved draft with it.
+                tabs: ws.tabs.map(t => (t.id === tabId ? { ...t, label } : t)),
+              },
+            },
+          }
+        })
+      },
       setTabUiState: (windowId, tabId, key, value) => {
         set(state => {
           const ws = state.activeWindows[windowId]
@@ -852,7 +951,7 @@ export const useNavigationStore = create<NavigationStore>()(
 export function getWindowId(): string {
   let id = sessionStorage.getItem(SESSION_WINDOW_ID_KEY)
   if (!id) {
-    id = crypto.randomUUID()
+    id = generateId()
     sessionStorage.setItem(SESSION_WINDOW_ID_KEY, id)
   }
   return id

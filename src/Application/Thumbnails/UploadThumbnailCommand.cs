@@ -15,7 +15,6 @@ internal class UploadThumbnailCommandHandler : ICommandHandler<UploadThumbnailCo
     private readonly IModelRepository _modelRepository;
     private readonly IThumbnailRepository _thumbnailRepository;
     private readonly IFileStorage _fileStorage;
-    private readonly IUploadPathProvider _pathProvider;
     private readonly IDateTimeProvider _dateTimeProvider;
     private readonly IUnitOfWork _unitOfWork;
 
@@ -23,14 +22,12 @@ internal class UploadThumbnailCommandHandler : ICommandHandler<UploadThumbnailCo
         IModelRepository modelRepository,
         IThumbnailRepository thumbnailRepository,
         IFileStorage fileStorage,
-        IUploadPathProvider pathProvider,
         IDateTimeProvider dateTimeProvider,
         IUnitOfWork unitOfWork)
     {
         _modelRepository = modelRepository;
         _thumbnailRepository = thumbnailRepository;
         _fileStorage = fileStorage;
-        _pathProvider = pathProvider;
         _dateTimeProvider = dateTimeProvider;
         _unitOfWork = unitOfWork;
     }
@@ -66,8 +63,9 @@ internal class UploadThumbnailCommandHandler : ICommandHandler<UploadThumbnailCo
             // Store the thumbnail file using existing storage infrastructure
             var storedFileResult = await _fileStorage.SaveAsync(command.ThumbnailFile, FileType.Texture, cancellationToken);
             
-            // Build the full path for the thumbnail
-            var fullPath = Path.Combine(_pathProvider.UploadRootPath, storedFileResult.RelativePath);
+            // Persist the uploads-relative path (like every other file); readers rebase
+            // it against the uploads root so the library is portable across roots.
+            var relativePath = storedFileResult.RelativePath;
 
             // Get image dimensions if possible (optional, can default to command values)
             var width = command.Width ?? 256; // Default width if not provided
@@ -101,7 +99,7 @@ internal class UploadThumbnailCommandHandler : ICommandHandler<UploadThumbnailCo
 
             // Mark thumbnail as ready with the uploaded file details
             thumbnailToUpdate.MarkAsReady(
-                fullPath,
+                relativePath,
                 storedFileResult.SizeBytes,
                 width,
                 height,
@@ -112,7 +110,7 @@ internal class UploadThumbnailCommandHandler : ICommandHandler<UploadThumbnailCo
 
             return Result.Success(new UploadThumbnailCommandResponse(
                 model.Id,
-                fullPath,
+                relativePath,
                 storedFileResult.SizeBytes,
                 width,
                 height));

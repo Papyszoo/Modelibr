@@ -1,0 +1,12 @@
+/* The level's way into its scene: one compact control, and its own error. */
+.project-level-scene {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--mod-space-3xs);
+}
+
+.project-level-scene-error {
+  color: var(--red-500);
+  font-size: var(--mod-text-xs);
+  white-space: nowrap;
+}

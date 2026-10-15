@@ -11,10 +11,16 @@
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import http from "node:http";
+import https from "node:https";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const PORT = Number(process.env.PORT || 9280);
+// The browser talks to the store's fixed https origin, so the fixture also
+// serves TLS for the host-resolver mapping the Playwright config installs.
+const TLS_PORT = Number(process.env.TLS_PORT || 0);
+const TLS_CERT = process.env.TLS_CERT || "server.crt";
+const TLS_KEY = process.env.TLS_KEY || "server.key";
 // The base baked into manifest downloadUrls - must be the store's own host
 // so the backend trusts it (same-host rule) and sends the import token.
 const PUBLIC_BASE = process.env.PUBLIC_BASE || `http://localhost:${PORT}`;
@@ -24,7 +30,31 @@ const PASSWORD = "e2e-store-pass";
 const ACCESS_TOKEN = "e2e-access-token";
 const REFRESH_TOKEN = "e2e-refresh-token";
 const IMPORT_TOKEN = "e2e-import-token";
+// The browser sign-in path browses the store by its own non-Guid pack id.
 const ASSET_ID = "e2e-props-pack";
+// The agent catalog path (MCP) requires the store's public catalog contract:
+// anonymous routes and Guid asset ids. A separate, free, GUID-keyed asset keeps
+// those two paths from sharing bytes (SHA dedupe) or provenance.
+const CATALOG_ASSET_ID = "3b1a2c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d";
+const CATALOG_ITEM_ID = "7c8d9e0f-1a2b-4c3d-9e4f-5a6b7c8d9e0f";
+const CATALOG_PREVIEW_ID = "9e0f1a2b-3c4d-4e5f-8a6b-7c8d9e0f1a2b";
+const CATALOG_TITLE = "E2E Catalog Cube";
+// A second anonymous Guid asset for the signed-out UI import scenario. It is
+// kept SEPARATE from the MCP catalog asset and the texture pack so no two
+// scenarios race the same pack (they run in parallel): different ids,
+// different bytes.
+const FREE_ASSET_ID = "2d3c4b5a-6e7f-4890-9a1b-2c3d4e5f6a7b";
+const FREE_ITEM_ID = "8a9b0c1d-2e3f-4a5b-8c7d-6e5f4a3b2c1d";
+const FREE_PACK_TITLE = "E2E Free Props Pack";
+const FREE_TITLE = "E2E Free Cube";
+// The free TEXTURE pack: a second anonymous Guid asset whose items are
+// TextureSets. Its maps are the formats real store texture packs ship -
+// KTX2, WebP and PNG - which the importer must accept as textures.
+const TEXTURE_ASSET_ID = "6f1e2d3c-4b5a-6978-8c9d-0e1f2a3b4c5d";
+const TEXTURE_ITEM_ID = "1a2b3c4d-5e6f-4a7b-9c8d-7e6f5a4b3c2d";
+const TEXTURE_PACK_TITLE = "E2E Texture Pack";
+const TEXTURE_SET_TITLE = "E2E Brick Material";
+const TEXTURE_CATEGORY = "E2E Store Textures";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 
@@ -81,6 +111,50 @@ const files = {
         name: "preview.png",
         contentType: "image/png",
         bytes: readFileSync(path.join(here, "assets/blue_color.png")),
+    },
+    // The agent catalog asset's mesh. Re-tagged with a DIFFERENT marker than the
+    // browser pack's file so its SHA-256 differs - otherwise the first import
+    // would dedupe the second one's model away.
+    3: {
+        name: "test-cube.glb",
+        contentType: "model/gltf-binary",
+        bytes: retagGlb(
+            readFileSync(path.join(here, "assets/test-cube.glb")),
+            "e2e-store-catalog",
+        ),
+    },
+    // The texture pack's maps. Freshly generated files (not shared with other
+    // scenarios' uploads), one per shipped container format.
+    4: {
+        name: "brick_albedo.ktx2",
+        contentType: "image/ktx2",
+        bytes: readFileSync(
+            path.join(here, "assets/store-texture-brick_albedo.ktx2"),
+        ),
+    },
+    5: {
+        name: "brick_normal.webp",
+        contentType: "image/webp",
+        bytes: readFileSync(
+            path.join(here, "assets/store-texture-brick_normal.webp"),
+        ),
+    },
+    6: {
+        name: "brick_roughness.png",
+        contentType: "image/png",
+        bytes: readFileSync(
+            path.join(here, "assets/store-texture-brick_roughness.png"),
+        ),
+    },
+    // The signed-out UI scenario's mesh - re-tagged with its own marker so its
+    // SHA-256 is unique to this asset (see the catalog file's comment).
+    7: {
+        name: "test-cube.glb",
+        contentType: "model/gltf-binary",
+        bytes: retagGlb(
+            readFileSync(path.join(here, "assets/test-cube.glb")),
+            "e2e-store-free-props",
+        ),
     },
 };
 
@@ -165,6 +239,265 @@ const libraryItem = {
     addedAt: "2026-07-01T00:00:00+00:00",
 };
 
+// Catalog detail (GET /api/assets/{guid}) - the shape the backend's
+// StoreCatalogClient deserializes into StoreAssetDto. Anonymous, and the id
+// is a Guid because the catalog client parses it as one.
+const catalogAssetDetail = {
+    id: CATALOG_ASSET_ID,
+    title: "E2E Catalog Pack",
+    description: "Fixture pack for the agent catalog path.",
+    author: "E2E Fixture",
+    thumbnailUrl: `${PUBLIC_BASE}/api/files/2/download`,
+    itemTypes: ["Model"],
+    formats: ["glb"],
+    fileSize: files[3].bytes.length,
+    isPack: true,
+    itemCount: 1,
+    downloadCount: 0,
+    tags: ["e2e", "catalog"],
+    price: 0,
+    currency: "USD",
+    creditName: "E2E Fixture",
+    creditUrl: `${PUBLIC_BASE}/credits/e2e-fixture`,
+    license: "CC0",
+    items: [
+        {
+            id: CATALOG_ITEM_ID,
+            itemType: "Model",
+            name: CATALOG_TITLE,
+            isPreviewable: true,
+            category: "Catalog Props",
+            subcategory: null,
+        },
+    ],
+    previews: [
+        {
+            id: CATALOG_PREVIEW_ID,
+            type: "Thumbnail",
+            url: `${PUBLIC_BASE}/api/files/2/download`,
+            fileName: "preview.png",
+            packItemId: CATALOG_ITEM_ID,
+        },
+    ],
+};
+
+// Catalog manifest (GET /api/assets/{guid}/manifest) - anonymous because a free
+// approved asset is fetchable with no credential (the agent import sends none).
+const catalogManifest = {
+    schemaVersion: 1,
+    title: "E2E Catalog Pack",
+    description: "Fixture pack for the agent catalog path.",
+    license: "CC0",
+    author: "E2E Fixture",
+    creditName: "E2E Fixture",
+    creditUrl: `${PUBLIC_BASE}/credits/e2e-fixture`,
+    tags: ["e2e", "catalog"],
+    items: [
+        {
+            id: CATALOG_ITEM_ID,
+            itemType: "Model",
+            name: CATALOG_TITLE,
+            metadataJson: JSON.stringify({ category: "Catalog Props" }),
+            description: "A catalog-imported cube.",
+            tags: ["catalog-import"],
+            files: [
+                {
+                    fileName: files[3].name,
+                    fileSize: files[3].bytes.length,
+                    sha256: sha256(files[3].bytes),
+                    role: "Mesh",
+                    downloadUrl: `${PUBLIC_BASE}/api/files/3/download`,
+                },
+            ],
+            previews: [],
+        },
+    ],
+    previews: [
+        {
+            type: "Thumbnail",
+            fileName: files[2].name,
+            contentType: files[2].contentType,
+            url: `${PUBLIC_BASE}/api/files/2/download`,
+        },
+    ],
+};
+
+// The free TEXTURE pack's catalog detail (GET /api/assets/{guid}), anonymous.
+// One TextureSet item carrying the maps a real PBR material ships - a KTX2
+// albedo, a WebP normal and a PNG roughness.
+const texturePackDetail = {
+    id: TEXTURE_ASSET_ID,
+    title: TEXTURE_PACK_TITLE,
+    description: "Fixture texture pack for the free texture-set import path.",
+    author: "E2E Fixture",
+    thumbnailUrl: `${PUBLIC_BASE}/api/files/2/download`,
+    itemTypes: ["TextureSet"],
+    formats: ["ktx2", "webp", "png"],
+    fileSize:
+        files[4].bytes.length + files[5].bytes.length + files[6].bytes.length,
+    isPack: true,
+    itemCount: 1,
+    downloadCount: 0,
+    tags: ["e2e", "textures"],
+    price: 0,
+    currency: "USD",
+    creditName: "E2E Fixture",
+    creditUrl: `${PUBLIC_BASE}/credits/e2e-fixture`,
+    license: "CC0",
+    items: [
+        {
+            id: TEXTURE_ITEM_ID,
+            itemType: "TextureSet",
+            name: TEXTURE_SET_TITLE,
+            isPreviewable: false,
+            category: TEXTURE_CATEGORY,
+            subcategory: null,
+        },
+    ],
+    previews: [],
+};
+
+// The texture pack's manifest (GET /api/assets/{guid}/manifest), anonymous.
+const texturePackManifest = {
+    schemaVersion: 1,
+    title: TEXTURE_PACK_TITLE,
+    description: "Fixture texture pack for the free texture-set import path.",
+    license: "CC0",
+    author: "E2E Fixture",
+    creditName: "E2E Fixture",
+    creditUrl: `${PUBLIC_BASE}/credits/e2e-fixture`,
+    tags: ["e2e", "textures"],
+    items: [
+        {
+            id: TEXTURE_ITEM_ID,
+            itemType: "TextureSet",
+            name: TEXTURE_SET_TITLE,
+            metadataJson: JSON.stringify({ category: TEXTURE_CATEGORY }),
+            files: [
+                {
+                    fileName: files[4].name,
+                    fileSize: files[4].bytes.length,
+                    sha256: sha256(files[4].bytes),
+                    role: "Texture:Albedo",
+                    downloadUrl: `${PUBLIC_BASE}/api/files/4/download`,
+                },
+                {
+                    fileName: files[5].name,
+                    fileSize: files[5].bytes.length,
+                    sha256: sha256(files[5].bytes),
+                    role: "Texture:Normal",
+                    downloadUrl: `${PUBLIC_BASE}/api/files/5/download`,
+                },
+                {
+                    fileName: files[6].name,
+                    fileSize: files[6].bytes.length,
+                    sha256: sha256(files[6].bytes),
+                    role: "Texture:Roughness:R",
+                    downloadUrl: `${PUBLIC_BASE}/api/files/6/download`,
+                },
+            ],
+            previews: [],
+        },
+    ],
+    previews: [],
+};
+
+// The signed-out UI import scenario's asset - anonymous Guid id, free, and its
+// own bytes so nothing else dedupes against it.
+const freePackDetail = {
+    id: FREE_ASSET_ID,
+    title: FREE_PACK_TITLE,
+    description: "Fixture pack for the signed-out UI import path.",
+    author: "E2E Fixture",
+    thumbnailUrl: `${PUBLIC_BASE}/api/files/2/download`,
+    itemTypes: ["Model"],
+    formats: ["glb"],
+    fileSize: files[7].bytes.length,
+    isPack: true,
+    itemCount: 1,
+    downloadCount: 0,
+    tags: ["e2e", "free"],
+    price: 0,
+    currency: "USD",
+    creditName: "E2E Fixture",
+    creditUrl: `${PUBLIC_BASE}/credits/e2e-fixture`,
+    license: "CC0",
+    items: [
+        {
+            id: FREE_ITEM_ID,
+            itemType: "Model",
+            name: FREE_TITLE,
+            isPreviewable: true,
+            category: "Free Props",
+            subcategory: null,
+        },
+    ],
+    previews: [],
+};
+
+const freePackManifest = {
+    schemaVersion: 1,
+    title: FREE_PACK_TITLE,
+    description: "Fixture pack for the signed-out UI import path.",
+    license: "CC0",
+    author: "E2E Fixture",
+    creditName: "E2E Fixture",
+    creditUrl: `${PUBLIC_BASE}/credits/e2e-fixture`,
+    tags: ["e2e", "free"],
+    items: [
+        {
+            id: FREE_ITEM_ID,
+            itemType: "Model",
+            name: FREE_TITLE,
+            metadataJson: JSON.stringify({ category: "Free Props" }),
+            files: [
+                {
+                    fileName: files[7].name,
+                    fileSize: files[7].bytes.length,
+                    sha256: sha256(files[7].bytes),
+                    role: "Mesh",
+                    downloadUrl: `${PUBLIC_BASE}/api/files/7/download`,
+                },
+            ],
+            previews: [],
+        },
+    ],
+    previews: [],
+};
+
+const catalogAssets = [catalogAssetDetail, freePackDetail, texturePackDetail];
+
+const catalogAssetById = (id) =>
+    catalogAssets.find((asset) => asset.id.toLowerCase() === id.toLowerCase());
+
+// GET /api/assets - the public catalog search. The backend's StoreCatalogClient
+// calls this anonymously with page/pageSize and the optional filters; the
+// browser's signed-out tab uses it as a plain list.
+function catalogSearchResults(url) {
+    const search = (url.searchParams.get("search") || "").trim().toLowerCase();
+    const itemType = url.searchParams.get("itemType");
+    const tag = url.searchParams.get("tag");
+    const format = url.searchParams.get("format");
+
+    const items = catalogAssets.filter((asset) => {
+        const haystack =
+            `${asset.title} ${asset.author} ${asset.description}`.toLowerCase();
+        return (
+            (!search || haystack.includes(search)) &&
+            (!itemType || asset.itemTypes.includes(itemType)) &&
+            (!tag || asset.tags.includes(tag)) &&
+            (!format || asset.formats.includes(format))
+        );
+    });
+    return {
+        items,
+        page: 1,
+        pageSize: 12,
+        totalCount: items.length,
+        totalPages: items.length > 0 ? 1 : 0,
+    };
+}
+
 const json = (res, status, body) => {
     const payload = JSON.stringify(body);
     res.writeHead(status, {
@@ -193,7 +526,7 @@ const hasImportToken = (req) =>
     req.headers.authorization === `ImportToken ${IMPORT_TOKEN}` ||
     hasBearer(req);
 
-const server = http.createServer(async (req, res) => {
+const handleRequest = async (req, res) => {
     // Open CORS - mirrors the store's credential-less ModelibrImport policy.
     res.setHeader("Access-Control-Allow-Origin", "*");
     res.setHeader("Access-Control-Allow-Headers", "Authorization, Content-Type");
@@ -270,6 +603,39 @@ const server = http.createServer(async (req, res) => {
         return json(res, 200, manifest);
     }
 
+    // ── Agent catalog contract (anonymous, Guid ids) ──────────────────────
+    // The backend's StoreCatalogClient sends no credential and parses asset
+    // ids as Guids, so these routes must not require the browser's Bearer.
+    if (route === "GET /api/assets") {
+        return json(res, 200, catalogSearchResults(url));
+    }
+
+    const catalogDetail = url.pathname.match(
+        /^\/api\/assets\/([0-9a-fA-F-]{36})$/,
+    );
+    if (req.method === "GET" && catalogDetail) {
+        const asset = catalogAssetById(catalogDetail[1]);
+        if (asset) return json(res, 200, asset);
+        return json(res, 404, { message: "No such asset." });
+    }
+
+    const catalogManifestRoute = url.pathname.match(
+        /^\/api\/assets\/([0-9a-fA-F-]{36})\/manifest$/,
+    );
+    if (req.method === "GET" && catalogManifestRoute) {
+        const id = catalogManifestRoute[1].toLowerCase();
+        if (id === CATALOG_ASSET_ID) {
+            return json(res, 200, catalogManifest);
+        }
+        if (id === FREE_ASSET_ID) {
+            return json(res, 200, freePackManifest);
+        }
+        if (id === TEXTURE_ASSET_ID) {
+            return json(res, 200, texturePackManifest);
+        }
+        return json(res, 404, { message: "No such asset." });
+    }
+
     const download = url.pathname.match(/^\/api\/files\/(\d+)\/download$/);
     if (req.method === "GET" && download) {
         const file = files[download[1]];
@@ -286,8 +652,24 @@ const server = http.createServer(async (req, res) => {
     }
 
     return json(res, 404, { message: `No route: ${route}` });
-});
+};
 
-server.listen(PORT, () => {
+http.createServer(handleRequest).listen(PORT, () => {
     console.log(`[store-fixture] listening on :${PORT} (base ${PUBLIC_BASE})`);
 });
+
+if (TLS_PORT) {
+    https
+        .createServer(
+            {
+                cert: readFileSync(TLS_CERT),
+                key: readFileSync(TLS_KEY),
+            },
+            handleRequest,
+        )
+        .listen(TLS_PORT, () => {
+            console.log(
+                `[store-fixture] listening on https://store.modelibr.com:${TLS_PORT}`,
+            );
+        });
+}

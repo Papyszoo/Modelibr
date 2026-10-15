@@ -2,7 +2,8 @@ import { Button } from 'primereact/button'
 import { Checkbox } from 'primereact/checkbox'
 import { Dialog } from 'primereact/dialog'
 import { InputText } from 'primereact/inputtext'
-import { useEffect, useState } from 'react'
+import { Toast } from 'primereact/toast'
+import { useEffect, useRef, useState } from 'react'
 
 import { getModelsPaginated } from '@/features/models/api/modelApi'
 import { addModelToPack } from '@/features/pack/api/packApi'
@@ -31,6 +32,7 @@ export function AddModelDialog({
   const [selectedModelIds, setSelectedModelIds] = useState<number[]>([])
   const [searchQuery, setSearchQuery] = useState('')
   const [loading, setLoading] = useState(false)
+  const toast = useRef<Toast>(null)
 
   const label = packId ? 'Pack' : 'Project'
 
@@ -84,6 +86,7 @@ export function AddModelDialog({
   }
 
   const handleAdd = async () => {
+    const count = selectedModelIds.length
     try {
       for (const modelId of selectedModelIds) {
         if (packId) {
@@ -92,10 +95,22 @@ export function AddModelDialog({
           await addModelToProject(projectId, modelId)
         }
       }
+      toast.current?.show({
+        severity: 'success',
+        summary: 'Added',
+        detail: `${count} model${count === 1 ? '' : 's'} added to the ${label.toLowerCase()}.`,
+        life: 3000,
+      })
       onModelsAdded()
       onHide()
     } catch (error) {
       console.error('Failed to add models:', error)
+      toast.current?.show({
+        severity: 'error',
+        summary: 'Error',
+        detail: `Failed to add models to the ${label.toLowerCase()}.`,
+        life: 3000,
+      })
     }
   }
 
@@ -128,6 +143,7 @@ export function AddModelDialog({
         </div>
       }
     >
+      <Toast ref={toast} />
       <div className="add-dialog-content">
         <div className="search-bar">
           <i className="pi pi-search" />

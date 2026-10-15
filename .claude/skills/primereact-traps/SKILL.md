@@ -5,7 +5,7 @@ description: PrimeReact components that fail soft in Modelibr - wrong-shape prop
 
 # PrimeReact traps (visual state that silently doesn't render)
 
-PrimeReact fails soft: a prop of the wrong *shape* renders fine with the state
+PrimeReact fails soft: a prop of the wrong _shape_ renders fine with the state
 feature dead - no error, and in some cases no type failure either.
 
 ## Known cases

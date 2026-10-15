@@ -1,5 +1,6 @@
 ---
-sidebar_position: 10
+description: Mount your Modelibr library as a WebDAV drive in Finder or File Explorer. Save a .blend file and Modelibr creates a new model version automatically.
+sidebar_position: 13
 ---
 
 # WebDAV
@@ -28,7 +29,7 @@ In the WebDAV **Models** directory, you can have exposed editable `.blend` files
 
 When you open a model's `.blend` file, make changes, and save it, Modelibr creates a new model version automatically.
 
-That new version is then processed through the Blender CLI pipeline so Modelibr can extract `.glb` files with baked textures.
+That new version is then processed through the Blender CLI pipeline, which exports a `.glb` file alongside the `.blend`.
 
 ## Exposed directories
 
@@ -39,6 +40,7 @@ That new version is then processed through the Blender CLI pipeline so Modelibr 
 5. Sounds
 6. Projects -> With subdirectories (Models, Texture Sets, EnvironmentMaps, Sprites, Sounds)
 7. Packs -> With subdirectories (Models, Texture Sets, EnvironmentMaps, Sprites, Sounds)
+8. Selection -> the mixdown of your current sound selection, served as `{Sound}Selection.wav`
 
 Environment maps are available globally and inside containers:
 
@@ -53,9 +55,10 @@ Each environment map directory exposes:
 
 ## Notes
 
-- Native installers expose WebDAV on the same local port as the app by default. Change that port in the host status window's **Configuration** panel and restart Modelibr.
+- Native installers expose WebDAV on the same local port as the app by default. Change that port in the host status window's **Settings** panel (see [Desktop app](/docs/features/desktop)) and restart Modelibr.
 - Docker deployments still use `.env` for WebDAV port configuration.
 - Availability depends on your local deployment configuration and network access.
+- If it will not mount, see [Troubleshooting](/docs/features/troubleshooting).
 
 :::note Video placeholder
 The walkthrough video for this page will be added later.

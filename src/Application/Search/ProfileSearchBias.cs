@@ -73,10 +73,16 @@ public sealed record ProfileSearchBias(
                                   && string.Equals(Mode, AssetSearchProfileModes.Enforce, StringComparison.Ordinal);
 
     /// <summary>True when nothing in this profile can change a result. Ranking can then skip the work entirely.</summary>
+    /// <remarks>
+    /// A triangle cap counts as non-inert even in <c>bias</c>, where it is reported rather
+    /// than enforced: the cap rides out on every hit as <c>facts.profileFit</c>, and treating
+    /// it as inert made the profile report itself unapplied while carrying a cap in the same
+    /// object - contradicting the "no style and no triangle budget" note beside it.
+    /// </remarks>
     public bool IsInert => Styles.Count == 0
                            && BoostTokens.Count == 0
                            && PenaltyTokens.Count == 0
-                           && !EnforcesBudget;
+                           && TriangleCap is null;
 }
 
 /// <summary>

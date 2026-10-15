@@ -10,7 +10,7 @@ Feature: Application Settings
   @settings-display
   Scenario: Settings page displays all configuration fields
     Then the settings page title should be "Settings"
-    And the settings grid should be visible
+    And the settings section nav should be visible
     And the max file size field should have a value
     And the max thumbnail size field should have a value
     And the frame count field should have a value
@@ -86,11 +86,11 @@ Feature: Application Settings
     When I change the theme to "light"
     Then the theme should be "light"
 
-  # ── Grid + navigation ─────────────────────────────────────────────
+  # ── Section nav + navigation ──────────────────────────────────────
 
-  @settings-grid-cards
-  Scenario: All eight settings sections are listed in the grid
-    Then the grid should show the following section cards:
+  @settings-nav-sections
+  Scenario: All eight settings sections are listed in the section nav
+    Then the section nav should show the following sections:
       | Appearance           |
       | File Upload          |
       | Thumbnail Generation |
@@ -100,23 +100,21 @@ Feature: Application Settings
       | WebDAV               |
       | Backup & Restore     |
 
-  @settings-grid-open-card
-  Scenario: Clicking a card opens its section detail
-    When I open the "File Upload" section card
+  @settings-nav-open-section
+  Scenario: Selecting a nav item shows its section content
+    When I select the "File Upload" settings section
     Then I should be in the "File Upload" section
     And the save button should be visible
-    When I click the back button
-    Then the settings grid should be visible
 
-  @settings-grid-back-clean
-  Scenario: Back button on a clean section returns to the grid without prompting
-    When I open the "Thumbnail Generation" section card
-    And I click the back button
-    Then the settings grid should be visible
+  @settings-nav-switch
+  Scenario: Switching sections shows the newly selected content
+    When I select the "Thumbnail Generation" settings section
+    And I select the "Texture Proxy" settings section
+    Then I should be in the "Texture Proxy" section
 
   @settings-discard-resets
   Scenario: Discard resets unsaved changes in the current section
-    When I open the "Texture Proxy" section card
+    When I select the "Texture Proxy" settings section
     And I change the texture proxy size to "1024"
     Then the save button should be enabled
     When I click discard
@@ -127,7 +125,7 @@ Feature: Application Settings
 
   @settings-section-tab-persistence
   Scenario: Active section is remembered when switching away and back
-    When I open the "Thumbnail Generation" section card
+    When I select the "Thumbnail Generation" settings section
     Then I should be in the "Thumbnail Generation" section
     When I switch to the model list tab
     And I return to the settings tab
@@ -135,7 +133,7 @@ Feature: Application Settings
 
   @settings-dirty-draft-tab-persistence
   Scenario: Unsaved field values are remembered when switching away and back
-    When I open the "File Upload" section card
+    When I select the "File Upload" settings section
     And I change the max thumbnail size to "42"
     Then the save button should be enabled
     When I switch to the model list tab
@@ -156,13 +154,13 @@ Feature: Application Settings
     And the search results should include "Thumbnail Generation"
 
   @settings-search-dimming
-  Scenario: Cards for non-matching sections are dimmed
+  Scenario: Nav items for non-matching sections are dimmed
     When I search settings for "blender"
-    Then the dimmed card labels should not include "Blender"
-    And the dimmed card labels should include "Appearance"
+    Then the dimmed section labels should not include "Blender"
+    And the dimmed section labels should include "Appearance"
 
   @settings-search-click
-  Scenario: Clicking a search result opens its section and clears the search
+  Scenario: Selecting a search result shows its section and clears the search
     When I search settings for "frame"
     And I click the first search result
     Then I should be in the "Thumbnail Generation" section
@@ -171,7 +169,7 @@ Feature: Application Settings
 
   @settings-texture-proxy-persist
   Scenario: Texture proxy size persists across reload
-    When I open the "Texture Proxy" section card
+    When I select the "Texture Proxy" settings section
     And I change the texture proxy size to "1024"
     And I save the settings
     Then the success message should be visible
@@ -212,6 +210,6 @@ Feature: Application Settings
 
   @settings-ssl-download-link
   Scenario: SSL Certificate section exposes a download link
-    When I open the "SSL Certificate" section card
+    When I select the "SSL Certificate" settings section
     Then the SSL certificate download link should be visible
     And the SSL certificate download link should point at "modelibr-cert.crt"

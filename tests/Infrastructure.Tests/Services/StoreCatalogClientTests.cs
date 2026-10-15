@@ -48,12 +48,16 @@ public class StoreCatalogClientTests
         var settings = new Dictionary<string, string?>();
         if (storeUrl != null)
         {
-            settings["STORE_URL"] = storeUrl;
+            // The store base is fixed; StoreBaseUrlProvider.OverrideKey is the test-only
+            // seam that points the client at a stand-in origin.
+            settings[StoreBaseUrlProvider.OverrideKey] = storeUrl;
         }
 
         var configuration = new ConfigurationBuilder().AddInMemoryCollection(settings).Build();
         var client = new StoreCatalogClient(
-            factory.Object, configuration, NullLogger<StoreCatalogClient>.Instance);
+            factory.Object,
+            new StoreBaseUrlProvider(configuration),
+            NullLogger<StoreCatalogClient>.Instance);
         // Public by default, so the ordinary tests are unaffected by the address check that
         // now runs on every hop. A test that cares supplies its own answers.
         resolve ??= _ => new[] { IPAddress.Parse("93.184.216.34") };
@@ -155,24 +159,11 @@ public class StoreCatalogClientTests
     }
 
     [Fact]
-    public async Task SearchAsync_When_NoStoreConfigured_Returns_NotConfigured_Without_A_Request()
-    {
-        var (client, handler) = Build(_ => Json(OnePage), storeUrl: null);
-
-        var result = await client.SearchAsync(
-            new Application.StoreCatalog.StoreCatalogQuery("chair"), CancellationToken.None);
-
-        Assert.True(result.IsFailure);
-        Assert.Equal("StoreCatalog.NotConfigured", result.Error.Code);
-        Assert.Empty(handler.Requests);
-        Assert.Null(client.StoreUrl);
-    }
-
-    [Fact]
     public async Task SearchAsync_When_StoreUrlIsPlainHttp_Refuses_It()
     {
         // The same rule the importer applies: https, or loopback for a developer running a
-        // store locally. A configured store is operator-supplied, not therefore trusted.
+        // store locally. The base URL is fixed in production, so this only exercises the
+        // validation path through the test-only override.
         var (client, handler) = Build(_ => Json(OnePage), storeUrl: "http://store.example.com");
 
         var result = await client.SearchAsync(
@@ -603,5 +594,16 @@ public class StoreCatalogClientTests
             followed.Options.TryGetValue(StoreEndpointGuard.PinnedAddressKey, out var pinned),
             "the follow-up request carried no pinned address, so the socket would re-resolve");
         Assert.Equal(IPAddress.Parse("93.184.216.34"), pinned);
+    }
+
+    [Fact]
+    public void StoreUrl_IsCanonicalized_TheSameWayTheImporterStoresIt()
+    {
+        // The store URL is also the key the importer's provenance rows carry, and those are
+        // canonicalized (lowercase host, default port stripped). A raw "Store.X.com:443" here
+        // meant every already-imported lookup missed and the import guard never fired.
+        var (client, _) = Build(_ => Json(OnePage), storeUrl: "https://Store.Example.COM:443/");
+
+        Assert.Equal("https://store.example.com", client.StoreUrl);
     }
 }

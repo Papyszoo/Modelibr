@@ -172,7 +172,7 @@ export function ContainerSpritesTab({
           <ListToolbarSearchInput
             value={localSearch}
             onChange={setLocalSearch}
-            placeholder="Search sprites…"
+            placeholder="Search sprites..."
           />
         </ListToolbarPanel>
       </ListToolbar>
@@ -191,6 +191,11 @@ export function ContainerSpritesTab({
                 <AssetTile
                   key={sprite.id}
                   name={sprite.name}
+                  accessory={adapter.renderAssetAccessory?.({
+                    type: 'sprite',
+                    id: sprite.id,
+                    name: sprite.name,
+                  })}
                   media={
                     spriteUrl ? (
                       <img src={spriteUrl} alt={sprite.name} />

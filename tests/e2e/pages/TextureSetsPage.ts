@@ -34,7 +34,9 @@ export class TextureSetsPage {
         this.fileInput = page.locator(
             'input[data-testid="texture-upload-input"]',
         );
-        this.createSetButton = page.locator('button:has-text("Create Set")');
+        this.createSetButton = page.locator(
+            'button:has-text("Create Texture Set")',
+        );
 
         // Grid elements
         this.textureSetGrid = page.locator(".texture-set-grid");

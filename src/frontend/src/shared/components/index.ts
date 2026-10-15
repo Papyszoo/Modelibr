@@ -1,3 +1,4 @@
+export { NumberInput } from './NumberInput'
 export { UploadableGrid } from './UploadableGrid'
 export { UploadProgressWindow } from './UploadProgressWindow'
 
@@ -6,3 +7,4 @@ export { UploadProgressWindow } from './UploadProgressWindow'
 export * from './feedback'
 export * from './layout'
 export * from './overlay'
+export * from './selection'

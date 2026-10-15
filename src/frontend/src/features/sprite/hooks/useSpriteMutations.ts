@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { type RefObject } from 'react'
+import { type ReactNode, type RefObject } from 'react'
 
+import { restoreEntity } from '@/features/recycled-files/api/recycledApi'
 import {
   createSpriteCategory,
   deleteSpriteCategory,
@@ -8,6 +9,10 @@ import {
   updateSprite,
   updateSpriteCategory,
 } from '@/features/sprite/api/spriteApi'
+import {
+  recycleToastContent,
+  UNDO_TOAST_LIFE_MS,
+} from '@/shared/components/feedback/RecycleToastContent'
 import { useCategoryMutations } from '@/shared/hooks/useCategoryMutations'
 import { type SpriteCategoryDto, type SpriteDto } from '@/types'
 
@@ -37,8 +42,9 @@ interface UseSpriteMutationsOptions {
     show: (opts: {
       severity: string
       summary: string
-      detail: string
+      detail?: string
       life: number
+      content?: () => ReactNode
     }) => void
   } | null>
 }
@@ -103,6 +109,34 @@ export function useSpriteMutations({
     },
   })
 
+  /** Restores sprites just moved to the recycle bin, from the Undo toast. */
+  const handleUndoRecycle = async (spriteIds: number[]) => {
+    try {
+      await Promise.all(spriteIds.map(id => restoreEntity('sprite', id)))
+      setSelectedSpriteIds(new Set())
+      setContextMenuTarget(null)
+      await invalidateSprites()
+      await queryClient.invalidateQueries({ queryKey: ['recycledFiles'] })
+      toast.current?.show({
+        severity: 'success',
+        summary: 'Restored',
+        detail:
+          spriteIds.length > 1
+            ? `${spriteIds.length} sprites restored`
+            : 'Sprite restored',
+        life: 3000,
+      })
+    } catch (error) {
+      console.error('Failed to restore sprites:', error)
+      toast.current?.show({
+        severity: 'error',
+        summary: 'Error',
+        detail: 'Failed to restore sprites',
+        life: 3000,
+      })
+    }
+  }
+
   const recycleSpritesMutation = useMutation({
     mutationFn: async (spriteIds: number[]) => {
       await Promise.all(spriteIds.map(id => softDeleteSprite(id)))
@@ -111,11 +145,14 @@ export function useSpriteMutations({
       toast.current?.show({
         severity: 'success',
         summary: 'Recycled',
-        detail:
-          spriteIds.length > 1
-            ? `${spriteIds.length} sprites moved to recycle bin`
-            : 'Sprite moved to recycle bin',
-        life: 3000,
+        life: UNDO_TOAST_LIFE_MS,
+        content: () =>
+          recycleToastContent(
+            spriteIds.length > 1
+              ? `${spriteIds.length} sprites moved to recycled files`
+              : 'Sprite moved to recycled files',
+            () => void handleUndoRecycle(spriteIds)
+          ),
       })
       setSelectedSpriteIds(new Set())
       setContextMenuTarget(null)

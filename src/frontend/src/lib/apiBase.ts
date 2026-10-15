@@ -216,9 +216,10 @@ export const client = createApiClient(baseURL)
  * `baseURL` at call time, so the reassignment reaches them; the axios instance
  * already captured its own copy, so that one is set explicitly.
  *
- * Only ever called from the `render=scene` bootstrap. Honouring an arbitrary API
- * origin on the normal app would let a crafted link show a user someone else's
- * data as if it were their library.
+ * Only ever called from the headless render bootstrap (`render=scene` /
+ * `render=vfx`), and only with a value that passed `sanitizeApiBaseUrlOverride`.
+ * Honouring an arbitrary API origin on the normal app would let a crafted link
+ * show a user someone else's data as if it were their library.
  */
 export function overrideApiBaseUrl(url: string): void {
   baseURL = url

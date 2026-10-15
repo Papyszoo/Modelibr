@@ -2,7 +2,6 @@ import '@testing-library/jest-dom'
 
 // Mock Vite environment variables for Jest (import.meta.env -> process.env)
 process.env.VITE_API_BASE_URL = 'http://localhost:8080'
-process.env.VITE_STORE_URL = 'https://store.test'
 process.env.DEV = 'true'
 process.env.PROD = 'false'
 process.env.MODE = 'test'
@@ -65,12 +64,6 @@ jest.mock('@/lib/apiBase', () => {
           : `http://localhost:8080${url.startsWith('/') ? url : `/${url}`}`,
   }
 })
-
-// storeEnv reads import.meta at module scope (Jest can't parse it) - back
-// the asset-store feature's env read with process.env instead.
-jest.mock('@/features/asset-store/lib/storeEnv', () => ({
-  readStoreUrlEnv: () => process.env.VITE_STORE_URL,
-}))
 
 jest.mock('./services/ApiClient', () => ({
   __esModule: true,

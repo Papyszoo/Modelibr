@@ -683,9 +683,11 @@ describe('BlenderOperationProcessor - convert-format', () => {
     expect(args).toContain('--format')
     expect(args[args.indexOf('--format') + 1]).toBe('glb')
     // With its siblings: a loose glTF without its .bin converts to a valid file of nothing.
+    // And from the AUTHORED file: a .blend's auto-converted .glb is not what a conversion
+    // is for, and reading it was a race with the conversion.
     expect(
       processor.modelFileService.fetchModelFileWithAuxiliaries
-    ).toHaveBeenCalledWith(42, 7)
+    ).toHaveBeenCalledWith(42, 7, { preferSource: true })
   })
 
   it('reports both formats and the new version id back on the job', async () => {
@@ -751,6 +753,102 @@ describe('BlenderOperationProcessor - convert-format', () => {
       expect(errorMessage).toContain('not a format this worker writes')
       expect(processor.jobApi.createModelVersion).not.toHaveBeenCalled()
     }
+  })
+
+  it('passes --bake and names the result -web when the job asks for it', async () => {
+    // The bake collapses constraints/drivers/modifiers into the file, so the output is
+    // not a plain recased copy of the source - the name says so, and the flag is what
+    // makes Blender do the work before the export.
+    processor.runBlender = vi.fn().mockResolvedValue({
+      format: 'glb',
+      sourceFormat: 'blend',
+      meshCount: 2,
+      inputSizeBytes: 88868,
+      outputSizeBytes: 10568,
+      baked: {
+        poseBaked: 1,
+        objectsBaked: 2,
+        shapeKeyChannels: 2,
+        driversRemoved: 1,
+        modifiersApplied: 1,
+        meshesRebuilt: 1,
+        nlaTracksRemoved: 0,
+        constraintsCleared: 2,
+      },
+    })
+
+    await processor.process({
+      ...job,
+      parametersJson: JSON.stringify({ format: 'glb', bake: true }),
+    })
+
+    const [script, args] = processor.runBlender.mock.calls[0]
+    expect(script).toBe('convert_format.py')
+    expect(args).toContain('--bake')
+    expect(processor.jobApi.createModelVersion).toHaveBeenCalledWith(
+      42,
+      expect.stringContaining('convert-format-9'),
+      'chair-web.glb',
+      expect.stringContaining('Baked for web'),
+      false
+    )
+  })
+
+  it('reports the bake flag and its counts back on the job', async () => {
+    const baked = {
+      poseBaked: 1,
+      objectsBaked: 2,
+      shapeKeyChannels: 2,
+      driversRemoved: 1,
+      modifiersApplied: 1,
+      meshesRebuilt: 1,
+      nlaTracksRemoved: 0,
+      constraintsCleared: 2,
+    }
+    processor.runBlender = vi.fn().mockResolvedValue({
+      format: 'glb',
+      sourceFormat: 'blend',
+      meshCount: 2,
+      inputSizeBytes: 88868,
+      outputSizeBytes: 10568,
+      baked,
+    })
+
+    await processor.process({
+      ...job,
+      parametersJson: JSON.stringify({ format: 'glb', bake: true }),
+    })
+
+    const [, , success, error, , resultJson] =
+      processor.jobApi.finishExtractionJob.mock.calls[0]
+    expect(success).toBe(true)
+    expect(error).toBeNull()
+
+    const result = JSON.parse(resultJson)
+    expect(result.baked).toBe(true)
+    expect(result.bakeSummary).toEqual(baked)
+    expect(result.fileName).toBe('chair-web.glb')
+  })
+
+  it('leaves a plain conversion untouched by the bake', async () => {
+    await processor.process(job)
+
+    const [, args] = processor.runBlender.mock.calls[0]
+    expect(args).not.toContain('--bake')
+
+    const [, , , , , resultJson] =
+      processor.jobApi.finishExtractionJob.mock.calls[0]
+    const result = JSON.parse(resultJson)
+    expect(result.baked).toBe(false)
+    expect(result.bakeSummary).toBeNull()
+    expect(result.fileName).toBe('chair.glb')
+  })
+
+  it('names a baked conversion for what it is', () => {
+    expect(processor.webBakedFileName('chair.blend', 'glb')).toBe(
+      'chair-web.glb'
+    )
+    expect(processor.webBakedFileName('chair.fbx', 'fbx')).toBe('chair-web.fbx')
   })
 
   it('reports a failed Blender run instead of writing a version', async () => {

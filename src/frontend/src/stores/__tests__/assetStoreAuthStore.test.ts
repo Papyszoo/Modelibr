@@ -3,7 +3,6 @@
  * persistence, not the happy path: tokens are bearer credentials scoped to one
  * store origin, so rehydrating them anywhere else must not happen.
  */
-import * as storeConfig from '@/features/asset-store/lib/storeConfig'
 import { useAssetStoreAuthStore } from '@/stores/assetStoreAuthStore'
 
 const STORAGE_KEY = 'modelibr_store_session'
@@ -30,16 +29,13 @@ beforeEach(() => {
 })
 
 describe('session persistence', () => {
-  it('restores a session saved for the currently configured store', async () => {
-    jest
-      .spyOn(storeConfig, 'getConfiguredStoreUrl')
-      .mockReturnValue('https://store.test')
+  it('restores a session saved for the store', async () => {
     persistSession({
       status: 'loggedIn',
       accessToken: 'a',
       refreshToken: 'r',
       username: 'artist',
-      storeOrigin: 'https://store.test',
+      storeOrigin: 'https://store.modelibr.com',
     })
 
     await rehydrate()
@@ -51,19 +47,16 @@ describe('session persistence', () => {
     })
   })
 
-  // Regression: tokens were persisted without recording which store minted them.
-  // Repointing VITE_STORE_URL then replayed account credentials for store A
-  // against store B on the very first request.
-  it('discards a session whose store origin no longer matches VITE_STORE_URL', async () => {
-    jest
-      .spyOn(storeConfig, 'getConfiguredStoreUrl')
-      .mockReturnValue('https://other-store.test')
+  // Regression: tokens were persisted without recording which store minted them,
+  // so credentials for store A could be replayed against store B on the first
+  // request. A session whose recorded origin is not Modelibr's store is dropped.
+  it('discards a session minted for a different store', async () => {
     persistSession({
       status: 'loggedIn',
       accessToken: 'a',
       refreshToken: 'r',
       username: 'artist',
-      storeOrigin: 'https://store.test',
+      storeOrigin: 'https://other-store.test',
     })
 
     await rehydrate()
@@ -74,27 +67,9 @@ describe('session persistence', () => {
     expect(state.refreshToken).toBeNull()
   })
 
-  it('discards a session when the store URL has been unset entirely', async () => {
-    jest.spyOn(storeConfig, 'getConfiguredStoreUrl').mockReturnValue(null)
-    persistSession({
-      status: 'loggedIn',
-      accessToken: 'a',
-      refreshToken: 'r',
-      username: 'artist',
-      storeOrigin: 'https://store.test',
-    })
-
-    await rehydrate()
-
-    expect(useAssetStoreAuthStore.getState().status).toBe('loggedOut')
-  })
-
   // Sessions written before storeOrigin existed carry no binding and cannot be
-  // proven to belong to the configured store - one re-login is the safe answer.
+  // proven to belong to the store - one re-login is the safe answer.
   it('discards a legacy session that recorded no store origin', async () => {
-    jest
-      .spyOn(storeConfig, 'getConfiguredStoreUrl')
-      .mockReturnValue('https://store.test')
     persistSession({
       status: 'loggedIn',
       accessToken: 'a',

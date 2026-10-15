@@ -15,7 +15,6 @@ import {
 import { MeshHighlighter } from './MeshHighlighter'
 import { Model } from './Model'
 import { type MaterialTextureSets, TexturedModel } from './TexturedModel'
-import { type ViewerSettingsType } from './ViewerSettings'
 
 /**
  * The shared cross-runtime light rig (lib/sceneLighting.js - also used by the
@@ -90,6 +89,30 @@ interface SceneProps {
   preserveMaterials?: boolean
   cameraState?: ViewerCameraState
   onCameraChange?: (state: ViewerCameraState) => void
+}
+
+/**
+ * Camera, light and environment controls fed by the viewer settings store.
+ * Moved here from the removed viewer settings panel - this scene is the only
+ * component that consumes them.
+ */
+export interface ViewerSettingsType {
+  orbitSpeed: number
+  zoomSpeed: number
+  panSpeed: number
+  modelRotationSpeed: number
+  showShadows: boolean
+  showStats: boolean
+  showPerf: boolean
+  // Lights
+  ambientIntensity: number
+  directionalIntensity: number
+  showLightHelpers: boolean
+  // Environment
+  environmentPreset: string
+  showEnvironmentBackground: boolean
+  backgroundIntensity: number
+  environmentIntensity: number
 }
 
 export interface ViewerCameraState {

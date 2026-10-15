@@ -34,13 +34,19 @@ public sealed class AssetMetadataReadMcpTools
     }
 
     [McpServerTool(Name = "get_asset_metadata")]
-    [Description("Every schema field's current value for one asset - authored, imported and derived alike - plus `completeness`, which lists the fields a caller could still fill. Use it to find what an asset is missing rather than reading it and comparing by hand.")]
+    [Description("Every schema field's current value for one asset - authored, imported and derived alike - plus `completeness`, which lists the fields a caller could still fill. Use it to find what an asset is missing rather than reading it and comparing by hand. The response also carries `animations` (`{name, durationSeconds, kinds}`) and `shapeKeys` (`{meshName, names}`) recorded by the extraction pipeline, so a rigged or morphable asset's clips are visible here too.")]
     public static async Task<object> GetAssetMetadata(
         IQueryHandler<ReadAssetMetadataQuery, AssetMetadataResponse> handler,
         [Description("Asset family, e.g. Model.")] string assetType,
         [Description("Asset id.")] int assetId,
+        McpCallerContext? caller = null,
         CancellationToken cancellationToken = default)
     {
+        if (caller?.FamilyDenial(assetType) is { } denied)
+        {
+            return new { error = "AssetFamilyNotAllowed", message = denied };
+        }
+
         var result = await handler.Handle(new ReadAssetMetadataQuery(assetType, assetId), cancellationToken);
 
         return result.IsFailure

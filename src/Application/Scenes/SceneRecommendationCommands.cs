@@ -250,11 +250,18 @@ internal sealed class RestoreSceneRecommendationsCommandHandler
             expectedRevision: null,
             document =>
             {
-                // Only the slots that still exist. A slot deleted since the recommendation was
-                // given cannot take one back, and refusing the whole undo over it would leave
-                // the rest of the advice wrongly restored to nothing.
+                // Only the slots that still exist AND still hold the candidate. A slot
+                // deleted since the recommendation was given cannot take one back, and a
+                // slot removed and recreated under the same id holds unrelated candidates -
+                // restoring the old id would point the advice at the wrong asset. Refusing
+                // the whole undo over either would leave the rest of the advice wrongly
+                // restored to nothing, so the surviving entries are restored and the rest
+                // are dropped.
                 var surviving = requested.Value
-                    .Where(entry => IndexOfSlot(document, entry.Key) >= 0)
+                    .Where(entry =>
+                        IndexOfSlot(document, entry.Key) is var index
+                        && index >= 0
+                        && document.Slots![index].Candidate(entry.Value) is not null)
                     .ToDictionary(entry => entry.Key, entry => entry.Value, StringComparer.Ordinal);
 
                 return Result.Success(SceneRecommendations.Write(document, surviving, command.Summary));

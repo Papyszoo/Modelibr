@@ -1,4 +1,9 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import fs from 'fs'
+import os from 'os'
+import path from 'path'
+import { Readable } from 'stream'
+
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 
 import { ModelDataService } from '../modelDataService.js'
 
@@ -36,6 +41,11 @@ describe('ModelDataService.saveTechnicalMetadata', () => {
       animationCount: 2,
       animationNames: ['Idle', 'Walk'],
       boneCount: 24,
+      animations: [
+        { name: 'Idle', durationSeconds: 1.5, kinds: ['skeletal'] },
+        { name: 'Walk', durationSeconds: 2, kinds: ['skeletal', 'morph'] },
+      ],
+      shapeKeys: [{ meshName: 'Body', shapeKeys: ['Squash', 'Stretch'] }],
     })
 
     expect(ok).toBe(true)
@@ -51,6 +61,11 @@ describe('ModelDataService.saveTechnicalMetadata', () => {
       animationCount: 2,
       animationNames: ['Idle', 'Walk'],
       boneCount: 24,
+      animations: [
+        { name: 'Idle', durationSeconds: 1.5, kinds: ['skeletal'] },
+        { name: 'Walk', durationSeconds: 2, kinds: ['skeletal', 'morph'] },
+      ],
+      shapeKeys: [{ meshName: 'Body', shapeKeys: ['Squash', 'Stretch'] }],
     })
   })
 
@@ -68,6 +83,49 @@ describe('ModelDataService.saveTechnicalMetadata', () => {
     expect(body.animationCount).toBeNull()
     expect(body.boneCount).toBeNull()
     expect(body.animationNames).toEqual([])
+    expect(body.animations).toEqual([])
+    expect(body.shapeKeys).toEqual([])
+  })
+})
+
+describe('ModelDataService.downloadTextureFile', () => {
+  let service
+  let rootDir
+
+  beforeEach(() => {
+    service = new ModelDataService()
+    rootDir = fs.mkdtempSync(path.join(os.tmpdir(), 'modelibr-texture-test-'))
+    service.tempDir = path.join(rootDir, 'textures')
+  })
+
+  afterEach(() => {
+    fs.rmSync(rootDir, { recursive: true, force: true })
+  })
+
+  // Regression: the textures/ dir was only created in the constructor. The
+  // periodic ModelFileService.cleanupOldFiles sweep deletes stale entries under
+  // /tmp/modelibr-worker - including this directory - after which every texture
+  // download failed with ENOENT, so a model with a bound texture set rendered
+  // as neutral grey. Recreating the dir at the write site keeps downloads alive.
+  it('recreates the texture temp directory after the periodic sweep removed it', async () => {
+    fs.mkdirSync(service.tempDir, { recursive: true })
+    fs.rmSync(service.tempDir, { recursive: true, force: true })
+    expect(fs.existsSync(service.tempDir)).toBe(false)
+
+    service.apiClient = {
+      get: vi.fn().mockResolvedValue({
+        data: Readable.from([Buffer.from('png-bytes')]),
+      }),
+    }
+
+    const filePath = await service.downloadTextureFile(
+      335,
+      'Dungeons_Texture_01.png'
+    )
+
+    expect(filePath).toBeTruthy()
+    expect(fs.existsSync(filePath)).toBe(true)
+    expect(fs.readFileSync(filePath).toString()).toBe('png-bytes')
   })
 })
 
@@ -122,12 +180,31 @@ describe('ModelDataService.saveSceneGraph', () => {
       boneCount: 0,
       worldBounds: { min: [0, 0, 0], max: [1, 1, 1], dimensions: [1, 1, 1] },
       unitConfidence: 'medium',
-      animationCount: 0,
-      animationNames: [],
-      animations: [],
+      animationCount: 1,
+      animationNames: ['Wave'],
+      animations: [{ name: 'Wave', durationSeconds: 1, kinds: ['skeletal'] }],
+      // Only a .blend source gets one, and only when web_bake.inspect() found
+      // something a plain conversion cannot run.
+      unbakedRig: {
+        objectConstraints: 1,
+        boneConstraints: 1,
+        ikConstraints: 1,
+        objectDrivers: 0,
+        armatureDrivers: 0,
+        shapeKeyDrivers: 1,
+        shapeKeyActions: 1,
+        droppedModifiers: ['Morph:Array (ARRAY)'],
+        hasRigFeatures: true,
+      },
       referencedImages: { resolvedCount: 0, unresolved: [] },
     },
-    warnings: [],
+    // The plain-language line attachUnbakedRigReport() adds beside the counts;
+    // it must travel to the stored payload with them.
+    warnings: [
+      'This .blend source carries rig features the web viewer cannot run ' +
+        '(2 constraints, 1 driver, 1 modifier glTF would drop). Bake for web ' +
+        'writes them into the mesh; without it the rig arrives frozen or broken.',
+    ],
   }
 
   it('PUTs to the version scene-graph endpoint with the mapped contract', async () => {
@@ -151,6 +228,31 @@ describe('ModelDataService.saveSceneGraph', () => {
     expect(body.parts[0].geometryHash).toBe('aaaa000000000000')
     expect(body.parts[0].detail.materialSlots).toEqual(['Wood'])
     expect(body.parts[0].detail.vertexGroups).toBeNull()
+    // Per-clip kinds ride in the rollups so the raw payload can answer what
+    // each clip moves, not just its name.
+    expect(body.rollups.animations).toEqual([
+      { name: 'Wave', durationSeconds: 1, kinds: ['skeletal'] },
+    ])
+    // The unbaked-rig counts travel too; the stored raw payload is where the
+    // viewer reads them from.
+    expect(body.rollups.unbakedRig).toEqual(sceneGraph.rollups.unbakedRig)
+    // And the warning line attached beside them.
+    expect(body.warnings).toEqual(sceneGraph.warnings)
+  })
+
+  it('sends a null unbakedRig when the extractor reported none', async () => {
+    // Every non-.blend source, and a .blend with nothing to warn about. The key
+    // is still sent so the server's binding never treats "absent" as unknown.
+    const withoutRig = {
+      ...sceneGraph,
+      rollups: { ...sceneGraph.rollups },
+    }
+    delete withoutRig.rollups.unbakedRig
+
+    await service.saveSceneGraph(42, 'a'.repeat(64), withoutRig)
+
+    const [, body] = putSpy.mock.calls[0]
+    expect(body.rollups.unbakedRig).toBeNull()
   })
 
   it('returns false when the request fails, without throwing', async () => {

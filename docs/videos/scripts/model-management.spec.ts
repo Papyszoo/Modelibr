@@ -4,226 +4,161 @@ import path from "path";
 import { fileURLToPath } from "url";
 import {
     ciVideoTimeout,
+    caption,
+    focusOn,
+    glideClick,
+    glideDrag,
+    glideTo,
+    holdOn,
+    offCamera,
+    regionAround,
     shortPause,
-    mediumPause,
     viewerPause,
-    smoothDrag,
     navigateTo,
     waitForModelCards,
     waitForThumbnails,
+    waitForThumbnailsReady,
+    settleImportSuggestions,
     clearAllData,
-    disableHighlights,
     startFeatureRecording,
     stopFeatureRecording,
 } from "../helpers/video-helpers";
+import { uploadDemoModel } from "../helpers/demo-art";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const assetsDir = path.resolve(__dirname, "../../../tests/e2e/assets");
-const API_BASE_URL = process.env.API_BASE_URL || "http://127.0.0.1:8090";
 
 test.describe("Model Management", () => {
-    test("Model Management Video", async ({ page, request }, testInfo) => {
-        const uploadModel = async (filename: string) => {
-            const response = await request.post(`${API_BASE_URL}/models`, {
-                multipart: {
-                    file: {
-                        name: filename,
-                        mimeType: "application/octet-stream",
-                        buffer: fs.readFileSync(path.join(assetsDir, filename)),
-                    },
-                },
-            });
-
-            expect(response.ok()).toBeTruthy();
-            const body = await response.json();
-            return Number(body.id ?? body.modelId);
-        };
-
-        const waitForThumbnailReady = async (modelId: number) => {
-            await expect
-                .poll(
-                    async () => {
-                        const response = await request.get(
-                            `${API_BASE_URL}/models/${modelId}/thumbnail`,
-                        );
-                        if (!response.ok()) {
-                            return `HTTP ${response.status()}`;
-                        }
-
-                        const thumbnail = await response.json();
-                        return thumbnail.status;
-                    },
-                    {
-                        timeout: 30000,
-                        intervals: [500, 1000, 1500],
-                    },
-                )
-                .toBe("Ready");
-        };
-
-        const moveToAndClick = async (locator: ReturnType<typeof page.locator>) => {
-            const box = await locator.boundingBox();
-            if (!box) {
-                throw new Error("Could not determine element position");
-            }
-
-            await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2, {
-                steps: 18,
-            });
-            await viewerPause(page, 250);
-            await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
-            await shortPause(page);
-        };
-
-        // Off-camera setup: prepare a small, thumbnail-ready library.
+    test("Model Management Video", async ({ page }, testInfo) => {
+        // Off-camera setup: a small, thumbnail-ready library.
         await clearAllData(page);
-
-        const [primaryModelId, comparisonModelId, thirdModelId] = await Promise.all([
-            uploadModel("test-cube.glb"),
-            uploadModel("test-cylinder.fbx"),
-            uploadModel("test-cone.fbx"),
+        // The hero is a block-out "wheel" whose new version is the real tire.
+        const modelIds = await Promise.all([
+            uploadDemoModel(page, "test-cube.glb", "wheel"),
+            uploadDemoModel(page, "test-cylinder.fbx"),
+            uploadDemoModel(page, "test-cone.fbx"),
         ]);
+        const heroModelId = modelIds[0];
+        await waitForThumbnailsReady(page, modelIds);
+        await settleImportSuggestions(page);
 
-        await Promise.all([
-            waitForThumbnailReady(primaryModelId),
-            waitForThumbnailReady(comparisonModelId),
-            waitForThumbnailReady(thirdModelId),
-        ]);
-
-        // Off-camera prewarm: open the comparison model once so its file is
-        // in the browser cache and the viewer machinery is warm. The recorded
-        // beat re-opens it and must not spend seconds on a cold FBX load
-        // (this wait timed out under CI load when the open was cold).
+        // Start on a split view: library on the left, the hero model on the right.
         await navigateTo(
             page,
-            `/?leftTabs=modelList&rightTabs=model-${comparisonModelId}&activeRight=model-${comparisonModelId}`,
+            `/?leftTabs=modelList&rightTabs=model-${heroModelId}&activeRight=model-${heroModelId}`,
         );
-        await expect(
-            page.locator(".p-splitter-panel").nth(1).locator("canvas").first(),
-        ).toBeVisible({ timeout: ciVideoTimeout });
-
-        // Second off-camera prewarm: mount BOTH viewers at once. The prewarm
-        // above only warms the model file and a single viewer; the recorded
-        // beat instead brings up a second canvas while the hero viewer is
-        // already running, and on a GPU-less runner that first two-context
-        // setup is the expensive part. Paying it off-camera keeps it out of the
-        // recording. Without this the recorded clip ran 77.44s against its 75s
-        // cap (analyze gate failed the whole docs lane), and under heavier load
-        // the same wait blew its 30s timeout outright - which is what broke the
-        // v0.5.0 main push and cost that release its Docker image.
-        await navigateTo(
-            page,
-            `/?leftTabs=model-${comparisonModelId}&activeLeft=model-${comparisonModelId}` +
-                `&rightTabs=model-${primaryModelId}&activeRight=model-${primaryModelId}`,
-        );
-        await expect(
-            page.locator(".p-splitter-panel").first().locator("canvas").first(),
-        ).toBeVisible({ timeout: ciVideoTimeout });
-        await expect(
-            page.locator(".p-splitter-panel").nth(1).locator("canvas").first(),
-        ).toBeVisible({ timeout: ciVideoTimeout });
-
-        // Start on a polished split view: library on the left, hero model on the right.
-        await navigateTo(
-            page,
-            `/?leftTabs=modelList&rightTabs=model-${primaryModelId}&activeRight=model-${primaryModelId}`,
-        );
-        await disableHighlights(page);
         await waitForModelCards(page, 3);
         await waitForThumbnails(page, 3, 30000);
-
-        const leftPanel = page.locator(".p-splitter-panel").first();
         const rightPanel = page.locator(".p-splitter-panel").nth(1);
+        const canvas = rightPanel.locator("canvas").first();
+        await expect(canvas).toBeVisible({ timeout: ciVideoTimeout });
+        await viewerPause(page, 1500);
 
-        await expect(rightPanel.locator("canvas").first()).toBeVisible({
-            timeout: ciVideoTimeout,
+        await startFeatureRecording(page, testInfo, {
+            slug: "model-management",
+            caption: "Inspect every model in a live 3D viewer",
+            cursorAt: { x: 1000, y: 470 },
         });
-        await viewerPause(page, 400);
-        await startFeatureRecording(page, testInfo, { slug: "model-management" });
 
-        // Open a second model for an immediate side-by-side comparison.
-        const comparisonCard = leftPanel
-            .locator(`.model-card[data-model-id="${comparisonModelId}"]`)
-            .first();
-        await comparisonCard.waitFor({
-            state: "visible",
-            timeout: ciVideoTimeout,
-        });
-        await moveToAndClick(comparisonCard);
-
-        const leftCanvas = leftPanel.locator("canvas").first();
-        await leftCanvas.waitFor({ state: "visible", timeout: ciVideoTimeout });
-        await viewerPause(page, 250);
-
-        // One quick orbit to show the viewer without lingering on it.
-        const canvasBox = await leftCanvas.boundingBox();
-        if (canvasBox) {
-            const centerX = canvasBox.x + canvasBox.width / 2;
-            const centerY = canvasBox.y + canvasBox.height / 2;
-
-            await smoothDrag(
+        const orbit = async (dx: number, dy: number) => {
+            const box = await canvas.boundingBox();
+            if (!box) return;
+            const cx = box.x + box.width / 2;
+            const cy = box.y + box.height / 2;
+            await glideDrag(
                 page,
-                centerX - 30,
-                centerY + 10,
-                centerX + 70,
-                centerY - 55,
-                24,
-                "left",
+                { x: cx - dx / 2, y: cy - dy / 2 },
+                () => ({ x: cx + dx / 2, y: cy + dy / 2 }),
+                { follow: false, maxSteps: 10 },
             );
-        }
-        await mediumPause(page);
+        };
 
-        // Add a new version to the hero model.
-        const fileMenu = rightPanel
-            .locator(
-                '.p-menubar .p-menuitem-link:has(.p-menuitem-text:text-is("File"))',
-            )
-            .first();
-        await fileMenu.waitFor({ state: "visible", timeout: ciVideoTimeout });
-        await moveToAndClick(fileMenu);
-
-        const addVersionItem = rightPanel
-            .getByTestId("viewer-menubar")
-            .getByRole("menuitem", { name: "Add New Version" });
-        await addVersionItem.waitFor({
-            state: "visible",
-            timeout: ciVideoTimeout,
-        });
-        await moveToAndClick(addVersionItem);
-
-        const versionInput = rightPanel.locator('input[type="file"]').first();
-        await versionInput.setInputFiles(path.join(assetsDir, "test-torus.fbx"));
-
-        const uploadDialog = page.locator('.p-dialog:has-text("Upload File to Model")');
-        await uploadDialog.waitFor({ state: "visible", timeout: ciVideoTimeout });
-
-        await page.getByLabel("Create new version").click();
+        // ── Step 1: orbit the hero model ──
+        await focusOn(page, await regionAround(rightPanel, 560, 380));
+        await orbit(150, -40);
         await shortPause(page);
 
-        const descriptionInput = uploadDialog.locator("#description");
-        if (await descriptionInput.isVisible({ timeout: 1000 }).catch(() => false)) {
-            await descriptionInput.click();
-            await descriptionInput.pressSequentially("Gameplay update", {
-                delay: 35,
+        // ── Step 2: upload a new version ──
+        caption(page, "Upload a new version and keep the old one");
+        const menubar = rightPanel.getByTestId("viewer-menubar");
+        await focusOn(page, menubar.or(rightPanel.getByTestId("version-dropdown-trigger")), {
+            zoom: 1.6,
+        });
+        const fileMenu = rightPanel
+            .locator('.p-menubar .p-menuitem-link:has(.p-menuitem-text:text-is("File"))')
+            .first();
+        await glideClick(page, fileMenu);
+        await glideClick(page, menubar.getByRole("menuitem", { name: "Add New Version" }));
+
+        const versionInput = rightPanel.locator('input[type="file"]').first();
+        const uploadDialog = page.locator('.p-dialog:has-text("Upload File to Model")');
+        await offCamera(page, async () => {
+            await versionInput.setInputFiles({
+                name: "wheel.fbx",
+                mimeType: "application/octet-stream",
+                buffer: fs.readFileSync(path.join(assetsDir, "test-torus.fbx")),
             });
-            await shortPause(page);
-        }
+            await uploadDialog.waitFor({ state: "visible", timeout: ciVideoTimeout });
+        });
+        await focusOn(page, uploadDialog);
+        await glideClick(page, page.getByLabel("Create new version"));
+        // The dialog grows by a description field; frame it again.
+        const descriptionInput = uploadDialog.locator("#description");
+        await descriptionInput.waitFor({ state: "visible", timeout: ciVideoTimeout });
+        await focusOn(page, uploadDialog);
+        await glideClick(page, descriptionInput);
+        await page.keyboard.type("Gameplay update", { delay: 45 });
+        await shortPause(page);
+        await glideClick(
+            page,
+            uploadDialog.locator(".p-dialog-footer button", { hasText: "Upload" }).first(),
+            {
+                cutUntil: async () => {
+                    await uploadDialog.waitFor({ state: "hidden", timeout: 60000 });
+                    await expect(page.locator(".p-toast-message")).toHaveCount(0, {
+                        timeout: 15000,
+                    });
+                },
+            },
+        );
 
-        await uploadDialog
-            .locator(".p-dialog-footer button", { hasText: "Upload" })
-            .first()
-            .click();
-
-        await uploadDialog.waitFor({ state: "hidden", timeout: 60000 });
-
+        // ── Step 3: switch to the new version ──
+        caption(page, "Switch between versions at any time");
         const versionDropdown = rightPanel.getByTestId("version-dropdown-trigger");
-        await moveToAndClick(versionDropdown);
-        const versionTwoItem = page.getByTestId("version-dropdown-item-2");
-        await versionTwoItem.waitFor({ state: "visible", timeout: ciVideoTimeout });
-        await moveToAndClick(versionTwoItem);
-        await expect(versionDropdown).toContainText("v2", { timeout: 10000 });
-        await page.mouse.move(1040, 300, { steps: 16 });
-        await viewerPause(page, 900);
+        await focusOn(page, versionDropdown, { zoom: 1.7 });
+        await glideClick(page, versionDropdown);
+        // The viewer's "Loading 3D Model..." label is drawn inside the canvas,
+        // so there is no DOM state to wait on: cut until the new version's
+        // file has downloaded, plus a beat for parsing it.
+        const modelFile = page.waitForResponse(
+            (response) => /\/files\/\d+/.test(response.url()) && response.ok(),
+            { timeout: 30000 },
+        );
+        await glideClick(page, page.getByTestId("version-dropdown-item-2"), {
+            cutUntil: async () => {
+                await expect(versionDropdown).toContainText("v2", { timeout: 10000 });
+                await modelFile;
+                await page.waitForTimeout(900);
+            },
+        });
+
+        // Bring the new version up close: wheel-zoom and a short orbit.
+        await focusOn(page, await regionAround(rightPanel, 560, 380));
+        const box = await canvas.boundingBox();
+        if (box) {
+            await glideTo(page, { x: box.x + box.width / 2, y: box.y + box.height / 2 }, {
+                follow: false,
+                durationMs: 500,
+            });
+            for (let i = 0; i < 6; i++) {
+                await page.mouse.wheel(0, -160);
+                await page.waitForTimeout(90);
+            }
+        }
+        await orbit(110, 70);
+        await glideTo(page, { x: 1215, y: 640 }, { follow: false });
+        // End close on the new version (its v2 badge was just shown above).
+        await holdOn(page, await regionAround(rightPanel, 520, 360));
         await stopFeatureRecording(page);
     });
 });

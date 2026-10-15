@@ -124,7 +124,12 @@ describe('scene editing is serialised against every direct scene write', () => {
   /** Renders the editor and waits for the scene to load. */
   async function open() {
     const rendered = renderWithProviders(
-      <SceneEditor sceneId={2} onClose={() => {}} />
+      <SceneEditor
+        sceneId={2}
+        onShowSceneList={() => {}}
+        registerSave={() => {}}
+        onClose={() => {}}
+      />
     )
     await screen.findByTestId('scene-canvas')
     return rendered

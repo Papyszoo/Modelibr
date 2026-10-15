@@ -1,0 +1,83 @@
+/*
+ * The :not() chains outrank the global native-button rule in index.css,
+ * which would otherwise pad and frame these compact controls.
+ *
+ * The comments count on a card or row. The overlay variant reads on top of a
+ * thumbnail, so it uses the same dark translucent chip as the card's other
+ * corner badges; the inline variant is a quiet text button.
+ */
+.project-comments-badge-host {
+  display: inline-flex;
+}
+
+.project-comments-badge:not(.p-button):not(.p-component):not(.p-link) {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--mod-space-2xs);
+  border: 0;
+  cursor: pointer;
+  font-size: var(--mod-text-xs);
+  font-weight: var(--mod-font-weight-semibold);
+  line-height: 1;
+  transition:
+    background var(--mod-transition-fast),
+    color var(--mod-transition-fast);
+}
+
+.project-comments-badge:not(.p-button):not(.p-component):not(
+    .p-link
+  ):focus-visible {
+  outline: 2px solid var(--mod-color-primary);
+  outline-offset: 1px;
+}
+
+.project-comments-badge--overlay:not(.p-button):not(.p-component):not(.p-link) {
+  height: 1.5rem;
+  min-width: 1.5rem;
+  justify-content: center;
+  padding: 0 var(--mod-space-xs);
+  border-radius: var(--mod-radius-pill);
+  /* Chrome over a thumbnail of any colour - the card badges' own scrim. */
+  background: rgba(0, 0, 0, 0.55);
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.project-comments-badge--overlay:not(.p-button):not(.p-component):not(
+    .p-link
+  ):hover {
+  background: rgba(0, 0, 0, 0.75);
+  color: var(--mod-color-text-inverse);
+}
+
+.project-comments-badge--overlay:not(.p-button):not(.p-component):not(
+    .p-link
+  ).has-open {
+  background: var(--mod-color-primary);
+  color: var(--mod-color-primary-text);
+}
+
+.project-comments-badge--inline:not(.p-button):not(.p-component):not(.p-link) {
+  height: 1.75rem;
+  padding: 0 var(--mod-space-xs);
+  border-radius: var(--mod-radius-pill);
+  background: transparent;
+  color: var(--mod-color-text-muted);
+}
+
+.project-comments-badge--inline:not(.p-button):not(.p-component):not(
+    .p-link
+  ):hover {
+  background: var(--mod-color-surface-hover);
+  color: var(--mod-color-primary);
+}
+
+.project-comments-badge--inline:not(.p-button):not(.p-component):not(
+    .p-link
+  ).has-open {
+  background: rgba(var(--primary-color-rgb), 0.12);
+  color: var(--mod-color-primary);
+}
+
+.project-comments-dialog .p-dialog-content {
+  padding-top: var(--mod-space-xs);
+}

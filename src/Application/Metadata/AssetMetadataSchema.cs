@@ -10,7 +10,7 @@ namespace Application.Metadata;
 /// licence, an author or a record of where it came from, even though the store manifest
 /// already sends all three on every import. Nothing anywhere stated what the complete field
 /// set was, so a population pass over an existing library had no contract to write against
-/// and an agent had <c>set_tags</c> and nothing else.
+/// and an agent had one tags call and nothing else.
 /// </para>
 ///
 /// <para>
@@ -247,6 +247,9 @@ public static class AssetMetadataSchema
             Type: FieldTypes.Text,
             Repeats: true,
             Provenance: FieldProvenance.Authored,
+            // Matches ModelTag's own ceiling, so an over-long tag is refused with a clear
+            // MetadataValueTooLong instead of reaching SanitizeName and throwing.
+            MaxLength: 100,
             Storage: TagsOnEntity(family) ? AssetMetadataStorage.Entity : AssetMetadataStorage.Metadata,
             Description: "Free-text labels. The strongest search signal there is, because a person chose the words.",
             StoreManifestPath: "tags");

@@ -1,9 +1,11 @@
 using Application.Abstractions;
 using Application.Abstractions.Repositories;
+using Application.Abstractions.Services;
 using Application.Scenes;
 using Domain.Models;
 using Domain.Services;
 using Moq;
+using SharedKernel;
 using Xunit;
 
 namespace Application.Tests.Scenes;
@@ -14,14 +16,16 @@ public class SetSceneProjectCommandTests
 
     private readonly Mock<ISceneRepository> _scenes = new();
     private readonly Mock<IProjectRepository> _projects = new();
+    private readonly Mock<ISceneDocumentCommit> _commit = new();
     private readonly SetSceneProjectCommandHandler _handler;
 
     public SetSceneProjectCommandTests()
     {
         var clock = new Mock<IDateTimeProvider>();
         clock.SetupGet(c => c.UtcNow).Returns(Now);
+        _commit.Setup(c => c.SaveAsync(It.IsAny<CancellationToken>())).ReturnsAsync(Result.Success());
         _handler = new SetSceneProjectCommandHandler(
-            _scenes.Object, _projects.Object, clock.Object, new Mock<IUnitOfWork>().Object);
+            _scenes.Object, _projects.Object, clock.Object, _commit.Object);
     }
 
     private static Scene NewScene()
@@ -120,5 +124,27 @@ public class SetSceneProjectCommandTests
 
         Assert.True(result.IsFailure);
         Assert.Equal("SceneNotFound", result.Error.Code);
+    }
+
+    /// <summary>
+    /// A concurrent edit is reported, not thrown. Before this, the handler staged its change
+    /// and left the commit to the trailing unit-of-work decorator, where the database's
+    /// concurrency verdict surfaced as an unhandled exception (a 500) rather than the
+    /// revision-conflict error every other scene write returns.
+    /// </summary>
+    [Fact]
+    public async Task AWriteThatLosesTheConcurrencyRace_ReturnsRevisionConflict()
+    {
+        var scene = NewScene();
+        GivenScene(scene);
+        GivenProject(7, "Nightfall");
+        _commit.Setup(c => c.SaveAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Result.Failure(new Error(
+                "Scene.RevisionConflict", "This scene was modified by someone else.")));
+
+        var result = await _handler.Handle(new SetSceneProjectCommand(1, 7), CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("Scene.RevisionConflict", result.Error.Code);
     }
 }

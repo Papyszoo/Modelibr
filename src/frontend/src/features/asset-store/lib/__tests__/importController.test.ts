@@ -5,6 +5,7 @@
  * primary channel here.
  */
 import { queryClient } from '@/lib/react-query'
+import { useAssetStoreAuthStore } from '@/stores/assetStoreAuthStore'
 import { useAssetStoreImportStore } from '@/stores/assetStoreImportStore'
 
 import type { StoreImportJobDto, StoreLibraryItem } from '../../types'
@@ -67,10 +68,20 @@ function jobDto(overrides: Partial<StoreImportJobDto>): StoreImportJobDto {
 
 const entry = () => useAssetStoreImportStore.getState().imports['asset-1']
 
+/** A store session - the token-minting import path only runs for these. */
+function loggedIn() {
+  useAssetStoreAuthStore.getState().setSession({
+    accessToken: 'access-1',
+    refreshToken: 'refresh-1',
+    username: 'artist',
+  })
+}
+
 beforeEach(() => {
   jest.clearAllMocks()
   jest.useFakeTimers()
   useAssetStoreImportStore.setState({ imports: {} })
+  useAssetStoreAuthStore.getState().clearSession()
 })
 
 afterEach(() => {
@@ -81,6 +92,7 @@ describe('startImport', () => {
   // Regression: the whole point of the token flow - the LOCAL backend gets
   // the minted import token and the configured store URL, never the JWT.
   it('mints a token, starts the job, and polls it to completion', async () => {
+    loggedIn()
     storeApi.mintImportToken.mockResolvedValue({
       token: 'tok-1',
       scheme: 'ImportToken',
@@ -101,7 +113,7 @@ describe('startImport', () => {
     // Let mint + start settle, then walk the two poll ticks.
     await jest.advanceTimersByTimeAsync(0)
     expect(importApi.startStoreImport).toHaveBeenCalledWith({
-      storeUrl: 'https://store.test',
+      storeUrl: 'https://store.modelibr.com',
       assetId: 'asset-1',
       importToken: 'tok-1',
     })
@@ -129,11 +141,41 @@ describe('startImport', () => {
     invalidateSpy.mockRestore()
   })
 
+  // Regression: the Asset Store tab must import a FREE pack without an
+  // account, the same anonymous path the MCP agent import uses. Minting a
+  // token first made a signed-out import impossible (the store 401s the mint).
+  it('imports a free pack anonymously when signed out - nothing is minted or sent', async () => {
+    importApi.startStoreImport.mockResolvedValue({ jobId: 9 })
+    importApi.getStoreImportJob.mockResolvedValue(
+      jobDto({ status: 'Completed', packId: 42, itemsCreated: 4 })
+    )
+    const invalidateSpy = jest
+      .spyOn(queryClient, 'invalidateQueries')
+      .mockResolvedValue()
+
+    const run = startImport(ITEM)
+    await jest.advanceTimersByTimeAsync(0)
+
+    expect(storeApi.mintImportToken).not.toHaveBeenCalled()
+    expect(importApi.startStoreImport).toHaveBeenCalledWith({
+      storeUrl: 'https://store.modelibr.com',
+      assetId: 'asset-1',
+      importToken: undefined,
+    })
+
+    await jest.advanceTimersByTimeAsync(2500)
+    await run
+
+    expect(entry()).toMatchObject({ phase: 'completed', packId: 42 })
+    invalidateSpy.mockRestore()
+  })
+
   // Regression: the backend finishes a partially-failed import as
   // 'CompletedWithErrors'. The controller only treated Completed/Failed as
   // terminal, so the poll loop never stopped: a permanent spinner and a
   // request every 2.5s forever, with no cache invalidation.
   it('treats CompletedWithErrors as terminal and stops polling', async () => {
+    loggedIn()
     storeApi.mintImportToken.mockResolvedValue({ token: 'tok-1' })
     importApi.startStoreImport.mockResolvedValue({ jobId: 9 })
     importApi.getStoreImportJob.mockResolvedValue(
@@ -168,6 +210,7 @@ describe('startImport', () => {
   })
 
   it('marks the entry failed when token minting is rejected', async () => {
+    loggedIn()
     storeApi.mintImportToken.mockRejectedValue(new Error('403 not entitled'))
 
     await startImport(ITEM)
@@ -177,6 +220,7 @@ describe('startImport', () => {
   })
 
   it('marks the entry failed when the local backend rejects the job', async () => {
+    loggedIn()
     storeApi.mintImportToken.mockResolvedValue({ token: 'tok-1' })
     importApi.startStoreImport.mockRejectedValue(
       new Error('Store URL must use https')
@@ -193,6 +237,7 @@ describe('startImport', () => {
   // Regression: a single failed poll (backend restart, blip) used to be
   // able to kill progress tracking for a job that was still running.
   it('keeps polling through transient poll failures', async () => {
+    loggedIn()
     storeApi.mintImportToken.mockResolvedValue({ token: 'tok-1' })
     importApi.startStoreImport.mockResolvedValue({ jobId: 9 })
     importApi.getStoreImportJob
@@ -216,6 +261,7 @@ describe('startImport', () => {
   // Regression: the polled snapshot dropped job.errorMessage, so every
   // failed import showed a generic "Import failed" with no diagnostic.
   it('surfaces the backend errorMessage when the job fails', async () => {
+    loggedIn()
     storeApi.mintImportToken.mockResolvedValue({ token: 'tok-1' })
     importApi.startStoreImport.mockResolvedValue({ jobId: 9 })
     importApi.getStoreImportJob.mockResolvedValue(

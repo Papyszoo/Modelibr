@@ -3,18 +3,13 @@ import './SceneEditor.css'
 import { Button } from 'primereact/button'
 import { Message } from 'primereact/message'
 import { SelectButton } from 'primereact/selectbutton'
-import {
-  type JSX,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react'
+import { Toast } from 'primereact/toast'
+import { type JSX, useCallback, useEffect, useMemo, useRef } from 'react'
 
 import { ApiClientError } from '@/lib/apiBase'
 import { ErrorState, ListHeader, LoadingState } from '@/shared/components'
 import { useSceneEditorStore } from '@/stores'
+import type { SceneSlotPreview } from '@/stores/sceneEditorStore'
 
 import {
   SceneWriteHeldError,
@@ -32,18 +27,37 @@ import { useSceneMaterials } from '../hooks/useSceneMaterials'
 import { bindNodeMaterial } from '../lib/sceneDressing'
 import { transformsEqual } from '../lib/sceneGeometry'
 import { buildSceneNodeFacts } from '../lib/sceneNodeFacts'
-import { nextLightId, nextNodeId, nextPlacementX } from '../lib/sceneNodeIds'
-import type { SceneMaterialBinding, SceneSlotView } from '../types'
+import {
+  type DraftNodeBounds,
+  nextLightId,
+  nextNodeId,
+  nextPlacementX,
+} from '../lib/sceneNodeIds'
+import { sceneResourceKey } from '../lib/sceneResourceKey'
+import type {
+  SceneDocument,
+  SceneLight,
+  SceneMaterialBinding,
+  SceneNode,
+  SceneSlotView,
+  SceneTransform,
+} from '../types'
 import { SceneAssetPicker } from './SceneAssetPicker'
 import { SceneCanvas } from './SceneCanvas'
 import { SceneChoicesPanel } from './SceneChoicesPanel'
 import { SceneHierarchy } from './SceneHierarchy'
+import { SceneNodeAnimation } from './SceneNodeAnimation'
 import { SceneNodeMaterials } from './SceneNodeMaterials'
 import { SceneProjectBrief } from './SceneProjectBrief'
 import { ScenePropertyPanel } from './ScenePropertyPanel'
 
 const IDENTITY_ROTATION = { x: 0, y: 0, z: 0 }
 const UNIT_SCALE = { x: 1, y: 1, z: 1 }
+
+// Stable empty references for a scene whose draft has not been seeded yet, so a
+// bare `?? []` / `?? new Map()` does not hand every render a fresh identity.
+const EMPTY_HISTORY: SceneDocument[] = []
+const EMPTY_FAILURES: Map<string, string> = new Map()
 
 /**
  * The stage picker's options, plus the "not authored in stages" default every
@@ -61,11 +75,34 @@ const STAGE_OPTIONS: { label: string; value: SceneStage | 'none' }[] = [
 
 interface SceneEditorProps {
   sceneId: number
+  /**
+   * Focuses the Scenes list. This is a navigation, not a close: the editor stays
+   * open with its draft, because the alternative - a Back button that closes the
+   * tab - is how an unsaved scene disappears.
+   */
+  onShowSceneList: () => void
+  /**
+   * Publishes the save so the tab's close guard can run it for "Save and close".
+   * Called on every render; the caller stores it in a ref.
+   */
+  registerSave: (save: () => Promise<boolean>) => void
+  /**
+   * Reports the scene's current name, so the tab can be relabelled in place.
+   *
+   * Driven by the fetched name rather than by a rename control on purpose: a scene
+   * can also be renamed from the list or by an agent over MCP, and a tab that
+   * only relabelled on its own control would keep the old name after either.
+   */
+  onSceneNameChange?: (name: string) => void
+  /** Explicitly abandons this scene: the tab caller forgets the session and closes. */
   onClose: () => void
 }
 
 export function SceneEditor({
   sceneId,
+  onShowSceneList,
+  registerSave,
+  onSceneNameChange,
   onClose,
 }: SceneEditorProps): JSX.Element {
   const {
@@ -85,27 +122,111 @@ export function SceneEditor({
   const resolveSlot = useResolveSceneSlotMutation()
   const rejectCandidates = useRejectSceneCandidatesMutation()
   const acceptRecommendations = useAcceptSceneRecommendationsMutation()
-  const [saveError, setSaveError] = useState<string | null>(null)
+
+  // Every read and write below is scoped to THIS tab's scene. The store's flat
+  // fields are a projection of whichever scene opened last, so with two scene
+  // tabs in split view reading them showed one tab's document in the other and
+  // writing through the shared projection landed edits in the wrong scene.
+  const sceneDraft = useSceneEditorStore(state => state.drafts[sceneId])
 
   const {
-    document,
-    baseRevision,
-    isDirty,
-    selectedNodeId,
     open,
-    markSaved,
+    markSaved: markSavedDraft,
     edit: editDraft,
     undo: undoDraft,
     redo: redoDraft,
-    selectNode,
+    selectNode: selectNodeDraft,
+    selectLight: selectLightDraft,
     setNodeTransform: setNodeTransformDraft,
     updateNode: updateNodeDraft,
     removeNode: removeNodeDraft,
     addNode: addNodeDraft,
     setLight: setLightDraft,
-    past,
-    future,
+    setSaveError: setSaveErrorDraft,
+    setPlaceError: setPlaceErrorDraft,
+    setSlotError: setSlotErrorDraft,
+    setPreview: setPreviewDraft,
+    setIsPlacing: setIsPlacingDraft,
+    setBlockoutOverride: setBlockoutOverrideDraft,
+    recordNodeFailure: recordNodeFailureDraft,
+    clearNodeFailure: clearNodeFailureDraft,
   } = useSceneEditorStore()
+
+  const document = sceneDraft?.document ?? null
+  const baseRevision = sceneDraft?.baseRevision ?? null
+  const isDirty = sceneDraft?.isDirty ?? false
+  const selectedNodeId = sceneDraft?.selectedNodeId ?? null
+  const selectedLightId = sceneDraft?.selectedLightId ?? null
+  const past = sceneDraft?.past ?? EMPTY_HISTORY
+  const future = sceneDraft?.future ?? EMPTY_HISTORY
+  const saveError = sceneDraft?.saveError ?? null
+  const placeError = sceneDraft?.placeError ?? null
+  const slotError = sceneDraft?.slotError ?? null
+  const preview = sceneDraft?.preview ?? null
+  const isPlacing = sceneDraft?.isPlacing ?? false
+  const failedNodes = sceneDraft?.failedNodes ?? EMPTY_FAILURES
+  const blockoutOverride = sceneDraft?.blockoutOverride ?? null
+
+  // Scene-bound setters, so every call site below writes this tab's draft
+  // without repeating the id - and cannot forget it.
+  const setSaveError = useCallback(
+    (message: string | null) => setSaveErrorDraft(message, sceneId),
+    [setSaveErrorDraft, sceneId]
+  )
+  const setPlaceError = useCallback(
+    (message: string | null) => setPlaceErrorDraft(message, sceneId),
+    [setPlaceErrorDraft, sceneId]
+  )
+  const setSlotError = useCallback(
+    (message: string | null) => setSlotErrorDraft(message, sceneId),
+    [setSlotErrorDraft, sceneId]
+  )
+  const setPreview = useCallback(
+    (next: SceneSlotPreview | null) => setPreviewDraft(next, sceneId),
+    [setPreviewDraft, sceneId]
+  )
+  const setIsPlacing = useCallback(
+    (next: boolean) => setIsPlacingDraft(next, sceneId),
+    [setIsPlacingDraft, sceneId]
+  )
+  const setBlockoutOverride = useCallback(
+    (next: boolean | null) => setBlockoutOverrideDraft(next, sceneId),
+    [setBlockoutOverrideDraft, sceneId]
+  )
+  const selectNode = useCallback(
+    (nodeId: string | null) => {
+      selectNodeDraft(nodeId, sceneId)
+      // The inspector has one body. Selecting a node is the answer for what it
+      // shows, so it drops any light selection.
+      if (nodeId !== null) {
+        selectLightDraft(null, sceneId)
+      }
+    },
+    [selectNodeDraft, selectLightDraft, sceneId]
+  )
+  const selectLight = useCallback(
+    (lightId: string | null) => {
+      selectLightDraft(lightId, sceneId)
+      if (lightId !== null) {
+        selectNodeDraft(null, sceneId)
+      }
+    },
+    [selectNodeDraft, selectLightDraft, sceneId]
+  )
+  const recordNodeFailure = useCallback(
+    (nodeId: string, message: string) =>
+      recordNodeFailureDraft(nodeId, message, sceneId),
+    [recordNodeFailureDraft, sceneId]
+  )
+  const clearNodeFailure = useCallback(
+    (nodeId: string) => clearNodeFailureDraft(nodeId, sceneId),
+    [clearNodeFailureDraft, sceneId]
+  )
+  const markSaved = useCallback(
+    (revision: number, savedDocument: SceneDocument) =>
+      markSavedDraft(revision, savedDocument, sceneId),
+    [markSavedDraft, sceneId]
+  )
 
   // Editing is held while a direct scene write is moving the scene's revision -
   // the project link and every slot write alike. The hold belongs to the SCENE,
@@ -128,58 +249,78 @@ export function SceneEditor({
   // in an effect: an effect would leave the ref a render behind, which is
   // exactly the window a placement finishes in.
   const editsBlockedRef = useRef(editsBlocked)
+  const toast = useRef<Toast>(null)
   editsBlockedRef.current = editsBlocked
 
   // One guard, applied where the draft actions enter this component, so every
   // call site inherits it rather than each one remembering to ask. Wrapped with
   // useCallback because these identities are dependencies of the handlers below.
+  const setNodeTransformAction = useCallback(
+    (nodeId: string, transform: SceneTransform) =>
+      setNodeTransformDraft(nodeId, transform, sceneId),
+    [setNodeTransformDraft, sceneId]
+  )
+  const updateNodeAction = useCallback(
+    (nodeId: string, patch: Partial<SceneNode>) =>
+      updateNodeDraft(nodeId, patch, sceneId),
+    [updateNodeDraft, sceneId]
+  )
+  const removeNodeAction = useCallback(
+    (nodeId: string) => removeNodeDraft(nodeId, sceneId),
+    [removeNodeDraft, sceneId]
+  )
+  const addNodeAction = useCallback(
+    (node: SceneNode) => addNodeDraft(node, sceneId),
+    [addNodeDraft, sceneId]
+  )
+  const setLightAction = useCallback(
+    (light: SceneLight) => setLightDraft(light, sceneId),
+    [setLightDraft, sceneId]
+  )
+  const editAction = useCallback(
+    (mutate: (current: SceneDocument) => SceneDocument) =>
+      editDraft(mutate, sceneId),
+    [editDraft, sceneId]
+  )
+  const undoAction = useCallback(() => undoDraft(sceneId), [undoDraft, sceneId])
+  const redoAction = useCallback(() => redoDraft(sceneId), [redoDraft, sceneId])
+
   const setNodeTransform = useGuardedEdit(
-    setNodeTransformDraft,
+    setNodeTransformAction,
     editsBlockedRef
   )
-  const updateNode = useGuardedEdit(updateNodeDraft, editsBlockedRef)
-  const removeNode = useGuardedEdit(removeNodeDraft, editsBlockedRef)
-  const addNode = useGuardedEdit(addNodeDraft, editsBlockedRef)
-  const setLight = useGuardedEdit(setLightDraft, editsBlockedRef)
-  const edit = useGuardedEdit(editDraft, editsBlockedRef)
+  const updateNode = useGuardedEdit(updateNodeAction, editsBlockedRef)
+  const removeNode = useGuardedEdit(removeNodeAction, editsBlockedRef)
+  const addNode = useGuardedEdit(addNodeAction, editsBlockedRef)
+  const setLight = useGuardedEdit(setLightAction, editsBlockedRef)
+  const edit = useGuardedEdit(editAction, editsBlockedRef)
 
   // Undo and redo are draft writes like any other, and were reaching the store
   // raw. Rolling the draft back mid-link leaves it dirty at the old revision -
   // the same stale-revision conflict every other edit is held for, arrived at
   // through the one pair of actions that skipped the gate.
-  const undo = useGuardedEdit(undoDraft, editsBlockedRef)
-  const redo = useGuardedEdit(redoDraft, editsBlockedRef)
+  const undo = useGuardedEdit(undoAction, editsBlockedRef)
+  const redo = useGuardedEdit(redoAction, editsBlockedRef)
 
-  const [placeError, setPlaceError] = useState<string | null>(null)
+  const handleNodeLoadError = useCallback(
+    (nodeId: string, message: string) => {
+      recordNodeFailure(nodeId, message)
+    },
+    [recordNodeFailure]
+  )
 
-  // Which candidate the viewport is showing instead of what the slot's node
-  // actually wears. Local state, never a write: looking at four options must
-  // not move the scene's revision four times, and must not disturb anything the
-  // user has already settled.
-  const [preview, setPreview] = useState<{
-    slotId: string
-    candidateId: string
-    ref: string
-  } | null>(null)
-  const [slotError, setSlotError] = useState<string | null>(null)
-  const [isPlacing, setIsPlacing] = useState(false)
-  const [failedNodes, setFailedNodes] = useState<Map<string, string>>(new Map())
-
-  // Null until the user decides, and then it is theirs. Until then it follows
-  // the stage: a scene being laid out is shown as the volumes its composition
-  // is actually judged on, and a dressed scene is shown dressed.
-  const [blockoutOverride, setBlockoutOverride] = useState<boolean | null>(null)
-
-  const handleNodeLoadError = useCallback((nodeId: string, message: string) => {
-    setFailedNodes(previous => {
-      if (previous.get(nodeId) === message) {
-        return previous
+  // A node whose resource arrived is no longer failed. Without this the flag
+  // from a first load attempt survived a successful retry (a swapped asset, a
+  // late auxiliary file) until the whole draft was reseeded, so the hierarchy
+  // kept marking a node that was drawing fine.
+  const handleNodeLoadSettled = useCallback(
+    (nodeId: string, loaded: boolean) => {
+      if (loaded) {
+        clearNodeFailure(nodeId)
       }
-      const next = new Map(previous)
-      next.set(nodeId, message)
-      return next
-    })
-  }, [])
+    },
+    [clearNodeFailure]
+  )
 
   // The draft is seeded once per (scene, revision): re-seeding on every render
   // of a fetched query would throw away the user's unsaved edits each time
@@ -188,8 +329,17 @@ export function SceneEditor({
   // revision, so nothing is re-seeded and nothing is lost.
   const loadedRevision = view?.scene.revision
   useEffect(() => {
-    if (view && (baseRevision === null || loadedRevision !== baseRevision)) {
-      if (!isDirty) {
+    if (!view) {
+      return
+    }
+    // Read THIS scene's draft, not the flat projection: the flat fields belong
+    // to whichever scene opened last, and with two tabs open a reseed decided
+    // from another scene's revision either skipped this one or clobbered it.
+    const stored = useSceneEditorStore.getState().drafts[sceneId]
+    const storedRevision = stored?.baseRevision ?? null
+    const storedDirty = stored?.isDirty ?? false
+    if (storedRevision === null || loadedRevision !== storedRevision) {
+      if (!storedDirty) {
         open(sceneId, view.document, view.scene.revision)
       }
     }
@@ -197,6 +347,41 @@ export function SceneEditor({
   }, [sceneId, loadedRevision])
 
   const nodeFacts = useMemo(() => buildSceneNodeFacts(view), [view])
+
+  // Measured bounds for assets placed into this draft, keyed by the asset ref
+  // the resource queue uses. The server derives a footprint only on save, so a
+  // node placed in this session has none yet, and placement reads the
+  // measurements the placement itself fetched - otherwise a box added beside
+  // a freshly placed model lands inside it. Keyed per asset rather than per
+  // node: one asset measures the same wherever it is placed.
+  const draftBoundsRef = useRef(new Map<string, DraftNodeBounds>())
+
+  // The per-node measurements placement may use, assembled against the draft
+  // so each entry carries its node's id. Server footprints still win inside
+  // `nextPlacementX`.
+  const draftBoundsFor = useCallback(
+    (
+      current: SceneDocument
+    ): ReadonlyMap<string, DraftNodeBounds> | undefined => {
+      if (draftBoundsRef.current.size === 0) {
+        return undefined
+      }
+      const bounds = new Map<string, DraftNodeBounds>()
+      for (const node of current.nodes) {
+        if (!node.asset) {
+          continue
+        }
+        const measured = draftBoundsRef.current.get(
+          sceneResourceKey(node.asset)
+        )
+        if (measured) {
+          bounds.set(node.id, measured)
+        }
+      }
+      return bounds.size > 0 ? bounds : undefined
+    },
+    []
+  )
 
   // What dresses each node, resolved from ids to names. The canvas resolves the
   // same bindings to render them, through the same query keys, so the panel
@@ -254,8 +439,11 @@ export function SceneEditor({
 
   const handlePreviewCandidate = useCallback(
     (slot: SceneSlotView, candidateRef: string, candidateId: string) => {
-      setPreview(current =>
-        current?.ref === candidateRef
+      // Toggling: previewing the candidate the viewport already shows clears it.
+      // Read through the store rather than an updater, because the write is a
+      // session field and the value it compares against is the same session's.
+      setPreview(
+        preview?.ref === candidateRef
           ? null
           : { slotId: slot.slotId, candidateId, ref: candidateRef }
       )
@@ -263,7 +451,7 @@ export function SceneEditor({
         selectNode(slot.nodeId)
       }
     },
-    [selectNode]
+    [preview, selectNode, setPreview]
   )
 
   /**
@@ -315,34 +503,39 @@ export function SceneEditor({
    * project link starting behind it was two writes racing for one revision, and
    * whichever lost came back as a conflict the user could not have caused.
    */
-  const runSlotWrite = useCallback(async (write: () => Promise<unknown>) => {
-    if (slotsBlockedRef.current !== null) {
-      setSlotError(slotsBlockedRef.current)
-      return
-    }
-    if (sceneWritePendingRef.current) {
-      setSlotError(
-        'Another change to this scene is still being saved. Wait for it to finish - both would be written against the same revision.'
-      )
-      return
-    }
+  const runSlotWrite = useCallback(
+    async (write: () => Promise<unknown>) => {
+      if (slotsBlockedRef.current !== null) {
+        setSlotError(slotsBlockedRef.current)
+        return
+      }
+      if (sceneWritePendingRef.current) {
+        setSlotError(
+          'Another change to this scene is still being saved. Wait for it to finish - both would be written against the same revision.'
+        )
+        return
+      }
 
-    setSlotError(null)
-    try {
-      await write()
-      setPreview(null)
-    } catch (caught) {
-      setSlotError(
-        caught instanceof ApiClientError ||
-          caught instanceof SceneWriteHeldError
-          ? caught.message
-          : 'The choice could not be saved.'
-      )
-    }
-  }, [])
+      setSlotError(null)
+      try {
+        await write()
+        setPreview(null)
+      } catch (caught) {
+        setSlotError(
+          caught instanceof ApiClientError ||
+            caught instanceof SceneWriteHeldError
+            ? caught.message
+            : 'The choice could not be saved.'
+        )
+      }
+    },
+    [setPreview, setSlotError]
+  )
 
   const selectedNode =
     document?.nodes.find(node => node.id === selectedNodeId) ?? null
+  const selectedLight =
+    document?.lights.find(light => light.id === selectedLightId) ?? null
   const selectedFacts = selectedNodeId
     ? (nodeFacts.get(selectedNodeId) ?? null)
     : null
@@ -368,7 +561,8 @@ export function SceneEditor({
    */
   const handlePlaceModel = useCallback(
     async (model: { id: string; name: string }, versionId: number) => {
-      const current = useSceneEditorStore.getState().document
+      const current =
+        useSceneEditorStore.getState().drafts[sceneId]?.document ?? null
       if (!current) {
         return
       }
@@ -384,6 +578,7 @@ export function SceneEditor({
 
       let groundedY = 0
       let width: number | null = null
+      let originFractionX: number | null = null
       try {
         const facts = await getSceneAssetFacts({
           assetType: 'Model',
@@ -392,6 +587,19 @@ export function SceneEditor({
         })
         groundedY = facts.groundedYAtOrigin ?? 0
         width = facts.sourceDimensions?.x ?? null
+        originFractionX = facts.originInBounds?.x ?? null
+        if (facts.sourceDimensions) {
+          // Remembered per asset so the next placement can clear the node this
+          // one becomes, before any server footprint for it exists.
+          draftBoundsRef.current.set(
+            sceneResourceKey({ assetType: 'Model', assetId, versionId }),
+            {
+              sourceDimensions: facts.sourceDimensions,
+              originConvention: facts.originConvention,
+              originInBounds: facts.originInBounds,
+            }
+          )
+        }
       } catch (caught) {
         // Bounds are advisory: an asset that has never been extracted still
         // places, at y=0, and the panel reports its bounds as unknown. Refusing
@@ -418,7 +626,17 @@ export function SceneEditor({
         id: nodeId,
         name: model.name,
         transform: {
-          position: { x: nextPlacementX(current, width), y: groundedY, z: 0 },
+          position: {
+            x: nextPlacementX(
+              current,
+              width,
+              nodeFacts,
+              originFractionX,
+              draftBoundsFor(current)
+            ),
+            y: groundedY,
+            z: 0,
+          },
           rotationEuler: IDENTITY_ROTATION,
           scale: UNIT_SCALE,
         },
@@ -427,7 +645,15 @@ export function SceneEditor({
       })
       selectNode(nodeId)
     },
-    [addNode, selectNode]
+    [
+      addNode,
+      selectNode,
+      sceneId,
+      setIsPlacing,
+      setPlaceError,
+      nodeFacts,
+      draftBoundsFor,
+    ]
   )
 
   /**
@@ -441,21 +667,21 @@ export function SceneEditor({
    */
   const handleBindMaterial = useCallback(
     (slot: string | null, binding: SceneMaterialBinding | null) => {
-      const nodeId = useSceneEditorStore.getState().selectedNodeId
-      const current = useSceneEditorStore
-        .getState()
-        .document?.nodes.find(node => node.id === nodeId)
+      const own = useSceneEditorStore.getState().drafts[sceneId]
+      const nodeId = own?.selectedNodeId ?? null
+      const current = own?.document?.nodes.find(node => node.id === nodeId)
       if (!nodeId || !current) {
         return
       }
 
       updateNode(nodeId, bindNodeMaterial(current, slot, binding))
     },
-    [updateNode]
+    [updateNode, sceneId]
   )
 
   const handleAddPrimitive = useCallback(() => {
-    const current = useSceneEditorStore.getState().document
+    const current =
+      useSceneEditorStore.getState().drafts[sceneId]?.document ?? null
     if (!current) {
       return
     }
@@ -467,7 +693,17 @@ export function SceneEditor({
       transform: {
         // Primitives are authored centered, so half its height puts it on the
         // floor - the same offset the server's footprint uses for them.
-        position: { x: nextPlacementX(current, 1), y: 0.5, z: 0 },
+        position: {
+          x: nextPlacementX(
+            current,
+            1,
+            nodeFacts,
+            null,
+            draftBoundsFor(current)
+          ),
+          y: 0.5,
+          z: 0,
+        },
         rotationEuler: IDENTITY_ROTATION,
         scale: UNIT_SCALE,
       },
@@ -475,23 +711,45 @@ export function SceneEditor({
       visible: true,
     })
     selectNode(nodeId)
-  }, [addNode, selectNode])
+  }, [addNode, selectNode, sceneId, nodeFacts, draftBoundsFor])
 
   const handleAddLight = useCallback(() => {
-    const current = useSceneEditorStore.getState().document
+    const current =
+      useSceneEditorStore.getState().drafts[sceneId]?.document ?? null
     if (!current) {
       return
     }
 
-    setLight({
+    const light: SceneLight = {
       id: nextLightId(current, 'light'),
       type: 'directional',
       position: { x: 6, y: 10, z: 6 },
       intensity: 1.1,
       color: '#ffffff',
       name: 'Key light',
-    })
-  }, [setLight])
+    }
+    setLight(light)
+    // This button is the only way to reach a light, so it opens in the
+    // inspector ready to adjust instead of merely counting in the header.
+    selectLight(light.id)
+  }, [setLight, selectLight, sceneId])
+
+  /**
+   * Patches the selected light. Read back through the store at call time so an
+   * edit built before a previous one landed still merges onto the latest light
+   * rather than resurrecting a stale copy.
+   */
+  const handleChangeLight = useCallback(
+    (patch: Partial<SceneLight>) => {
+      const own = useSceneEditorStore.getState().drafts[sceneId]
+      const lightId = own?.selectedLightId ?? null
+      const light = own?.document?.lights.find(entry => entry.id === lightId)
+      if (light) {
+        setLight({ ...light, ...patch })
+      }
+    },
+    [setLight, sceneId]
+  )
 
   const handleSave = useCallback(async () => {
     if (!document || baseRevision === null) {
@@ -526,6 +784,12 @@ export function SceneEditor({
       // The document that was actually sent, so edits made while the request
       // was in flight stay dirty instead of being marked saved unsent.
       markSaved(saved.scene.revision, document)
+      toast.current?.show({
+        severity: 'success',
+        summary: 'Scene saved',
+        detail: 'Your changes were saved.',
+        life: 2500,
+      })
     } catch (caught) {
       // The server rejects an invalid document in full and says why, per
       // problem. Surfacing that verbatim is the point: the alternative this
@@ -536,7 +800,51 @@ export function SceneEditor({
           : 'The scene could not be saved.'
       )
     }
-  }, [document, baseRevision, sceneId, save, markSaved, editsBlocked])
+  }, [
+    document,
+    baseRevision,
+    sceneId,
+    save,
+    markSaved,
+    editsBlocked,
+    setSaveError,
+  ])
+
+  // handleSave is what Save does; the close guard needs the same code path to
+  // answer whether the save actually landed, so it is published rather than
+  // duplicated.
+  const saveAndReport = useCallback(async (): Promise<boolean> => {
+    await handleSave()
+    const state = useSceneEditorStore.getState()
+    const error =
+      state.drafts[sceneId]?.saveError ??
+      (state.sceneId === sceneId ? state.saveError : null)
+    return !error
+  }, [handleSave, sceneId])
+
+  /*
+   * Both publishers go through refs on purpose.
+   *
+   * The tab passes these as inline arrows, so their identity changes on every
+   * render. An effect that depended on that identity would re-run every render,
+   * and since relabelling the tab writes to the navigation store, the tab would
+   * re-render, the arrow would be new again, and the loop would take the whole
+   * app down with it. The refs make the effect depend on the VALUE that matters
+   * instead: the name, and the save function.
+   */
+  const registerSaveRef = useRef(registerSave)
+  registerSaveRef.current = registerSave
+  useEffect(() => {
+    registerSaveRef.current(saveAndReport)
+  }, [saveAndReport])
+
+  const onSceneNameChangeRef = useRef(onSceneNameChange)
+  onSceneNameChangeRef.current = onSceneNameChange
+  useEffect(() => {
+    if (view?.scene.name) {
+      onSceneNameChangeRef.current?.(view.scene.name)
+    }
+  }, [view?.scene.name])
 
   // Undo/redo on the usual chord. Scoped to the editor being mounted, and
   // ignored while a text field has focus so typing in the name box does not
@@ -577,21 +885,45 @@ export function SceneEditor({
   }
 
   if (error || !view) {
+    // A scene deleted while its tab was open is a normal outcome, not a crash:
+    // the tab is still here, and the honest thing is to say what happened and
+    // offer the two ways out. Throwing the whole tab layout away for one missing
+    // scene would be the worse answer.
+    const missing =
+      error instanceof ApiClientError &&
+      (error.status === 404 ||
+        error.message.toLowerCase().includes('not found'))
     return (
       <ErrorState
-        title="This scene could not be opened"
+        title={
+          missing
+            ? 'This scene no longer exists'
+            : 'This scene could not be opened'
+        }
         message={
-          error instanceof ApiClientError
-            ? error.message
-            : 'The scene could not be loaded.'
+          missing
+            ? 'It was deleted while this tab was open. The tab can be closed, and the rest of your workspace is untouched.'
+            : error instanceof ApiClientError
+              ? error.message
+              : 'The scene could not be loaded.'
         }
         action={
-          <Button
-            label="Back to scenes"
-            icon="pi pi-arrow-left"
-            size="small"
-            onClick={onClose}
-          />
+          <div className="scene-editor-missing-actions">
+            <Button
+              label="Scenes"
+              icon="pi pi-arrow-left"
+              size="small"
+              onClick={onShowSceneList}
+            />
+            <Button
+              label="Close tab"
+              icon="pi pi-times"
+              size="small"
+              severity="secondary"
+              outlined
+              onClick={onClose}
+            />
+          </div>
         }
       />
     )
@@ -628,9 +960,9 @@ export function SceneEditor({
               text
               rounded
               size="small"
-              aria-label="Back to scenes"
-              tooltip="Back to scenes"
-              onClick={onClose}
+              aria-label="Scenes"
+              tooltip="Scenes"
+              onClick={onShowSceneList}
             />
             {view.scene.name}
             <SceneProjectBrief
@@ -800,6 +1132,7 @@ export function SceneEditor({
           selectedNodeId={selectedNodeId}
           onSelectNode={selectNode}
           onNodeLoadError={handleNodeLoadError}
+          onNodeLoadSettled={handleNodeLoadSettled}
           blockout={blockout}
           undecidedNodeIds={undecidedNodeIds}
         />
@@ -879,6 +1212,8 @@ export function SceneEditor({
           <ScenePropertyPanel
             node={selectedNode}
             facts={selectedFacts}
+            light={selectedLight}
+            onChangeLight={handleChangeLight}
             warnings={view.scaleWarnings.filter(
               warning => warning.nodeId === selectedNodeId
             )}
@@ -929,9 +1264,20 @@ export function SceneEditor({
                 onBind={handleBindMaterial}
               />
             }
+            animation={
+              <SceneNodeAnimation
+                node={selectedNode}
+                onChange={patch => {
+                  if (selectedNodeId) {
+                    updateNode(selectedNodeId, patch)
+                  }
+                }}
+              />
+            }
           />
         </aside>
       </div>
+      <Toast ref={toast} />
     </div>
   )
 }

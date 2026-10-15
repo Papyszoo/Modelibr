@@ -1,5 +1,6 @@
 ---
-sidebar_position: 3
+description: Recover deleted models, texture sets, environment maps, sprites, sounds, and scripts from the recycle bin. Identical files are deduplicated automatically.
+sidebar_position: 6
 ---
 
 # Recycled Files
@@ -7,17 +8,26 @@ sidebar_position: 3
 The Recycle Bin provides a safety net for deleted items, allowing you to recover accidentally deleted models, versions, texture sets, environment maps, sprites, sounds, and scripts.
 
 <div className="feature-video-container">
-  <video controls width="100%" autoPlay muted loop>
+  <video
+    controls
+    width="100%"
+    autoPlay
+    muted
+    loop
+    playsInline
+    preload="metadata"
+    poster="/img/videos/recycled-files-poster.webp"
+  >
     <source src="/videos/recycled-files.webm" type="video/webm" />
-    <p className="video-fallback">Demo video is being generated...</p>
+    <p className="video-fallback">A short screen recording of recycling and restoring assets in Modelibr</p>
   </video>
 </div>
 
 ## Accessing the Recycle Bin
 
-Navigate to the **Recycled Files** tab in the left panel.
+Open the **Recycled Files** tab from the New Tab page.
 
-![Recycled Files](/img/screenshots/recycled-files.png)
+![The Modelibr recycle bin listing deleted assets that can be restored](/img/screenshots/recycled-files.png)
 
 ## What Can Be Recycled?
 
@@ -53,6 +63,17 @@ Once permanently deleted, the item and its associated files are removed from the
 
 For environment maps, this means unused variant files and custom-thumbnail files are deleted only when nothing else still references them.
 :::
+
+## Automatic retention
+
+By default, recycled items are kept until you delete them permanently. You can
+choose a retention in **Settings → Backup & Restore → Keep recycled files for
+(days)**: once a day, items recycled longer ago than that are permanently
+deleted through the same path as **Delete Permanently**. `0` (the default)
+means nothing is ever purged automatically.
+
+Automatic cleanup never removes files that a live asset still references,
+even when their recycled entry ages out.
 
 ## Shared File Protection
 

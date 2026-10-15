@@ -62,12 +62,24 @@ export default defineConfig({
         video: envEnum(process.env.PW_VIDEO, ["off", "on", "retain-on-failure", "on-first-retry"], "retain-on-failure") as any,
         // Strict compare: PW_HEADED=0 must not mean headed.
         headless: process.env.PW_HEADED === "1" ? false : undefined,
+        // The store's origin is a fixed https address and the app can no longer be
+        // repointed, so the suite maps that host to the local store fixture.
+        // page.route() cannot do this: Chromium does not expose CORS preflight
+        // (OPTIONS) requests to route handlers, so a routed store would still send
+        // its preflight to the real host. A host-resolver rule sends both the
+        // preflight and the real request to the fixture, whose self-signed cert is
+        // accepted here.
+        ignoreHTTPSErrors: true,
         // Keep WebGL available when Chromium falls back to software rendering
         // (SwiftShader) on a GPU-less CI runner - recent Chromium disables WebGL
         // on SwiftShader unless this flag is set. It's a no-op on machines with a
         // real GPU (the Mac Mini lane), so it doesn't force software rendering.
         launchOptions: {
-            args: ["--enable-unsafe-swiftshader"],
+            args: [
+                "--enable-unsafe-swiftshader",
+                // store-fixture-e2e's TLS listener, published on the host.
+                "--host-resolver-rules=MAP store.modelibr.com:443 127.0.0.1:9443",
+            ],
         },
     },
     // NOTE: Per-worker DB isolation (PARALLEL_DB=true / TEST_WORKER_INDEX) is

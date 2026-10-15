@@ -34,6 +34,41 @@ public sealed record SceneSlotSnapshot(SceneSlot? Slot, SceneSlotNodeState? Node
 /// <summary>What a slot's node was wearing - the half of a resolution that lives outside the slot.</summary>
 public sealed record SceneSlotNodeState(string NodeId, SceneAssetRef? Asset, SceneMaterialBinding? Material);
 
+/// <summary>
+/// The slot exactly as a write left it, recorded beside the write's inverse.
+///
+/// A slot id is stable for the life of a scene, but a node removed and recreated takes its
+/// slot with it and a fresh slot may be opened under the same id with unrelated candidates.
+/// The inverse uses this to tell whether what currently carries the id is still the slot the
+/// write produced - overwriting or removing a different slot would silently discard it.
+/// </summary>
+public sealed record SceneSlotProduced(
+    IReadOnlyList<string> CandidateIds,
+    string? ChosenCandidateId,
+    string? ResolvedBy,
+    string? RecommendedCandidateId,
+    string? ReopenedReason,
+    string? Brief)
+{
+    /// <summary>Reads the identifying fields out of the projected view a write returns.</summary>
+    public static SceneSlotProduced Of(SceneSlotView view) => new(
+        view.Candidates.Select(c => c.Id).ToList(),
+        view.ChosenCandidateId,
+        view.ResolvedBy,
+        view.RecommendedCandidateId,
+        view.ReopenedReason,
+        view.Brief);
+
+    /// <summary>Whether the stored slot is still the one this fingerprint was taken from.</summary>
+    public bool Matches(SceneSlot slot) =>
+        CandidateIds.SequenceEqual(slot.Candidates.Select(c => c.Id), StringComparer.Ordinal)
+        && string.Equals(ChosenCandidateId, slot.ChosenCandidateId, StringComparison.Ordinal)
+        && string.Equals(ResolvedBy, slot.ResolvedBy, StringComparison.Ordinal)
+        && string.Equals(RecommendedCandidateId, slot.RecommendedCandidateId, StringComparison.Ordinal)
+        && string.Equals(ReopenedReason, slot.ReopenedReason, StringComparison.Ordinal)
+        && string.Equals(Brief, slot.Brief, StringComparison.Ordinal);
+}
+
 /// <summary>The response every slot write returns, plus the inverse of what it just did.</summary>
 public sealed record SceneSlotWriteResponse(SceneSummary Scene, SceneSlotView Slot, SceneSlotSnapshot Previous);
 
@@ -96,7 +131,8 @@ public sealed record RestoreSceneSlotCommand(
     int SceneId,
     string SlotId,
     SceneSlot? Slot,
-    SceneSlotNodeState? Node = null) : ICommand<SceneSummary>;
+    SceneSlotNodeState? Node = null,
+    SceneSlotProduced? Produced = null) : ICommand<SceneSummary>;
 
 /// <summary>Every decision in a scene, with what the library knows about each proposal.</summary>
 public sealed record GetSceneSlotsQuery(int SceneId) : IQuery<SceneSlotsView>;

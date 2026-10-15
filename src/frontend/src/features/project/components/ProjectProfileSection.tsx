@@ -2,7 +2,6 @@ import './ProjectProfileSection.css'
 
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Button } from 'primereact/button'
-import { InputNumber } from 'primereact/inputnumber'
 import { type JSX, useEffect, useMemo, useRef, useState } from 'react'
 
 import {
@@ -19,6 +18,7 @@ import {
   type ProjectProfileDraft,
 } from '@/features/project/projectProfilePatch'
 import { useTabUiState } from '@/hooks/useTabUiState'
+import { NumberInput } from '@/shared/components'
 import { ErrorState } from '@/shared/components/feedback'
 import { TagInput } from '@/shared/components/tags/TagInput'
 import type { ProjectBriefDto, ProjectProfileOptionDto } from '@/types'
@@ -297,8 +297,8 @@ export function ProjectProfileSection({
     <div className="project-profile" data-testid="project-profile">
       <div className="container-rich-header-row">
         <div>
-          <span className="container-rich-kicker">Profile</span>
-          <h3>What is being made</h3>
+          <span className="container-rich-kicker">Project setup</span>
+          <h3>Profile and budgets</h3>
         </div>
         <Button
           label={save.isPending ? 'Saving…' : 'Save profile'}
@@ -329,7 +329,8 @@ export function ProjectProfileSection({
               value={selected.map(value => value.name)}
               options={dimensionOptions.map(option => option.name)}
               allowCustom
-              suggestionsLabel={`${label} in this library`}
+              suggestionsLabel={`Available ${label.toLowerCase()}`}
+              collapsibleSuggestions
               placeholder={`Add ${label.toLowerCase()}…`}
               onCreateOption={name =>
                 createOption.mutate({ dimension: key, name })
@@ -450,13 +451,14 @@ function BudgetField({
   return (
     <div className="project-profile-budget-field">
       <label htmlFor={id}>{label}</label>
-      <InputNumber
-        inputId={id}
+      <NumberInput
+        id={id}
+        className="project-profile-budget-input"
         value={value}
         min={0}
-        useGrouping
+        allowEmpty
         placeholder="unconstrained"
-        onValueChange={event => onChange(event.value ?? null)}
+        onChange={onChange}
       />
     </div>
   )

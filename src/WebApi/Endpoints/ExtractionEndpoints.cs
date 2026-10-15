@@ -25,7 +25,7 @@ public static class ExtractionEndpoints
             .AddEndpointFilter<WorkerApiKeyFilter>()
             .WithOpenApi();
 
-        // Derived metadata + part detail reads (wrapped by MCP get_asset/get_part).
+        // Derived metadata + part detail reads (wrapped by MCP get_asset).
         app.MapGet("/assets/{assetType}/{assetId:int}/metadata", GetAssetMetadata)
             .WithName("Get Asset Metadata")
             .WithSummary("Derived metadata + parts for an asset (active version unless ?versionId= says otherwise)")

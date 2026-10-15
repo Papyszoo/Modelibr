@@ -1,10 +1,37 @@
 import type { ReactNode } from "react";
 import clsx from "clsx";
+import Head from "@docusaurus/Head";
 import Link from "@docusaurus/Link";
+import useBaseUrl from "@docusaurus/useBaseUrl";
 import Layout from "@theme/Layout";
 import Heading from "@theme/Heading";
 
 import styles from "./index.module.css";
+
+const softwareApplicationJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    name: "Modelibr",
+    applicationCategory: "MultimediaApplication",
+    applicationSubCategory: "3D asset manager",
+    operatingSystem: "Windows, macOS, Linux, Docker",
+    url: "https://modelibr.com/",
+    description:
+        "Self-hosted, local-first 3D asset manager and game asset library for models, textures, environment maps, sprites, sounds, and scripts.",
+    image: "https://modelibr.com/img/screenshots/model-viewer.png",
+    screenshot: "https://modelibr.com/img/screenshots/model-list.png",
+    codeRepository: "https://github.com/Papyszoo/Modelibr",
+    license: "https://github.com/Papyszoo/Modelibr/blob/main/LICENSE",
+    isAccessibleForFree: true,
+    offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
+    featureList: [
+        "Model version history and deduplication",
+        "glTF, GLB, FBX, OBJ, STL, 3MF, and Blend preview in the browser",
+        "PBR texture sets and environment maps",
+        "WebDAV drive with Blender CLI integration",
+        "Local MCP server for AI agents",
+    ],
+};
 
 function HomepageHeader() {
     return (
@@ -20,17 +47,19 @@ function HomepageHeader() {
                         Self-Hosted &amp; Local-First
                     </div>
                     <Heading as="h1" className={styles.heroTitle}>
-                        Your Personal
+                        Your Self-Hosted
                         <br />
                         <span className={styles.heroGradient}>
                             Game Asset Library
                         </span>
                     </Heading>
                     <p className={styles.heroSubtitle}>
-                        Organize and preview your 3D models, textures, sprites,
-                        sounds, and scripts in one place - with animated
-                        thumbnails, version history, and a Blender-ready WebDAV
-                        drive. All on your own hardware.
+                        Modelibr is a local-first 3D asset manager: organize and
+                        preview your models, textures, environment maps,
+                        sprites, sounds, and scripts in one place - with
+                        animated thumbnails, version history, a Blender-ready
+                        WebDAV drive, and a local MCP server for AI agents. All
+                        on your own hardware.
                     </p>
                     <div className={styles.buttons}>
                         <Link
@@ -165,7 +194,7 @@ type FeatureItem = {
     title: string;
     icon: string;
     description: string;
-    highlight?: boolean;
+    to: string;
 };
 
 const FeatureList: FeatureItem[] = [
@@ -174,52 +203,76 @@ const FeatureList: FeatureItem[] = [
         icon: "🗂️",
         description:
             "Models, texture sets, environment maps, sprites, sounds, and scripts - one searchable library instead of scattered folders.",
+        to: "/docs/category/features",
     },
     {
-        title: "Animated Thumbnails",
+        title: "3D Preview in the Browser",
         icon: "🎬",
         description:
-            "Every model gets a rotating 360° preview, sounds get waveforms. No more guessing what's inside a file.",
+            "View glTF, GLB, FBX, OBJ, STL, 3MF, and Blend files without opening a 3D tool. Models get a rotating 360° thumbnail, sounds get waveforms.",
+        to: "/docs/features/models",
     },
     {
         title: "Version Control",
         icon: "📚",
         description:
             "Keep multiple versions of each model and roll back anytime. Identical files are deduplicated automatically.",
+        to: "/docs/features/models",
     },
     {
         title: "PBR Texture Sets",
         icon: "🎨",
         description:
-            "Organize your materials with full PBR and channel-packed map support. Preview on any shape in real-time.",
+            "Organize materials with full PBR and channel-packed maps, with global and per-model texture set kinds.",
+        to: "/docs/features/texture-sets",
+    },
+    {
+        title: "HDRIs and Environment Maps",
+        icon: "🌅",
+        description:
+            "Keep HDRI panoramas and cube maps as first-class assets, with size variants and a lit preview in the browser.",
+        to: "/docs/features/environment-maps",
     },
     {
         title: "WebDAV + Blender",
         icon: "🔌",
         description:
             "Mount your library like a network drive. Save a .blend into it and Modelibr creates a new model version automatically.",
+        to: "/docs/features/webdav",
     },
     {
-        title: "Self-Hosted & Private",
+        title: "MCP Server for AI Agents",
+        icon: "🤖",
+        description:
+            "A local Model Context Protocol server lets Claude Code or another agent search your library and read the metadata Modelibr extracts.",
+        to: "/docs/features/mcp-server",
+    },
+    {
+        title: "Self-Hosted and Private",
         icon: "🔒",
         description:
-            "Your data stays on your hardware. Works 100% offline. No subscriptions.",
+            "Your data stays on your hardware. Runs offline. No account and no subscription.",
+        to: "/docs#where-is-my-data",
+    },
+    {
+        title: "Free and Source-Available",
+        icon: "📦",
+        description:
+            "Installers for Windows, macOS, and Linux, or Docker Compose. The source is public and self-hosting costs nothing.",
+        to: "/docs#quick-start",
     },
 ];
 
-function FeatureCard({ title, icon, description, highlight }: FeatureItem) {
+function FeatureCard({ title, icon, description, to }: FeatureItem) {
     return (
         <div className={clsx("col col--4", styles.featureCol)}>
-            <div
-                className={clsx(
-                    styles.featureCard,
-                    highlight && styles.featureCardHighlight,
-                )}
-            >
-                <div className={styles.featureIcon}>{icon}</div>
-                <Heading as="h3">{title}</Heading>
-                <p>{description}</p>
-            </div>
+            <Link to={to} className={styles.featureCardLink}>
+                <div className={styles.featureCard}>
+                    <div className={styles.featureIcon}>{icon}</div>
+                    <Heading as="h3">{title}</Heading>
+                    <p>{description}</p>
+                </div>
+            </Link>
         </div>
     );
 }
@@ -374,14 +427,37 @@ function CTASection() {
     );
 }
 
+function ScreenshotSection() {
+    return (
+        <section className={styles.screenshotSection}>
+            <div className="container">
+                <img
+                    src={useBaseUrl("/img/screenshots/model-list.png")}
+                    alt="The Modelibr library showing 3D models, texture sets, environment maps, sprites, and sounds in one searchable grid"
+                    width={1600}
+                    height={803}
+                    loading="lazy"
+                    className={styles.screenshotImage}
+                />
+            </div>
+        </section>
+    );
+}
+
 export default function Home(): ReactNode {
     return (
         <Layout
-            title="Your Personal Game Asset Library"
-            description="Self-hosted game asset library. Organize and preview 3D models, textures, sprites, sounds, and scripts with automatic thumbnails, version history, and Blender integration."
+            title={"Self-Hosted 3D Asset Manager & Game Asset Library"}
+            description="Self-hosted, local-first 3D asset manager and game asset library. Preview models, textures, HDRIs, sprites, and sounds offline, with Blender and MCP support."
         >
+            <Head>
+                <script type="application/ld+json">
+                    {JSON.stringify(softwareApplicationJsonLd)}
+                </script>
+            </Head>
             <HomepageHeader />
             <main>
+                <ScreenshotSection />
                 <AudienceSection />
                 <FeaturesSection />
                 <HowItWorksSection />

@@ -1,7 +1,12 @@
 import { type JSX, type ReactNode, useContext } from 'react'
 
+import { useDockPanelActions } from '@/components/layout/dock-panel/DockPanelActionsContext'
 import { TabContext, type TabContextValue } from '@/contexts/TabContext'
-import { createTab } from '@/stores/navigationStore'
+import {
+  createTab,
+  getWindowId,
+  useNavigationStore,
+} from '@/stores/navigationStore'
 import { type Tab } from '@/types'
 
 // eslint-disable-next-line react-refresh/only-export-components
@@ -30,6 +35,9 @@ export const TabProvider = ({
   activeTab,
   setActiveTab,
 }: TabProviderProps): JSX.Element => {
+  const { closeTab } = useDockPanelActions()
+  const setTabLabel = useNavigationStore(state => state.setTabLabel)
+
   const openModelDetailsTab = (
     modelId: string,
     name?: string,
@@ -148,6 +156,62 @@ export const TabProvider = ({
     setActiveTab(newTab.id)
   }
 
+  const openSceneEditorTab = (sceneId: string, name?: string): void => {
+    // One tab per scene, so two scenes can stay open side by side. Re-opening a
+    // scene that is already open focuses its tab instead of duplicating it -
+    // and, crucially, does not restart its draft.
+    const existingTab = tabs.find(
+      tab => tab.type === 'sceneEditor' && tab.sceneId === sceneId
+    )
+
+    if (existingTab) {
+      setActiveTab(existingTab.id)
+      return
+    }
+
+    const newTab = createTab('sceneEditor', sceneId, name)
+    setTabs([...tabs, newTab])
+    setActiveTab(newTab.id)
+  }
+
+  const openVfxEditorTab = (vfxId: string, name?: string): void => {
+    // One tab per effect, like scenes: re-opening focuses it and keeps its draft.
+    const existingTab = tabs.find(
+      tab => tab.type === 'vfxEditor' && tab.params.vfxId === vfxId
+    )
+
+    if (existingTab) {
+      setActiveTab(existingTab.id)
+      return
+    }
+
+    const newTab = createTab('vfxEditor', vfxId, name)
+    setTabs([...tabs, newTab])
+    setActiveTab(newTab.id)
+  }
+
+  /**
+   * Relabels an existing tab in place.
+   *
+   * Not a re-open: a scene renamed in the editor must keep the tab the user is
+   * looking at, and a rename that recreated it would take the tab's internal UI
+   * state - and with it the scene's unsaved draft - down to nothing.
+   */
+  const relabelTab = (tabId: string, label: string): void => {
+    setTabLabel(getWindowId(), tabId, label)
+  }
+
+  const openScenesList = (): void => {
+    const existing = tabs.find(tab => tab.type === 'scenes')
+    if (existing) {
+      setActiveTab(existing.id)
+      return
+    }
+    const listTab = createTab('scenes')
+    setTabs([...tabs, listTab])
+    setActiveTab(listTab.id)
+  }
+
   const openTab = (
     type: Tab['type'],
     title: string,
@@ -160,7 +224,7 @@ export const TabProvider = ({
           type === 'environmentMaps' ||
           type === 'packs' ||
           type === 'sprites' ||
-          type === 'stageList' ||
+          type === 'vfxList' ||
           (type === 'modelViewer' &&
             tab.modelId === (data as { id?: string })?.id) ||
           (type === 'textureSetViewer' &&
@@ -168,9 +232,7 @@ export const TabProvider = ({
           (type === 'environmentMapViewer' &&
             tab.environmentMapId === (data as { id?: string })?.id) ||
           (type === 'packViewer' &&
-            tab.packId === (data as { id?: string })?.id) ||
-          (type === 'stageEditor' &&
-            tab.stageId === (data as { id?: string })?.id))
+            tab.packId === (data as { id?: string })?.id))
     )
 
     if (existingTab) {
@@ -196,7 +258,13 @@ export const TabProvider = ({
     openPackDetailsTab,
     openProjectDetailsTab,
     openScriptDetailsTab,
+    openSceneEditorTab,
+    openVfxEditorTab,
+    openScenesList,
+    relabelTab,
     openTab,
+    tabId: activeTab,
+    closeTab,
   }
 
   return <TabContext.Provider value={value}>{children}</TabContext.Provider>

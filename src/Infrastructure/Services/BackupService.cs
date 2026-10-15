@@ -1,10 +1,11 @@
-using System.Diagnostics;
 using System.Formats.Tar;
+using System.Globalization;
 using System.Security.Cryptography;
 using System.Text.Json;
 using Application.Abstractions.Services;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Npgsql;
 
 namespace Infrastructure.Services;
 
@@ -23,7 +24,6 @@ public sealed class BackupService : IBackupService
     private readonly ILogger<BackupService> _logger;
     private readonly BackupPaths _paths;
     private readonly PostgresConnectionInfo _postgres;
-    private readonly PostgresToolPaths _postgresTools;
     private readonly IBackupConsistencyGate _consistencyGate;
     private readonly SemaphoreSlim _runLock = new(1, 1);
     private readonly SemaphoreSlim _stageLock = new(1, 1);
@@ -39,7 +39,6 @@ public sealed class BackupService : IBackupService
         _logger = logger;
         _paths = BackupPaths.FromConfiguration(configuration);
         _postgres = PostgresConnectionInfo.FromConfiguration(configuration);
-        _postgresTools = PostgresToolPaths.FromConfiguration(configuration);
         _consistencyGate = consistencyGate;
 
         Directory.CreateDirectory(_paths.BackupRoot);
@@ -172,8 +171,13 @@ public sealed class BackupService : IBackupService
     public async Task<BackupSizeEstimate> EstimateSizeAsync(CancellationToken cancellationToken)
     {
         var dbBytes = await GetDatabaseSizeBytesAsync(cancellationToken);
-        var uploadBytes = DirectorySize(_paths.UploadRoot);
-        var thumbBytes = DirectorySize(_paths.ThumbnailRoot);
+
+        // Thumbnails physically live under the uploads root, so the raw uploads size
+        // already contains them. Report them separately (they are what includeThumbnails
+        // adds) so the UI does not count them twice.
+        var thumbBytes = await GetThumbnailStorageSizeAsync();
+        var uploadBytes = Math.Max(0, DirectorySize(_paths.UploadRoot) - thumbBytes);
+
         return new BackupSizeEstimate(dbBytes, uploadBytes, thumbBytes);
     }
 
@@ -276,26 +280,6 @@ public sealed class BackupService : IBackupService
             Error: null);
     }
 
-    public BackupToolAvailability GetToolAvailability()
-    {
-        foreach (var tool in new[] { _postgresTools.PgDumpPath, _postgresTools.PsqlPath })
-        {
-            // A bare executable name (the Docker/PATH fallback) is resolved by the OS at
-            // launch; we deliberately do not probe PATH here so a missing system install
-            // still surfaces as a real backup failure. Only an explicitly configured
-            // absolute path can be checked cheaply and without side effects.
-            if (Path.IsPathRooted(tool) && !File.Exists(tool))
-            {
-                return new BackupToolAvailability(
-                    false,
-                    $"'{tool}' is configured but does not exist. The packaged PostgreSQL " +
-                    "runtime is missing its client tools, so no backup can be produced.");
-            }
-        }
-
-        return new BackupToolAvailability(true, null);
-    }
-
     public void CleanupSnapshots(string fileNamePrefix, int keepCount)
     {
         if (string.IsNullOrWhiteSpace(fileNamePrefix))
@@ -350,11 +334,10 @@ public sealed class BackupService : IBackupService
             var referencedBeforeDump = await GetReferencedUploadPathsAsync();
             EnsureReferencedUploadFilesExist(referencedBeforeDump);
 
-            // Pre-flight: query the running Postgres for its actual major version
-            // so the manifest reports the truth, not a baked-in literal.
-            var pgMajor = await GetPostgresMajorVersionAsync();
-
-            await RunPgDumpAsync(dumpPath);
+            // The dumper reports the server's actual major version, so the manifest
+            // records the truth rather than a baked-in literal.
+            var header = await WriteDatabaseDumpAsync(dumpPath);
+            var pgMajor = header.PostgresMajorVersion;
 
             // A second read closes the other side of the race: a row committed
             // while the dump was running must be checked too. The physical-file
@@ -367,6 +350,15 @@ public sealed class BackupService : IBackupService
                 .ToList();
             var dumpInfo = new FileInfo(dumpPath);
             var dumpSha = await ComputeSha256Async(dumpPath);
+
+            // Thumbnails and previews live under the uploads root (content-addressed,
+            // like every other file), so the plain uploads sweep below would carry them.
+            // Resolve the referenced set once and either keep it out of that sweep - the
+            // default, and what makes includeThumbnails meaningful - or write it as its
+            // own section so the manifest's thumbnail count is real.
+            var thumbnailRelativePaths = (await GetThumbnailUploadPathsAsync())
+                .Select(path => ToUploadRelative(path, _paths.UploadRoot))
+                .ToHashSet(StringComparer.Ordinal);
 
             await using (var outStream = File.Create(tmpPath))
             await using (var tar = new TarWriter(outStream, TarEntryFormat.Pax, leaveOpen: false))
@@ -386,13 +378,17 @@ public sealed class BackupService : IBackupService
                     // user bytes that survived a failed save - real user data that a
                     // restore must bring back (prompt 30, item 5).
                     (uploadsCount, uploadsBytes) = await WriteDirectoryEntriesAsync(
-                        tar, _paths.UploadRoot, UploadsPrefix, skipDirNames: UploadSkipDirNames);
+                        tar,
+                        _paths.UploadRoot,
+                        UploadsPrefix,
+                        skipDirNames: UploadSkipDirNames,
+                        excludeRelativePaths: thumbnailRelativePaths);
                 }
 
-                if (scope.IncludeThumbnails && Directory.Exists(_paths.ThumbnailRoot))
+                if (scope.IncludeThumbnails && thumbnailRelativePaths.Count > 0)
                 {
-                    (thumbsCount, thumbsBytes) = await WriteDirectoryEntriesAsync(
-                        tar, _paths.ThumbnailRoot, ThumbnailsPrefix);
+                    (thumbsCount, thumbsBytes) = await WriteThumbnailEntriesAsync(
+                        tar, _paths.UploadRoot, thumbnailRelativePaths);
                 }
 
                 // Validate after enumeration as well as before the dump. The
@@ -408,6 +404,7 @@ public sealed class BackupService : IBackupService
                         Database: true,
                         Uploads: true,
                         Thumbnails: scope.IncludeThumbnails),
+                    DatabaseDumpFormat: ManagedDumpFormat.Id,
                     Stats: new BackupManifestStats(
                         UploadsCount: uploadsCount,
                         UploadsBytes: uploadsBytes,
@@ -443,19 +440,220 @@ public sealed class BackupService : IBackupService
         // The first-boot pre-migration backup runs before the schema exists.
         // Avoid treating an absent Files table as a database failure; once the
         // table exists, any query failure is still fatal to the backup.
-        var tableExists = await RunPsqlQueryAsync(
+        var tableExists = await ScalarAsync(
             "SELECT to_regclass('public.\"Files\"') IS NOT NULL;");
-        if (!string.Equals(tableExists.Trim(), "t", StringComparison.OrdinalIgnoreCase))
+        if (!string.Equals(tableExists, "t", StringComparison.OrdinalIgnoreCase))
         {
             return Array.Empty<string>();
         }
 
-        var output = await RunPsqlQueryAsync(
-            "SELECT DISTINCT \"FilePath\" FROM \"Files\";");
+        var output = await QueryAsync("SELECT DISTINCT \"FilePath\" FROM \"Files\";");
         return output
             .Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
             .Where(path => path.Length > 0)
             .ToList();
+    }
+
+    /// <summary>
+    /// Every thumbnail / preview path the database knows about, across every asset
+    /// family that stores one. These files live under the uploads root, so they have
+    /// to be identified to be left out of the uploads sweep (or included deliberately).
+    /// </summary>
+    /// <remarks>
+    /// Each table is probed before it is queried because the first-boot pre-migration
+    /// backup runs before any schema exists, and later tables arrive with later
+    /// migrations - one absent table must not fail the whole backup.
+    /// </remarks>
+    private async Task<IReadOnlyCollection<string>> GetThumbnailUploadPathsAsync()
+    {
+        var columnsByTable = new (string Table, string[] Columns)[]
+        {
+            ("Thumbnails", ["ThumbnailPath", "PngThumbnailPath"]),
+            ("TextureSets", ["ThumbnailPath", "PngThumbnailPath"]),
+            ("EnvironmentMapVariants", ["ThumbnailPath"]),
+            ("Materials", ["ThumbnailPath", "PngThumbnailPath"]),
+            ("Vfx", ["ThumbnailPath"]),
+            ("SceneRenders", ["FilePath"]),
+        };
+
+        var paths = new List<string>();
+        await using var connection = await OpenConnectionAsync();
+
+        foreach (var (table, columns) in columnsByTable)
+        {
+            if (!await TableExistsAsync(connection, table)) continue;
+
+            foreach (var column in columns)
+            {
+                await using var command = new NpgsqlCommand(
+                    $"SELECT DISTINCT \"{column}\" FROM \"{table}\" " +
+                    $"WHERE \"{column}\" IS NOT NULL AND \"{column}\" <> '';",
+                    connection);
+                await using var reader = await command.ExecuteReaderAsync();
+                while (await reader.ReadAsync())
+                {
+                    paths.Add(reader.GetString(0));
+                }
+            }
+        }
+
+        return paths.Distinct(StringComparer.Ordinal).ToList();
+    }
+
+    private async Task<long> GetThumbnailStorageSizeAsync()
+    {
+        // A size probe must never stand between a user and their backup, so any
+        // failure degrades to zero rather than throwing.
+        try
+        {
+            long total = 0;
+            foreach (var path in await GetThumbnailUploadPathsAsync())
+            {
+                try
+                {
+                    var full = Path.Combine(_paths.UploadRoot, ToUploadRelative(path, _paths.UploadRoot));
+                    var info = new FileInfo(full);
+                    if (info.Exists) total += info.Length;
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                {
+                    // Unreadable single file - skip it.
+                }
+            }
+
+            return total;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Could not estimate thumbnail storage; the estimate omits it.");
+            return 0;
+        }
+    }
+
+    private static async Task<bool> TableExistsAsync(NpgsqlConnection connection, string table)
+    {
+        await using var command = new NpgsqlCommand("SELECT to_regclass(@name) IS NOT NULL;", connection);
+        command.Parameters.AddWithValue("name", $"public.\"{table}\"");
+        return await command.ExecuteScalarAsync() is true;
+    }
+
+    /// <summary>
+    /// Expresses a stored path the way the uploads sweep sees it: relative to the
+    /// uploads root, with forward slashes. A path already relative is returned as is;
+    /// an absolute one (a row written before the relative-path migration, or a
+    /// pre-migration snapshot) has the current root stripped when it sits under it.
+    /// </summary>
+    internal static string ToUploadRelative(string storedPath, string uploadRoot)
+    {
+        var normalized = storedPath.Replace('\\', '/');
+        if (!Path.IsPathRooted(storedPath)) return normalized;
+
+        var rootFull = Path.GetFullPath(uploadRoot);
+        var rootPrefix = rootFull.EndsWith(Path.DirectorySeparatorChar)
+            ? rootFull
+            : rootFull + Path.DirectorySeparatorChar;
+        var comparison = OperatingSystem.IsWindows()
+            ? StringComparison.OrdinalIgnoreCase
+            : StringComparison.Ordinal;
+
+        string full;
+        try
+        {
+            full = Path.GetFullPath(storedPath);
+        }
+        catch (Exception ex) when (ex is ArgumentException or IOException or NotSupportedException)
+        {
+            return normalized;
+        }
+
+        return full.StartsWith(rootPrefix, comparison)
+            ? Path.GetRelativePath(rootFull, full).Replace('\\', '/')
+            : normalized;
+    }
+
+    /// <summary>
+    /// Runs a scalar query over the same connection the dump uses.
+    /// </summary>
+    /// <remarks>
+    /// This used to shell out to <c>psql</c>. It cannot any more: the embedded
+    /// PostgreSQL the desktop app ships carries the server, not the client tools,
+    /// and the app already has a driver for the server.
+    ///
+    /// The result comes back as <see cref="object"/> because a PostgreSQL scalar is
+    /// not always a string - <c>to_regclass(...) IS NOT NULL</c> is a boolean - and
+    /// casting that to <c>string</c> throws rather than returning anything. So it is
+    /// stringified, which is what the two callers wanted all along.
+    /// </remarks>
+    private async Task<string?> ScalarAsync(string query)
+    {
+        await using var connection = await OpenConnectionAsync();
+        await using var command = new NpgsqlCommand(query, connection);
+        var value = await command.ExecuteScalarAsync();
+        return value switch
+        {
+            null => null,
+            string text => text,
+            bool flag => flag ? "t" : "f",
+            IFormattable formattable => formattable.ToString(null, CultureInfo.InvariantCulture),
+            _ => value.ToString(),
+        };
+    }
+
+    private async Task<string> QueryAsync(string query)
+    {
+        await using var connection = await OpenConnectionAsync();
+        await using var command = new NpgsqlCommand(query, connection);
+        var value = await command.ExecuteScalarAsync();
+        return value switch
+        {
+            null => string.Empty,
+            string text => text,
+            bool flag => flag ? "t" : "f",
+            IFormattable formattable => formattable.ToString(null, CultureInfo.InvariantCulture),
+            _ => value.ToString() ?? string.Empty,
+        };
+    }
+
+    private async Task<NpgsqlConnection> OpenConnectionAsync()
+    {
+        var connection = new NpgsqlConnection(BuildConnectionString());
+        await connection.OpenAsync();
+        return connection;
+    }
+
+    private string BuildConnectionString() => new NpgsqlConnectionStringBuilder
+    {
+        Host = _postgres.Host,
+        Port = _postgres.Port,
+        Database = _postgres.Database,
+        Username = _postgres.User,
+        Password = _postgres.Password,
+    }.ConnectionString;
+
+    /// <summary>
+    /// Writes the database half of the archive.
+    /// </summary>
+    /// <remarks>
+    /// Replaces <c>pg_dump -Fc</c>. The dump is COPY text streamed through Npgsql -
+    /// see <see cref="ManagedDatabaseDumpper"/> for why the client tools are not an
+    /// option here and what the format gives up (schema) in exchange.
+    /// </remarks>
+    private async Task<ManagedDumpHeader> WriteDatabaseDumpAsync(string outputPath)
+    {
+        await using var connection = await OpenConnectionAsync();
+
+        // A repeatable-read transaction is what makes a per-table dump a
+        // consistent snapshot of the whole database, which is what pg_dump's own
+        // transaction gave us for free.
+        await using var transaction = await connection.BeginTransactionAsync(
+            System.Data.IsolationLevel.RepeatableRead);
+
+        var dumpper = new ManagedDatabaseDumpper(_logger);
+        await using var output = File.Create(outputPath);
+        var header = await dumpper.WriteAsync(connection, output);
+
+        await transaction.CommitAsync();
+        return header;
     }
 
     private void EnsureReferencedUploadFilesExist(IEnumerable<string> referencedPaths)
@@ -515,103 +713,6 @@ public sealed class BackupService : IBackupService
         return missing.Distinct(StringComparer.Ordinal).ToList();
     }
 
-    private async Task<string> RunPsqlQueryAsync(string query)
-    {
-        var psi = new ProcessStartInfo
-        {
-            FileName = _postgresTools.PsqlPath,
-            ArgumentList =
-            {
-                "-v", "ON_ERROR_STOP=1",
-                "-h", _postgres.Host,
-                "-p", _postgres.Port.ToString(),
-                "-U", _postgres.User,
-                "-d", _postgres.Database,
-                "-t", "-A",
-                "-c", query,
-            },
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false,
-        };
-        psi.Environment["PGPASSWORD"] = _postgres.Password;
-
-        using var p = Process.Start(psi)
-            ?? throw new InvalidOperationException("Failed to launch psql for backup consistency query.");
-        var output = await p.StandardOutput.ReadToEndAsync();
-        var stderr = await p.StandardError.ReadToEndAsync();
-        await p.WaitForExitAsync();
-        if (p.ExitCode != 0)
-        {
-            throw new InvalidOperationException(
-                $"Backup consistency query failed with psql exit code {p.ExitCode}: {stderr.Trim()}");
-        }
-
-        return output;
-    }
-
-    private async Task RunPgDumpAsync(string outputPath)
-    {
-        var psi = new ProcessStartInfo
-        {
-            FileName = _postgresTools.PgDumpPath,
-            ArgumentList =
-            {
-                "-Fc",                               // custom format (compressed)
-                "-h", _postgres.Host,
-                "-p", _postgres.Port.ToString(),
-                "-U", _postgres.User,
-                "-d", _postgres.Database,
-                "-f", outputPath,
-            },
-            RedirectStandardError = true,
-            RedirectStandardOutput = true,
-            UseShellExecute = false,
-        };
-        psi.Environment["PGPASSWORD"] = _postgres.Password;
-
-        using var p = Process.Start(psi)
-            ?? throw new InvalidOperationException("Failed to launch pg_dump.");
-        var stderr = await p.StandardError.ReadToEndAsync();
-        await p.WaitForExitAsync();
-        if (p.ExitCode != 0)
-        {
-            throw new InvalidOperationException($"pg_dump exited with code {p.ExitCode}: {stderr}");
-        }
-    }
-
-    private async Task<int> GetPostgresMajorVersionAsync()
-    {
-        var psi = new ProcessStartInfo
-        {
-            FileName = _postgresTools.PsqlPath,
-            ArgumentList =
-            {
-                "-h", _postgres.Host,
-                "-p", _postgres.Port.ToString(),
-                "-U", _postgres.User,
-                "-d", _postgres.Database,
-                "-t", "-A",
-                "-c", "SHOW server_version_num",
-            },
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false,
-        };
-        psi.Environment["PGPASSWORD"] = _postgres.Password;
-
-        using var p = Process.Start(psi)
-            ?? throw new InvalidOperationException("Failed to launch psql for version probe.");
-        var output = (await p.StandardOutput.ReadToEndAsync()).Trim();
-        await p.WaitForExitAsync();
-        if (p.ExitCode != 0 || !int.TryParse(output, out var verNum))
-        {
-            throw new InvalidOperationException($"Failed to read postgres version (exit {p.ExitCode}): '{output}'");
-        }
-        // server_version_num format: 160003 → major 16; 170000 → 17. Major = verNum / 10000.
-        return verNum / 10000;
-    }
-
     private static async Task WriteFileEntryAsync(TarWriter tar, string filePath, string entryName)
     {
         var entry = new PaxTarEntry(TarEntryType.RegularFile, entryName);
@@ -626,7 +727,8 @@ public sealed class BackupService : IBackupService
         TarWriter tar,
         string rootDir,
         string entryPrefix,
-        IReadOnlyCollection<string>? skipDirNames = null)
+        IReadOnlyCollection<string>? skipDirNames = null,
+        IReadOnlySet<string>? excludeRelativePaths = null)
     {
         var count = 0;
         long bytes = 0;
@@ -634,17 +736,50 @@ public sealed class BackupService : IBackupService
 
         foreach (var path in Directory.EnumerateFiles(rootDir, "*", SearchOption.AllDirectories))
         {
-            if (skipDirNames is { Count: > 0 })
-            {
-                var rel = Path.GetRelativePath(rootFull, path).Replace('\\', '/');
-                if (skipDirNames.Any(skip => rel.StartsWith(skip + "/", StringComparison.Ordinal))) continue;
-            }
             var relative = Path.GetRelativePath(rootFull, path).Replace('\\', '/');
+            if (skipDirNames is { Count: > 0 }
+                && skipDirNames.Any(skip => relative.StartsWith(skip + "/", StringComparison.Ordinal)))
+            {
+                continue;
+            }
+            if (excludeRelativePaths is not null && excludeRelativePaths.Contains(relative)) continue;
+
             var entryName = entryPrefix + relative;
             var entry = new PaxTarEntry(TarEntryType.RegularFile, entryName);
             await using var fs = File.OpenRead(path);
             // fs.Length is valid here regardless of stream position - it returns the
             // file's size, not bytes-read-since-open.
+            var size = fs.Length;
+            entry.DataStream = fs;
+            await tar.WriteEntryAsync(entry);
+            count++;
+            bytes += size;
+        }
+
+        return (count, bytes);
+    }
+
+    /// <summary>
+    /// Writes the referenced thumbnail files as their own <c>thumbnails/</c> section.
+    /// They physically live under the uploads root, but naming them separately is what
+    /// lets a restore count what it got and lets a backup without them omit them
+    /// cleanly. A path whose file is gone is skipped - the count reflects the archive.
+    /// </summary>
+    private static async Task<(int count, long bytes)> WriteThumbnailEntriesAsync(
+        TarWriter tar,
+        string uploadRoot,
+        IEnumerable<string> relativePaths)
+    {
+        var count = 0;
+        long bytes = 0;
+
+        foreach (var relative in relativePaths)
+        {
+            var fullPath = Path.Combine(uploadRoot, relative);
+            if (!File.Exists(fullPath)) continue;
+
+            var entry = new PaxTarEntry(TarEntryType.RegularFile, ThumbnailsPrefix + relative);
+            await using var fs = File.OpenRead(fullPath);
             var size = fs.Length;
             entry.DataStream = fs;
             await tar.WriteEntryAsync(entry);
@@ -706,34 +841,20 @@ public sealed class BackupService : IBackupService
 
     private async Task<long> GetDatabaseSizeBytesAsync(CancellationToken cancellationToken)
     {
-        var psi = new ProcessStartInfo
-        {
-            FileName = _postgresTools.PsqlPath,
-            ArgumentList =
-            {
-                "-h", _postgres.Host,
-                "-p", _postgres.Port.ToString(),
-                "-U", _postgres.User,
-                "-d", _postgres.Database,
-                "-t", "-A",
-                "-c", $"SELECT pg_database_size('{_postgres.Database}')",
-            },
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false,
-        };
-        psi.Environment["PGPASSWORD"] = _postgres.Password;
-
+        // An estimate, not a measurement that must be exact: 0 on any failure is
+        // the honest answer for "how big will the database half be" and keeps a
+        // size probe from ever standing between a user and their backup.
         try
         {
-            using var p = Process.Start(psi);
-            if (p == null) return 0;
-            var output = await p.StandardOutput.ReadToEndAsync(cancellationToken);
-            await p.WaitForExitAsync(cancellationToken);
-            return long.TryParse(output.Trim(), out var size) ? size : 0;
+            await using var connection = await OpenConnectionAsync();
+            await using var command = new NpgsqlCommand(
+                "SELECT pg_database_size(current_database());", connection);
+            var size = await command.ExecuteScalarAsync(cancellationToken);
+            return size is long bytes ? bytes : 0;
         }
-        catch
+        catch (Exception ex)
         {
+            _logger.LogWarning(ex, "Could not read the database size; the estimate omits it.");
             return 0;
         }
     }
@@ -800,26 +921,6 @@ public sealed class BackupService : IBackupService
                 UploadRoot = uploadRoot,
                 ThumbnailRoot = thumbRoot,
                 HostBackupRoot = hostBackupRoot,
-            };
-        }
-    }
-
-    internal sealed class PostgresToolPaths
-    {
-        public required string PgDumpPath { get; init; }
-        public required string PsqlPath { get; init; }
-
-        public static PostgresToolPaths FromConfiguration(IConfiguration cfg)
-        {
-            // Empty/unset values intentionally fall back to bare executable
-            // names. That preserves Docker/source-mode PATH resolution; managed
-            // desktop installs pass absolute paths for their bundled runtime.
-            var pgDumpPath = cfg["PG_DUMP_PATH"];
-            var psqlPath = cfg["PSQL_PATH"];
-            return new PostgresToolPaths
-            {
-                PgDumpPath = string.IsNullOrWhiteSpace(pgDumpPath) ? "pg_dump" : pgDumpPath,
-                PsqlPath = string.IsNullOrWhiteSpace(psqlPath) ? "psql" : psqlPath,
             };
         }
     }

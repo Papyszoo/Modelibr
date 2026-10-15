@@ -29,3 +29,14 @@
   background: var(--mod-color-text-muted);
   border-radius: 2px;
 }
+
+/* One panel: the right panel and the gutter are hidden (not unmounted), and
+   the left panel takes the full width over the splitter's inline basis. */
+.splitter-layout--single > .p-splitter > .p-splitter-gutter,
+.splitter-layout--single > .p-splitter > .p-splitter-panel:last-child {
+  display: none;
+}
+
+.splitter-layout--single > .p-splitter > .p-splitter-panel:first-child {
+  flex-basis: 100% !important;
+}

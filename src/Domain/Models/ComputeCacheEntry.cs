@@ -1,8 +1,8 @@
 namespace Domain.Models;
 
 /// <summary>
-/// A cached expensive-compute result (UV overlap, texel density, exact surface
-/// area, manifold check, per-part render), keyed on the <b>geometry hash</b> rather
+/// A cached expensive-compute result (local-space surface area, manifold check),
+/// keyed on the <b>geometry hash</b> rather
 /// than on part identity. A result computed for one instance is instantly available
 /// for every copy and across any asset sharing the geometry - the whole point of
 /// canonicalising the hash (prompt 21). One row per (GeometryHash, HashVersion,
@@ -15,7 +15,7 @@ public class ComputeCacheEntry
     public string GeometryHash { get; private set; } = string.Empty;
     public int GeometryHashVersion { get; private set; }
 
-    /// <summary>Metric name: "uv-overlap", "texel-density", "surface-area", "manifold", "part-render", …</summary>
+    /// <summary>Metric name: "surface-area", "manifold", ... (the vocabulary compute_on_demand answers).</summary>
     public string Metric { get; private set; } = string.Empty;
 
     /// <summary>Computed result as JSON (jsonb). Interpretation is per-metric.</summary>

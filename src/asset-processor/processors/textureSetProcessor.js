@@ -236,7 +236,7 @@ export class TextureSetProcessor extends BaseProcessor {
     } finally {
       disarmAbort()
       if (renderer) {
-        this.rendererPool.release(renderer)
+        await this.rendererPool.release(renderer)
       }
       if (texturePaths) {
         await this.modelDataService.cleanupTextureFiles(texturePaths)

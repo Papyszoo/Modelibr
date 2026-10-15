@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Domain.Models;
 using Domain.ValueObjects;
 
@@ -56,7 +57,8 @@ public record MaterialDto(
     bool RequiresUvs,
     IReadOnlyList<string> Tags,
     DateTime CreatedAt,
-    DateTime UpdatedAt)
+    DateTime UpdatedAt,
+    JsonElement? Effects = null)
 {
     public static MaterialDto From(Material material) => new(
         material.Id,
@@ -69,7 +71,8 @@ public record MaterialDto(
         material.RequiresUvs,
         material.Tags.Select(tag => tag.Name).OrderBy(name => name, StringComparer.OrdinalIgnoreCase).ToList(),
         material.CreatedAt,
-        material.UpdatedAt);
+        material.UpdatedAt,
+        MaterialEffectsDefinition.Parse(material.EffectsJson));
 }
 
 /// <summary>

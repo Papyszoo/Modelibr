@@ -1,5 +1,6 @@
 import type {
   SceneAnchor,
+  SceneAnimation,
   SceneAssetRef,
   SceneDocument,
   SceneEnvironment,
@@ -19,6 +20,7 @@ import type {
 
 export type {
   SceneAnchor,
+  SceneAnimation,
   SceneAssetRef,
   SceneDocument,
   SceneEnvironment,
@@ -68,6 +70,16 @@ export interface SceneSummary {
   /** The project this scene belongs to, or null. */
   projectId: number | null
   projectName: string | null
+  /**
+   * The level of that project this scene is filed under, or null. A Scene belongs
+   * to at most one Level - the project studio derives a Level's assets from the
+   * scenes filed under it rather than from asset pins of its own.
+   */
+  projectLevelId: number | null
+  /** The level's name, resolved server-side so a list need not load the levels. */
+  projectLevelName: string | null
+  /** True for the one scene a Level treats as its implementation. */
+  isPrimaryLevelScene: boolean
 }
 
 /**

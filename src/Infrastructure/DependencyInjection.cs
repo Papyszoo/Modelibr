@@ -98,18 +98,29 @@ namespace Infrastructure
                 configuration.GetSection("Derivation").Get<Application.Extraction.Derivation.DerivationOptions>()
                 ?? new Application.Extraction.Derivation.DerivationOptions();
             services.AddSingleton(derivationOptions);
+
+            // Env fallbacks for stored settings whose precedence is "stored wins,
+            // env falls back" - see Application.Settings.SettingEnvironmentDefaults.
+            // Read here so Application code never touches the process environment.
+            services.AddSingleton(Application.Settings.SettingEnvironmentDefaults.FromValues(
+                configuration["SKIP_DUPLICATE_THUMBNAILS"],
+                configuration["BLENDER_OPERATION_TIMEOUT_MS"]));
             services.AddScoped<ITextureSetRepository, TextureSetRepository>();
             services.AddScoped<IMaterialRepository, MaterialRepository>();
+            services.AddScoped<IVfxRepository, VfxRepository>();
             services.AddScoped<ITextureProxyRepository, TextureProxyRepository>();
             services.AddScoped<IPackRepository, PackRepository>();
             services.AddScoped<IProjectRepository, ProjectRepository>();
+            services.AddScoped<IProjectLevelRepository, ProjectLevelRepository>();
+            services.AddScoped<IProjectCharacterRepository, ProjectCharacterRepository>();
+            services.AddScoped<IProjectCharacterTagRepository, ProjectCharacterTagRepository>();
+            services.AddScoped<IProjectCommentRepository, ProjectCommentRepository>();
+            services.AddScoped<IProjectReferenceRepository, ProjectReferenceRepository>();
             services.AddScoped<IModelCategoryRepository, ModelCategoryRepository>();
             services.AddScoped<IModelTagRepository, ModelTagRepository>();
-            services.AddScoped<IStageRepository, StageRepository>();
             services.AddScoped<ISceneRepository, SceneRepository>();
             services.AddScoped<ISceneAssetUsageRepository, SceneAssetUsageRepository>();
             services.AddScoped<ISceneRenderRepository, SceneRenderRepository>();
-            services.AddScoped<IApplicationSettingsRepository, ApplicationSettingsRepository>();
             services.AddScoped<ISettingRepository, SettingRepository>();
             services.AddScoped<IBatchUploadRepository, BatchUploadRepository>();
             services.AddScoped<ISpriteRepository, SpriteRepository>();
@@ -173,6 +184,9 @@ namespace Infrastructure
                 .ConfigurePrimaryHttpMessageHandler(Infrastructure.Services.StoreImportClient.CreatePrimaryHandler);
 
             services.AddScoped<Application.Abstractions.Services.IStoreImportClient, StoreImportClient>();
+
+            // The companion Asset Store's fixed base URL (with the e2e test-only override).
+            services.AddSingleton<Application.Abstractions.Services.IStoreBaseUrlProvider, StoreBaseUrlProvider>();
 
             // Store catalog reader (v0.6 prompt 15): anonymous, small JSON, short timeout.
             // Deliberately NOT the importer's client - that one is sized for multi-gigabyte

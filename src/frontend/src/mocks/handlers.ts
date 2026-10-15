@@ -156,6 +156,9 @@ export const handlers = [
   // Models (paginated)
   http.get(`${BASE_URL}/models`, ({ request }) => {
     const url = new URL(request.url)
+    if (url.searchParams.has('projectIds')) {
+      return HttpResponse.json(mockModels)
+    }
     const page = Number(url.searchParams.get('page') || '1')
     const pageSize = Number(url.searchParams.get('pageSize') || '50')
     const start = (page - 1) * pageSize
@@ -250,6 +253,156 @@ export const handlers = [
       : new HttpResponse(null, { status: 404 })
   }),
 
+  http.get(`${BASE_URL}/projects/:id/characters`, () => HttpResponse.json([])),
+
+  http.get(
+    `${BASE_URL}/projects/:id/characters/:characterId`,
+    () => new HttpResponse(null, { status: 404 })
+  ),
+
+  http.post(
+    `${BASE_URL}/projects/:id/characters`,
+    async ({ request, params }) => {
+      const body = (await request.json()) as {
+        name: string
+        description?: string | null
+        tags?: string[]
+      }
+      return HttpResponse.json(
+        {
+          id: 1,
+          projectId: Number(params.id),
+          name: body.name,
+          description: body.description ?? null,
+          tags: body.tags ?? [],
+          images: [],
+          models: [],
+          abilities: [],
+          variants: [],
+          imageCount: 0,
+          modelCount: 0,
+          abilityCount: 0,
+          variantCount: 0,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        },
+        { status: 201 }
+      )
+    }
+  ),
+
+  http.put(
+    `${BASE_URL}/projects/:id/characters/:characterId`,
+    () => new HttpResponse(null, { status: 404 })
+  ),
+  http.delete(
+    `${BASE_URL}/projects/:id/characters/:characterId`,
+    () => new HttpResponse(null, { status: 204 })
+  ),
+  http.post(
+    `${BASE_URL}/projects/:id/characters/:characterId/images`,
+    () => new HttpResponse(null, { status: 404 })
+  ),
+  http.put(
+    `${BASE_URL}/projects/:id/characters/:characterId/images/:imageId`,
+    async ({ request, params }) => {
+      const body = (await request.json()) as {
+        title?: string | null
+        caption?: string | null
+        sortOrder?: number | null
+      }
+      return HttpResponse.json({
+        id: Number(params.imageId),
+        fileId: 0,
+        fileName: null,
+        title: body.title ?? null,
+        caption: body.caption ?? null,
+        previewUrl: null,
+        fileUrl: null,
+        sortOrder: body.sortOrder ?? 0,
+      })
+    }
+  ),
+  http.delete(
+    `${BASE_URL}/projects/:id/characters/:characterId/images/:imageId`,
+    () => new HttpResponse(null, { status: 204 })
+  ),
+  http.post(
+    `${BASE_URL}/projects/:id/characters/:characterId/models`,
+    () => new HttpResponse(null, { status: 404 })
+  ),
+  http.put(
+    `${BASE_URL}/projects/:id/characters/:characterId/models/:modelLinkId`,
+    async ({ request, params }) => {
+      const body = (await request.json()) as {
+        label?: string | null
+        sortOrder?: number | null
+      }
+      return HttpResponse.json({
+        id: Number(params.modelLinkId),
+        modelId: null,
+        modelName: null,
+        label: body.label ?? null,
+        sortOrder: body.sortOrder ?? 0,
+      })
+    }
+  ),
+  http.delete(
+    `${BASE_URL}/projects/:id/characters/:characterId/models/:modelLinkId`,
+    () => new HttpResponse(null, { status: 204 })
+  ),
+  http.post(
+    `${BASE_URL}/projects/:id/characters/:characterId/abilities`,
+    () => new HttpResponse(null, { status: 404 })
+  ),
+  http.put(
+    `${BASE_URL}/projects/:id/characters/:characterId/abilities/:abilityId`,
+    async ({ request, params }) => {
+      const body = (await request.json()) as {
+        name?: string
+        description?: string | null
+        sortOrder?: number | null
+      }
+      return HttpResponse.json({
+        id: Number(params.abilityId),
+        name: body.name ?? '',
+        description: body.description ?? null,
+        sortOrder: body.sortOrder ?? 0,
+      })
+    }
+  ),
+  http.delete(
+    `${BASE_URL}/projects/:id/characters/:characterId/abilities/:abilityId`,
+    () => new HttpResponse(null, { status: 204 })
+  ),
+  http.post(
+    `${BASE_URL}/projects/:id/characters/:characterId/variants`,
+    () => new HttpResponse(null, { status: 404 })
+  ),
+  http.put(
+    `${BASE_URL}/projects/:id/characters/:characterId/variants/:variantId`,
+    async ({ request, params }) => {
+      const body = (await request.json()) as {
+        name?: string
+        description?: string | null
+        projectLevelId?: number | null
+        sortOrder?: number | null
+      }
+      return HttpResponse.json({
+        id: Number(params.variantId),
+        name: body.name ?? '',
+        description: body.description ?? null,
+        projectLevelId: body.projectLevelId ?? null,
+        projectLevelName: null,
+        sortOrder: body.sortOrder ?? 0,
+      })
+    }
+  ),
+  http.delete(
+    `${BASE_URL}/projects/:id/characters/:characterId/variants/:variantId`,
+    () => new HttpResponse(null, { status: 204 })
+  ),
+
   http.put(`${BASE_URL}/projects/:id/thumbnail`, () => {
     return new HttpResponse(null, { status: 204 })
   }),
@@ -261,6 +414,122 @@ export const handlers = [
   http.delete(`${BASE_URL}/projects/:id/concept-images/:fileId`, () => {
     return new HttpResponse(null, { status: 204 })
   }),
+
+  http.get(`${BASE_URL}/projects/:id/levels`, () => HttpResponse.json([])),
+  http.get(
+    `${BASE_URL}/projects/:id/levels/:levelId`,
+    () => new HttpResponse(null, { status: 404 })
+  ),
+  http.post(`${BASE_URL}/projects/:id/levels`, async ({ request, params }) => {
+    const body = (await request.json()) as {
+      name: string
+      description?: string | null
+      productionStatus?: string
+      sortOrder?: number
+    }
+    return HttpResponse.json(
+      {
+        id: 1,
+        projectId: Number(params.id),
+        name: body.name,
+        description: body.description ?? null,
+        productionStatus: body.productionStatus ?? 'planned',
+        sortOrder: body.sortOrder ?? 0,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+      { status: 201 }
+    )
+  }),
+  http.put(
+    `${BASE_URL}/projects/:id/levels/:levelId`,
+    () => new HttpResponse(null, { status: 404 })
+  ),
+  http.delete(
+    `${BASE_URL}/projects/:id/levels/:levelId`,
+    () => new HttpResponse(null, { status: 204 })
+  ),
+  http.get(`${BASE_URL}/projects/:id/comments`, () => HttpResponse.json([])),
+  http.get(
+    `${BASE_URL}/projects/:id/comments/:commentId`,
+    () => new HttpResponse(null, { status: 404 })
+  ),
+  http.post(
+    `${BASE_URL}/projects/:id/comments`,
+    async ({ request, params }) => {
+      const body = (await request.json()) as {
+        title: string
+        body: string
+        isPinned: boolean
+      } & Record<string, number | null | undefined>
+      const target = (key: string) => (body[key] as number | undefined) ?? null
+      return HttpResponse.json(
+        {
+          id: 1,
+          projectId: Number(params.id),
+          levelId: target('levelId'),
+          referenceImageId: target('referenceImageId'),
+          characterId: target('characterId'),
+          modelId: target('modelId'),
+          textureSetId: target('textureSetId'),
+          spriteId: target('spriteId'),
+          soundId: target('soundId'),
+          environmentMapId: target('environmentMapId'),
+          vfxId: target('vfxId'),
+          title: body.title,
+          body: body.body,
+          isPinned: body.isPinned,
+          status: 'open',
+          resolution: null,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        },
+        { status: 201 }
+      )
+    }
+  ),
+  http.put(
+    `${BASE_URL}/projects/:id/comments/:commentId`,
+    () => new HttpResponse(null, { status: 404 })
+  ),
+  http.delete(
+    `${BASE_URL}/projects/:id/comments/:commentId`,
+    () => new HttpResponse(null, { status: 204 })
+  ),
+  http.post(
+    `${BASE_URL}/projects/:projectId/vfx/:vfxId`,
+    () => new HttpResponse(null, { status: 204 })
+  ),
+  http.delete(
+    `${BASE_URL}/projects/:projectId/vfx/:vfxId`,
+    () => new HttpResponse(null, { status: 204 })
+  ),
+  http.get(`${BASE_URL}/projects/:id/references`, () => HttpResponse.json([])),
+  http.put(
+    `${BASE_URL}/projects/:id/references/:referenceId`,
+    () => new HttpResponse(null, { status: 404 })
+  ),
+  http.post(
+    `${BASE_URL}/projects/:id/references/:referenceId/links`,
+    () => new HttpResponse(null, { status: 404 })
+  ),
+  http.delete(
+    `${BASE_URL}/projects/:id/references/:referenceId/links/:linkId`,
+    () => new HttpResponse(null, { status: 204 })
+  ),
+
+  // Scenes. The project studio derives a level's assets from the scenes filed
+  // under it, so an unmocked `/scenes` would leave the read bypassing to the
+  // static server and answering HTML - which a component reading `.scenes` off
+  // it throws on. An empty list is the honest answer here: the static set has no
+  // scene documents to serve.
+  http.get(`${BASE_URL}/scenes`, () => HttpResponse.json({ scenes: [] })),
+  http.get(`${BASE_URL}/scenes/:id`, () =>
+    HttpResponse.json(
+      { error: 'Scene.NotFound', message: 'No such scene.' },
+      { status: 404 }
+    )
+  ),
 
   // Sounds (paginated)
   http.get(`${BASE_URL}/sounds`, ({ request }) => {
@@ -316,11 +585,6 @@ export const handlers = [
       pageSize,
       totalPages: Math.ceil(mockTextureSets.length / pageSize),
     })
-  }),
-
-  // Stages
-  http.get(`${BASE_URL}/stages`, () => {
-    return HttpResponse.json([])
   }),
 
   // Settings / theme

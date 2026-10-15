@@ -1,5 +1,10 @@
 // Utility functions for file handling
 
+import {
+  type ModelAnimationDto,
+  type ModelShapeKeysDto,
+} from '@/features/models/types'
+
 /**
  * Interface representing a file in a model
  */
@@ -46,6 +51,10 @@ export interface ModelTechnicalMetadata {
   boundingBoxZ?: number | null
   animationCount?: number | null
   animationNames?: string[]
+  /** Per-clip detail when the extraction recorded it; may be empty. */
+  animations?: ModelAnimationDto[]
+  /** Shape-key names per mesh when the extraction recorded them; may be empty. */
+  shapeKeys?: ModelShapeKeysDto[]
   boneCount?: number | null
   updatedAt?: string | null
 }

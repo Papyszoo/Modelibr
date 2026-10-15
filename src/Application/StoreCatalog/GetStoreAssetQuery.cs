@@ -52,10 +52,6 @@ internal sealed class GetStoreAssetQueryHandler
         CancellationToken cancellationToken)
     {
         var storeUrl = _catalog.StoreUrl;
-        if (string.IsNullOrWhiteSpace(storeUrl))
-        {
-            return Result.Failure<StoreCatalogAssetResponse>(StoreCatalogErrors.NotConfigured);
-        }
 
         if (string.IsNullOrWhiteSpace(query.StoreAssetId))
         {

@@ -255,23 +255,18 @@
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 }
 
-/* Overlay with name at bottom */
+/* Name strip - always visible, like the Models tab (`AssetTile`); hover-only
+   labels made Recycled Files look like anonymous blank squares. */
 .recycled-card-overlay {
   position: absolute;
   bottom: 0;
   left: 0;
   right: 0;
-  background: linear-gradient(to top, rgba(0, 0, 0, 0.8), transparent);
+  background: var(--asset-card-overlay-gradient);
   padding: 2rem 0.75rem 0.75rem;
-  opacity: 0;
-  transition: opacity 0.3s ease;
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
-}
-
-.recycled-card:hover .recycled-card-overlay {
-  opacity: 1;
 }
 
 .recycled-card-name {
@@ -365,12 +360,9 @@
     transform: none;
   }
 
-  /* Touch - reveal actions and overlay without hover. */
+  /* Touch - reveal the action buttons without hover (the name strip is always
+     visible now). */
   .recycled-card-actions {
-    opacity: 1;
-  }
-
-  .recycled-card-overlay {
     opacity: 1;
   }
 

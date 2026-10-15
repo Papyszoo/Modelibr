@@ -15,8 +15,8 @@ Historical code predates both - new/edited code must not add to the drift
 
 Modelibr is a dense desktop tool. The recurring agent failure mode is website
 styling: hero-sized headers, generous section padding, nested "card in card in
-padded page" framing. User-stated direction: *"no fireworks - only clean, useful
-app"*. Concretely:
+padded page" framing. User-stated direction: _"no fireworks - only clean, useful
+app"_. Concretely:
 
 - Headers/toolbars: vertical padding ≤ `--mod-space-sm` (12px); the largest text
   in the whole app is 1.5rem (`--mod-text-2xl`) and there is deliberately no

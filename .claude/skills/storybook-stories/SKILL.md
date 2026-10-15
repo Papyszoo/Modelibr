@@ -19,12 +19,12 @@ after the change and read the image:
 ```js
 // node --input-type=module -e "..." from src/frontend (Playwright is a dep)
 // against `npm run design` (port 6006) or a served `build-storybook` output.
-const page = await (await chromium.launch()).newPage()
+const page = await (await chromium.launch()).newPage();
 await page.goto(
-  'http://localhost:6006/iframe.html?id=design-system-gallery--dark&viewMode=story',
-  { waitUntil: 'networkidle' }
-)
-await page.screenshot({ path: '<scratchpad>/gallery.png', fullPage: true })
+  "http://localhost:6006/iframe.html?id=design-system-gallery--dark&viewMode=story",
+  { waitUntil: "networkidle" },
+);
+await page.screenshot({ path: "<scratchpad>/gallery.png", fullPage: true });
 ```
 
 Shoot both `--dark` and `--light`. This loop is what catches the PrimeReact
@@ -59,13 +59,12 @@ Screenshots **every story**. Run:
 `npm run test:all -- --only=storybook-visual --yes --no-open`; baselines are
 machine-local and gitignored, refresh with `npm run test-storybook:update`.
 
-It is **non-gating and has rotted before** - AGENTS.md rule 10: grep it when
-changing shared UI.
+It is **non-gating and has rotted before** - grep it when changing shared UI.
 
 TRAPs learned when it was restored:
 
 - The suite was fully dark for months because the loop-all-stories test gated each
-  story on `#storybook-root` being *visible*, and a fixed-position or portal-only
+  story on `#storybook-root` being _visible_, and a fixed-position or portal-only
   story (Layout/FloatingWindow) collapses that root to a 0-width box - aborting the
   run at story #1 so baselines could never regenerate. **Keep the
   `body.sb-show-main` gate** (Storybook's own ready signal; render errors flip to

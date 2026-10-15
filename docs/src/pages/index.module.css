@@ -233,6 +233,38 @@
     }
 }
 
+/* Keep the hero stats pill inside the viewport on narrow phones. */
+@media screen and (max-width: 480px) {
+    .heroStats {
+        gap: 0.625rem;
+        padding: 0.875rem 1rem;
+        max-width: 100%;
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+    .statValue {
+        font-size: 1.25rem;
+    }
+    .statDivider {
+        height: 32px;
+    }
+}
+
+/* Screenshot Section */
+.screenshotSection {
+    padding: 0 0 6rem;
+    background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
+}
+
+.screenshotImage {
+    display: block;
+    width: 100%;
+    height: auto;
+    border-radius: 16px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.4);
+}
+
 /* Section Headers */
 .sectionHeader {
     text-align: center;
@@ -364,6 +396,13 @@
     margin-bottom: 2rem;
 }
 
+.featureCardLink {
+    display: block;
+    color: inherit;
+    text-decoration: none;
+    height: 100%;
+}
+
 .featureCard {
     background: rgba(255, 255, 255, 0.02);
     border: 1px solid rgba(255, 255, 255, 0.04);
@@ -378,20 +417,6 @@
     background: rgba(255, 255, 255, 0.05);
     border-color: rgba(255, 255, 255, 0.08);
     transform: translateY(-4px);
-}
-
-.featureCardHighlight {
-    background: linear-gradient(
-        135deg,
-        rgba(79, 107, 255, 0.1) 0%,
-        rgba(139, 92, 246, 0.05) 100%
-    );
-    border-color: rgba(79, 107, 255, 0.2);
-}
-
-.featureCardHighlight:hover {
-    border-color: rgba(79, 107, 255, 0.4);
-    box-shadow: 0 0 30px rgba(79, 107, 255, 0.15);
 }
 
 .featureIcon {
@@ -533,6 +558,7 @@
 
 /* Light mode overrides */
 [data-theme="light"] .heroBanner,
+[data-theme="light"] .screenshotSection,
 [data-theme="light"] .audienceSection,
 [data-theme="light"] .featuresSection,
 [data-theme="light"] .howItWorksSection,

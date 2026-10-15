@@ -15,6 +15,8 @@ import {
 import type * as THREE from 'three'
 
 import { ModelProvider } from '@/contexts/ModelContext'
+import { AnimationRunner } from '@/features/model-viewer/animation/AnimationRunner'
+import { ModelAnimationProvider } from '@/features/model-viewer/animation/ModelAnimationProvider'
 import {
   setActiveVersion,
   softDeleteModelVersion,
@@ -23,12 +25,18 @@ import {
   useModelByIdQuery,
   useModelVersionsQuery,
 } from '@/features/model-viewer/api/queries'
-import { useFileUploadHandlers } from '@/features/model-viewer/hooks/useFileUploadHandlers'
 import { useExternalResources } from '@/features/model-viewer/hooks/useExternalResources'
+import { useFileUploadHandlers } from '@/features/model-viewer/hooks/useFileUploadHandlers'
 import { useVersionSelection } from '@/features/model-viewer/hooks/useVersionSelection'
+import { restoreEntity } from '@/features/recycled-files/api/recycledApi'
 import { useTextureSetByIdQuery } from '@/features/texture-set/api/queries'
 import { useTextureSetsByModelVersionQuery } from '@/features/texture-set/api/queries'
 import { useTabUiState } from '@/hooks/useTabUiState'
+import {
+  recycleToastContent,
+  UNDO_TOAST_LIFE_MS,
+} from '@/shared/components/feedback/RecycleToastContent'
+import { useIsMobile } from '@/shared/hooks'
 import {
   EMPTY_RENDERER_PERF_STATS,
   type RendererPerfStats,
@@ -155,6 +163,10 @@ export function ModelViewer({
     )
 
   // --- Panel state ---
+  // Mobile shell rule: one panel at a time, over the content. Below the tablet
+  // breakpoint the panel columns are dropped and the panel floats over the
+  // canvas, which would otherwise be squeezed to a ~100px sliver.
+  const isMobile = useIsMobile()
   const [leftPanel, setLeftPanel] = useState<PanelContent>(
     savedLayout.leftPanel
   )
@@ -272,6 +284,34 @@ export function ModelViewer({
     },
     [leftPanel, rightPanel, topPanel, bottomPanel]
   )
+
+  // The mobile rule above ("one panel at a time") has to be enforced: on mobile
+  // every panel is a full-bleed overlay, so a second open panel would sit hidden
+  // underneath the first. Keep the most recently opened one and close the rest
+  // (also collapses a multi-panel desktop layout when the viewport narrows).
+  useEffect(() => {
+    if (!isMobile) return
+    const open = [
+      leftPanel !== null ? 'left' : null,
+      rightPanel !== null ? 'right' : null,
+      topPanel !== null ? 'top' : null,
+      bottomPanel !== null ? 'bottom' : null,
+    ].filter(
+      (side): side is 'left' | 'right' | 'top' | 'bottom' => side !== null
+    )
+    if (open.length <= 1) return
+
+    const keeper =
+      [...panelOpenOrder.current]
+        .reverse()
+        .find(side => open.some(openSide => openSide === side)) ?? open[0]
+
+    panelOpenOrder.current = [keeper]
+    if (keeper !== 'left') setLeftPanel(null)
+    if (keeper !== 'right') setRightPanel(null)
+    if (keeper !== 'top') setTopPanel(null)
+    if (keeper !== 'bottom') setBottomPanel(null)
+  }, [isMobile, leftPanel, rightPanel, topPanel, bottomPanel])
 
   // Resize divider mouse handlers
   const startResize = useCallback(
@@ -550,6 +590,35 @@ export function ModelViewer({
     [model, modelId, propModel, versionsQuery, modelQuery]
   )
 
+  /** Restores a version just moved to the recycle bin, from the Undo toast. */
+  const handleUndoRecycleVersion = useCallback(
+    async (versionId: number) => {
+      try {
+        await restoreEntity('modelVersion', versionId)
+        if (modelId && !propModel) {
+          await modelQuery.refetch()
+        }
+        await versionsQuery.refetch()
+        await queryClient.invalidateQueries({ queryKey: ['recycledFiles'] })
+        toast.current?.show({
+          severity: 'success',
+          summary: 'Restored',
+          detail: 'Model version restored',
+          life: 3000,
+        })
+      } catch (error) {
+        console.error('Failed to restore model version:', error)
+        toast.current?.show({
+          severity: 'error',
+          summary: 'Error',
+          detail: 'Failed to restore model version',
+          life: 3000,
+        })
+      }
+    },
+    [modelId, propModel, versionsQuery, modelQuery, queryClient]
+  )
+
   const handleRecycleVersion = useCallback(
     async (versionId: number) => {
       if (!model) return
@@ -557,9 +626,13 @@ export function ModelViewer({
         await softDeleteModelVersion(parseInt(model.id), versionId)
         toast.current?.show({
           severity: 'success',
-          summary: 'Success',
-          detail: 'Model version recycled successfully',
-          life: 3000,
+          summary: 'Recycled',
+          life: UNDO_TOAST_LIFE_MS,
+          content: () =>
+            recycleToastContent(
+              'Model version moved to recycled files',
+              () => void handleUndoRecycleVersion(versionId)
+            ),
         })
         if (modelId && !propModel) {
           await modelQuery.refetch()
@@ -581,7 +654,15 @@ export function ModelViewer({
         })
       }
     },
-    [model, modelId, propModel, versionsQuery, modelQuery, queryClient]
+    [
+      model,
+      modelId,
+      propModel,
+      versionsQuery,
+      modelQuery,
+      queryClient,
+      handleUndoRecycleVersion,
+    ]
   )
 
   const showToast = useCallback(
@@ -647,12 +728,29 @@ export function ModelViewer({
 
   const gridStyle: React.CSSProperties = {
     display: 'grid',
-    gridTemplateColumns: `${hasLeft ? panelSizes.left + 'px' : '0px'} ${hasLeft ? '4px' : '0px'} 1fr ${hasRight ? '4px' : '0px'} ${hasRight ? panelSizes.right + 'px' : '0px'}`,
-    gridTemplateRows: `${hasTop ? panelSizes.top + 'px' : '0px'} ${hasTop ? '4px' : '0px'} 1fr ${hasBottom ? '4px' : '0px'} ${hasBottom ? panelSizes.bottom + 'px' : '0px'}`,
+    // Mobile: keep the 5x5 template (the canvas and dividers carry inline grid
+    // positions) but zero every track except the centre one, so the canvas owns
+    // the whole layout. The panels are absolutely positioned over it by
+    // `.viewer-layout--mobile`.
+    gridTemplateColumns: isMobile
+      ? '0px 0px minmax(0, 1fr) 0px 0px'
+      : `${hasLeft ? panelSizes.left + 'px' : '0px'} ${hasLeft ? '4px' : '0px'} 1fr ${hasRight ? '4px' : '0px'} ${hasRight ? panelSizes.right + 'px' : '0px'}`,
+    gridTemplateRows: isMobile
+      ? '0px 0px minmax(0, 1fr) 0px 0px'
+      : `${hasTop ? panelSizes.top + 'px' : '0px'} ${hasTop ? '4px' : '0px'} 1fr ${hasBottom ? '4px' : '0px'} ${hasBottom ? panelSizes.bottom + 'px' : '0px'}`,
     flex: 1,
     minHeight: 0,
     overflow: 'hidden',
   }
+
+  // A panel with a grid area would be positioned against that (now zero-width)
+  // area, so on mobile the panels carry no placement at all and the CSS insets
+  // them over the canvas instead.
+  const panelPlacement = (
+    column: string,
+    row: string
+  ): React.CSSProperties | undefined =>
+    isMobile ? undefined : { gridColumn: column, gridRow: row }
 
   // Panel title map
   const panelTitles: Record<string, string> = {
@@ -797,149 +895,147 @@ export function ModelViewer({
         onAddVersion={fileUpload.handleUploadClick}
       />
 
-      <ModelProvider>
-        <input
-          type="file"
-          ref={fileUpload.fileInputRef}
-          style={{ display: 'none' }}
-          onChange={fileUpload.handleFileSelect}
-          accept={
-            blenderEnabled
-              ? '.obj,.fbx,.gltf,.glb,.stl,.3mf,.blend'
-              : '.obj,.fbx,.gltf,.glb,.stl,.3mf'
-          }
-        />
+      <ModelAnimationProvider>
+        <ModelProvider>
+          <input
+            type="file"
+            ref={fileUpload.fileInputRef}
+            style={{ display: 'none' }}
+            onChange={fileUpload.handleFileSelect}
+            accept={
+              blenderEnabled
+                ? '.obj,.fbx,.gltf,.glb,.stl,.3mf,.blend'
+                : '.obj,.fbx,.gltf,.glb,.stl,.3mf'
+            }
+          />
 
-        <div className="viewer-layout" style={gridStyle}>
-          {/* Left Panel */}
-          {hasLeft && (
-            <div
-              className="viewer-panel"
-              style={{
-                gridColumn: '1 / 2',
-                gridRow: `${leftRowStart} / ${leftRowEnd}`,
-              }}
-            >
-              <PanelWrapper
-                title={panelTitles[leftPanel!] ?? 'Panel'}
-                side="left"
-                onClose={() => handlePanelChange('left', null)}
-                expandActions={getLeftExpandActions()}
-              >
-                <ViewerSidePanel content={leftPanel} {...sidePanelProps} />
-              </PanelWrapper>
-            </div>
-          )}
-
-          {/* Left divider */}
-          {hasLeft && (
-            <div
-              className={`viewer-resize-divider viewer-resize-divider-h ${resizing === 'left' ? 'resizing' : ''}`}
-              style={{
-                gridColumn: '2 / 3',
-                gridRow: `${leftRowStart} / ${leftRowEnd}`,
-              }}
-              onMouseDown={e => startResize('left', e)}
-            />
-          )}
-
-          {/* Top Panel */}
-          {hasTop && (
-            <div
-              className="viewer-panel"
-              style={{
-                gridColumn: `${topColStart} / ${topColEnd}`,
-                gridRow: '1 / 2',
-              }}
-            >
-              <PanelWrapper
-                title={panelTitles[topPanel!] ?? 'Panel'}
-                side="top"
-                onClose={() => handlePanelChange('top', null)}
-                expandActions={getTopExpandActions()}
-              >
-                <ViewerSidePanel content={topPanel} {...sidePanelProps} />
-              </PanelWrapper>
-            </div>
-          )}
-
-          {/* Top divider */}
-          {hasTop && (
-            <div
-              className={`viewer-resize-divider viewer-resize-divider-v ${resizing === 'top' ? 'resizing' : ''}`}
-              style={{
-                gridColumn: `${topColStart} / ${topColEnd}`,
-                gridRow: '2 / 3',
-              }}
-              onMouseDown={e => startResize('top', e)}
-            />
-          )}
-
-          {/* Canvas (always center cell: col 3, row 3) */}
           <div
-            className="viewer-canvas-panel"
-            style={{ gridColumn: '3 / 4', gridRow: '3 / 4' }}
+            className={`viewer-layout${isMobile ? ' viewer-layout--mobile' : ''}`}
+            style={gridStyle}
           >
-            <div className="viewer-container">
-              <div className="viewer-model-name-overlay">
-                <span>{model.name}</span>
-              </div>
+            {/* Left Panel */}
+            {hasLeft && (
               <div
-                className="viewer-controls-info"
-                title={
-                  'Mouse: Rotate view\nScroll: Zoom in/out\nRight-click + drag: Pan view'
-                }
+                className="viewer-panel"
+                style={panelPlacement(
+                  '1 / 2',
+                  `${leftRowStart} / ${leftRowEnd}`
+                )}
               >
-                <i className="pi pi-info-circle" />
+                <PanelWrapper
+                  title={panelTitles[leftPanel!] ?? 'Panel'}
+                  side="left"
+                  onClose={() => handlePanelChange('left', null)}
+                  expandActions={getLeftExpandActions()}
+                >
+                  <ViewerSidePanel content={leftPanel} {...sidePanelProps} />
+                </PanelWrapper>
               </div>
+            )}
 
-              {error ? (
-                <div className="viewer-error">
-                  <h3>Failed to load model</h3>
-                  <p>{error}</p>
-                  <button
-                    onClick={() => void modelQuery.refetch()}
-                    className="retry-button"
-                  >
-                    Retry
-                  </button>
+            {/* Left divider */}
+            {hasLeft && (
+              <div
+                className={`viewer-resize-divider viewer-resize-divider-h ${resizing === 'left' ? 'resizing' : ''}`}
+                style={panelPlacement(
+                  '2 / 3',
+                  `${leftRowStart} / ${leftRowEnd}`
+                )}
+                onMouseDown={e => startResize('left', e)}
+              />
+            )}
+
+            {/* Top Panel */}
+            {hasTop && (
+              <div
+                className="viewer-panel"
+                style={panelPlacement(`${topColStart} / ${topColEnd}`, '1 / 2')}
+              >
+                <PanelWrapper
+                  title={panelTitles[topPanel!] ?? 'Panel'}
+                  side="top"
+                  onClose={() => handlePanelChange('top', null)}
+                  expandActions={getTopExpandActions()}
+                >
+                  <ViewerSidePanel content={topPanel} {...sidePanelProps} />
+                </PanelWrapper>
+              </div>
+            )}
+
+            {/* Top divider */}
+            {hasTop && (
+              <div
+                className={`viewer-resize-divider viewer-resize-divider-v ${resizing === 'top' ? 'resizing' : ''}`}
+                style={panelPlacement(`${topColStart} / ${topColEnd}`, '2 / 3')}
+                onMouseDown={e => startResize('top', e)}
+              />
+            )}
+
+            {/* Canvas (always center cell: col 3, row 3) */}
+            <div
+              className="viewer-canvas-panel"
+              style={{ gridColumn: '3 / 4', gridRow: '3 / 4' }}
+            >
+              <div className="viewer-container">
+                <div className="viewer-model-name-overlay">
+                  <span>{model.name}</span>
                 </div>
-              ) : (
-                <>
-                  <CanvasErrorBoundary>
-                    <Canvas
-                      key={`canvas-${model.id}-${side}-${selectedVersion?.id || 'original'}-${defaultFileId || 'auto'}`}
-                      shadows
-                      className="viewer-canvas"
-                      data-testid="model-viewer-canvas"
-                      camera={{
-                        position: cameraState.position,
-                        zoom: cameraState.zoom,
-                      }}
-                      gl={{
-                        antialias: true,
-                        alpha: true,
-                        powerPreference: 'high-performance',
-                      }}
-                      dpr={Math.min(window.devicePixelRatio, 2)}
-                      onCreated={state => {
-                        if (typeof window !== 'undefined') {
-                          ;(
-                            window as Window & {
-                              __THREE_SCENE__?: THREE.Scene
-                              __THREE_STATE__?: typeof state
-                            }
-                          ).__THREE_SCENE__ = state.scene
-                          ;(
-                            window as Window & {
-                              __THREE_SCENE__?: THREE.Scene
-                              __THREE_STATE__?: typeof state
-                            }
-                          ).__THREE_STATE__ = state
-                        }
-                      }}
+                <div
+                  className="viewer-controls-info"
+                  title={
+                    'Mouse: Rotate view\nScroll: Zoom in/out\nRight-click + drag: Pan view'
+                  }
+                >
+                  <i className="pi pi-info-circle" />
+                </div>
+
+                {error ? (
+                  <div className="viewer-error">
+                    <h3>Failed to load model</h3>
+                    <p>{error}</p>
+                    <button
+                      onClick={() => void modelQuery.refetch()}
+                      className="retry-button"
                     >
-                      {/*
+                      Retry
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <CanvasErrorBoundary>
+                      <Canvas
+                        key={`canvas-${model.id}-${side}-${selectedVersion?.id || 'original'}-${defaultFileId || 'auto'}`}
+                        shadows
+                        className="viewer-canvas"
+                        data-testid="model-viewer-canvas"
+                        camera={{
+                          position: cameraState.position,
+                          zoom: cameraState.zoom,
+                        }}
+                        gl={{
+                          antialias: true,
+                          alpha: true,
+                          powerPreference: 'high-performance',
+                        }}
+                        dpr={Math.min(window.devicePixelRatio, 2)}
+                        onCreated={state => {
+                          if (typeof window !== 'undefined') {
+                            ;(
+                              window as Window & {
+                                __THREE_SCENE__?: THREE.Scene
+                                __THREE_STATE__?: typeof state
+                              }
+                            ).__THREE_SCENE__ = state.scene
+                            ;(
+                              window as Window & {
+                                __THREE_SCENE__?: THREE.Scene
+                                __THREE_STATE__?: typeof state
+                              }
+                            ).__THREE_STATE__ = state
+                          }
+                        }}
+                      >
+                        {/*
                         Held back until the loose-glTF resource map has arrived.
                         Mounting the scene with an empty map hands the loader a
                         `.bin` the safe loading manager has rewritten to a
@@ -947,108 +1043,110 @@ export function ModelViewer({
                         the model opens as a mesh with zero vertices and never
                         recovers. See `useExternalResources`.
                       */}
-                      {isAwaitingResources ? null : (
-                        <ModelPreviewScene
-                          key={`scene-${model.id}-${side}-${selectedVariant}-${selectedVersion?.id || 'original'}-${defaultFileId || 'auto'}`}
-                          model={versionModel || model}
-                          resources={resources}
-                          settings={viewerSettings}
-                          materialTextureSets={
-                            useEmbeddedMaterials ? {} : materialTextureSets
-                          }
-                          defaultFileId={defaultFileId}
-                          preserveMaterials={useEmbeddedMaterials}
-                          cameraState={cameraState}
-                          onCameraChange={handleCameraStateChange}
-                        />
-                      )}
-                      {viewerSettings.showPerf && (
-                        <RendererPerfSampler statsRef={perfStatsRef} />
-                      )}
-                    </Canvas>
-                  </CanvasErrorBoundary>
-                  <div ref={statsContainerRef} className="stats-container" />
-                  {viewerSettings.showStats && statsContainerRef.current && (
-                    <Stats
-                      showPanel={0}
-                      parent={
-                        statsContainerRef as unknown as React.RefObject<HTMLElement>
-                      }
-                    />
-                  )}
-                  {viewerSettings.showPerf && (
-                    <PerfDisplay statsRef={perfStatsRef} />
-                  )}
-                </>
-              )}
+                        {isAwaitingResources ? null : (
+                          <ModelPreviewScene
+                            key={`scene-${model.id}-${side}-${selectedVariant}-${selectedVersion?.id || 'original'}-${defaultFileId || 'auto'}`}
+                            model={versionModel || model}
+                            resources={resources}
+                            settings={viewerSettings}
+                            materialTextureSets={
+                              useEmbeddedMaterials ? {} : materialTextureSets
+                            }
+                            defaultFileId={defaultFileId}
+                            preserveMaterials={useEmbeddedMaterials}
+                            cameraState={cameraState}
+                            onCameraChange={handleCameraStateChange}
+                          />
+                        )}
+                        <AnimationRunner />
+                        {viewerSettings.showPerf && (
+                          <RendererPerfSampler statsRef={perfStatsRef} />
+                        )}
+                      </Canvas>
+                    </CanvasErrorBoundary>
+                    <div ref={statsContainerRef} className="stats-container" />
+                    {viewerSettings.showStats && statsContainerRef.current && (
+                      <Stats
+                        showPanel={0}
+                        parent={
+                          statsContainerRef as unknown as React.RefObject<HTMLElement>
+                        }
+                      />
+                    )}
+                    {viewerSettings.showPerf && (
+                      <PerfDisplay statsRef={perfStatsRef} />
+                    )}
+                  </>
+                )}
+              </div>
             </div>
+
+            {/* Bottom divider */}
+            {hasBottom && (
+              <div
+                className={`viewer-resize-divider viewer-resize-divider-v ${resizing === 'bottom' ? 'resizing' : ''}`}
+                style={panelPlacement(
+                  `${bottomColStart} / ${bottomColEnd}`,
+                  '4 / 5'
+                )}
+                onMouseDown={e => startResize('bottom', e)}
+              />
+            )}
+
+            {/* Bottom Panel */}
+            {hasBottom && (
+              <div
+                className="viewer-panel"
+                style={panelPlacement(
+                  `${bottomColStart} / ${bottomColEnd}`,
+                  '5 / 6'
+                )}
+              >
+                <PanelWrapper
+                  title={panelTitles[bottomPanel!] ?? 'Panel'}
+                  side="bottom"
+                  onClose={() => handlePanelChange('bottom', null)}
+                  expandActions={getBottomExpandActions()}
+                >
+                  <ViewerSidePanel content={bottomPanel} {...sidePanelProps} />
+                </PanelWrapper>
+              </div>
+            )}
+
+            {/* Right divider */}
+            {hasRight && (
+              <div
+                className={`viewer-resize-divider viewer-resize-divider-h ${resizing === 'right' ? 'resizing' : ''}`}
+                style={panelPlacement(
+                  '4 / 5',
+                  `${rightRowStart} / ${rightRowEnd}`
+                )}
+                onMouseDown={e => startResize('right', e)}
+              />
+            )}
+
+            {/* Right Panel */}
+            {hasRight && (
+              <div
+                className="viewer-panel"
+                style={panelPlacement(
+                  '5 / 6',
+                  `${rightRowStart} / ${rightRowEnd}`
+                )}
+              >
+                <PanelWrapper
+                  title={panelTitles[rightPanel!] ?? 'Panel'}
+                  side="right"
+                  onClose={() => handlePanelChange('right', null)}
+                  expandActions={getRightExpandActions()}
+                >
+                  <ViewerSidePanel content={rightPanel} {...sidePanelProps} />
+                </PanelWrapper>
+              </div>
+            )}
           </div>
-
-          {/* Bottom divider */}
-          {hasBottom && (
-            <div
-              className={`viewer-resize-divider viewer-resize-divider-v ${resizing === 'bottom' ? 'resizing' : ''}`}
-              style={{
-                gridColumn: `${bottomColStart} / ${bottomColEnd}`,
-                gridRow: '4 / 5',
-              }}
-              onMouseDown={e => startResize('bottom', e)}
-            />
-          )}
-
-          {/* Bottom Panel */}
-          {hasBottom && (
-            <div
-              className="viewer-panel"
-              style={{
-                gridColumn: `${bottomColStart} / ${bottomColEnd}`,
-                gridRow: '5 / 6',
-              }}
-            >
-              <PanelWrapper
-                title={panelTitles[bottomPanel!] ?? 'Panel'}
-                side="bottom"
-                onClose={() => handlePanelChange('bottom', null)}
-                expandActions={getBottomExpandActions()}
-              >
-                <ViewerSidePanel content={bottomPanel} {...sidePanelProps} />
-              </PanelWrapper>
-            </div>
-          )}
-
-          {/* Right divider */}
-          {hasRight && (
-            <div
-              className={`viewer-resize-divider viewer-resize-divider-h ${resizing === 'right' ? 'resizing' : ''}`}
-              style={{
-                gridColumn: '4 / 5',
-                gridRow: `${rightRowStart} / ${rightRowEnd}`,
-              }}
-              onMouseDown={e => startResize('right', e)}
-            />
-          )}
-
-          {/* Right Panel */}
-          {hasRight && (
-            <div
-              className="viewer-panel"
-              style={{
-                gridColumn: '5 / 6',
-                gridRow: `${rightRowStart} / ${rightRowEnd}`,
-              }}
-            >
-              <PanelWrapper
-                title={panelTitles[rightPanel!] ?? 'Panel'}
-                side="right"
-                onClose={() => handlePanelChange('right', null)}
-                expandActions={getRightExpandActions()}
-              >
-                <ViewerSidePanel content={rightPanel} {...sidePanelProps} />
-              </PanelWrapper>
-            </div>
-          )}
-        </div>
-      </ModelProvider>
+        </ModelProvider>
+      </ModelAnimationProvider>
 
       {/* File Upload Modal */}
       <FileUploadModal

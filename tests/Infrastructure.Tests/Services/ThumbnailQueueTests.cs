@@ -1,6 +1,7 @@
 using Application.Abstractions;
 using Application.Abstractions.Repositories;
 using Application.Abstractions.Services;
+using Application.Settings;
 using Domain.Models;
 using Domain.ValueObjects;
 using Infrastructure.Services;
@@ -14,6 +15,9 @@ namespace Infrastructure.Tests.Services;
 public class ThumbnailQueueTests
 {
     private readonly Mock<IThumbnailJobRepository> _mockRepository;
+    private readonly Mock<IThumbnailRepository> _mockThumbnailRepository = new();
+    private readonly Mock<IModelVersionRepository> _mockModelVersionRepository = new();
+    private readonly Mock<ISettingRepository> _mockSettingRepository = new();
     private readonly Mock<IThumbnailJobQueueNotificationService> _mockQueueNotificationService;
     private readonly Mock<ILogger<ThumbnailQueue>> _mockLogger;
     private readonly Mock<IUnitOfWork> _mockUnitOfWork = new();
@@ -32,6 +36,10 @@ public class ThumbnailQueueTests
         _mockLogger = new Mock<ILogger<ThumbnailQueue>>();
         _thumbnailQueue = new ThumbnailQueue(
             _mockRepository.Object,
+            _mockThumbnailRepository.Object,
+            _mockModelVersionRepository.Object,
+            _mockSettingRepository.Object,
+            SettingEnvironmentDefaults.None,
             _mockQueueNotificationService.Object,
             _mockUnitOfWork.Object,
             _postCommit,
@@ -122,6 +130,106 @@ public class ThumbnailQueueTests
     }
 
     [Fact]
+    public async Task EnqueueAsync_WhenSkipDuplicateThumbnailsEnabledAndHashHasReadyThumbnail_ShouldReuseIt()
+    {
+        // Regression: an upload of a file whose hash already rendered must reuse the
+        // existing thumbnail (setting on) instead of queueing an identical render.
+        var modelId = 1;
+        var modelVersionId = 11;
+        var otherVersionId = 99;
+        var modelHash = "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef";
+
+        _mockRepository.Setup(r => r.GetByModelVersionIdAsync(modelVersionId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((ThumbnailJob?)null);
+        _mockSettingRepository
+            .Setup(r => r.GetByKeyAsync(SettingKeys.SkipDuplicateThumbnails, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Setting.Create(SettingKeys.SkipDuplicateThumbnails, "true", DateTime.UtcNow));
+        _mockThumbnailRepository
+            .Setup(r => r.GetByModelVersionIdAsync(modelVersionId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Thumbnail?)null);
+
+        var reusable = Thumbnail.Create(modelId, otherVersionId, DateTime.UtcNow);
+        reusable.MarkAsReady("thumbs/abc/orbit.webp", "thumbs/abc/thumb.png", 4321, 256, 256, DateTime.UtcNow);
+        _mockThumbnailRepository
+            .Setup(r => r.GetByModelHashAsync(modelHash, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(reusable);
+        _mockRepository.Setup(r => r.AddAsync(It.IsAny<ThumbnailJob>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((ThumbnailJob job, CancellationToken _) => job);
+
+        var result = await _thumbnailQueue.EnqueueAsync(modelId, modelVersionId, modelHash);
+
+        Assert.Equal(ThumbnailJobStatus.Done, result.Status);
+        Assert.Equal(modelVersionId, result.ModelVersionId);
+
+        _mockThumbnailRepository.Verify(
+            r => r.AddAsync(
+                It.Is<Thumbnail>(t => t.ModelVersionId == modelVersionId && t.Status == ThumbnailStatus.Ready),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
+        _mockModelVersionRepository.Verify(
+            r => r.SetThumbnailIdAsync(modelVersionId, It.IsAny<int>(), It.IsAny<CancellationToken>()),
+            Times.Once);
+        // Nothing to dequeue, so workers must not be told about a job.
+        _mockQueueNotificationService.Verify(
+            s => s.NotifyJobEnqueuedAsync(It.IsAny<ThumbnailJob>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task EnqueueAsync_WhenReuseEnabledButVersionAlreadyHasThumbnail_ShouldQueueRenderJob()
+    {
+        // The unique index allows one thumbnail per version; a version that already
+        // has a row (e.g. a store import) is replaced by the ordinary render path.
+        var modelId = 1;
+        var modelVersionId = 12;
+        var modelHash = "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef";
+
+        _mockRepository.Setup(r => r.GetByModelVersionIdAsync(modelVersionId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((ThumbnailJob?)null);
+        _mockSettingRepository
+            .Setup(r => r.GetByKeyAsync(SettingKeys.SkipDuplicateThumbnails, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Setting.Create(SettingKeys.SkipDuplicateThumbnails, "true", DateTime.UtcNow));
+        _mockThumbnailRepository
+            .Setup(r => r.GetByModelVersionIdAsync(modelVersionId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Thumbnail.Create(modelId, modelVersionId, DateTime.UtcNow));
+        _mockRepository.Setup(r => r.AddAsync(It.IsAny<ThumbnailJob>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((ThumbnailJob job, CancellationToken _) => job);
+
+        var result = await _thumbnailQueue.EnqueueAsync(modelId, modelVersionId, modelHash);
+
+        Assert.Equal(ThumbnailJobStatus.Pending, result.Status);
+        _mockThumbnailRepository.Verify(
+            r => r.GetByModelHashAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+        _mockQueueNotificationService.Verify(
+            s => s.NotifyJobEnqueuedAsync(It.IsAny<ThumbnailJob>(), It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task EnqueueAsync_WhenForceRegenerate_ShouldNotReuseDuplicateThumbnail()
+    {
+        var modelId = 1;
+        var modelVersionId = 13;
+        var modelHash = "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef";
+
+        _mockRepository.Setup(r => r.GetByModelVersionIdAsync(modelVersionId, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((ThumbnailJob?)null);
+        _mockSettingRepository
+            .Setup(r => r.GetByKeyAsync(SettingKeys.SkipDuplicateThumbnails, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(Setting.Create(SettingKeys.SkipDuplicateThumbnails, "true", DateTime.UtcNow));
+        _mockRepository.Setup(r => r.AddAsync(It.IsAny<ThumbnailJob>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((ThumbnailJob job, CancellationToken _) => job);
+
+        var result = await _thumbnailQueue.EnqueueAsync(modelId, modelVersionId, modelHash, forceRegenerate: true);
+
+        Assert.Equal(ThumbnailJobStatus.Pending, result.Status);
+        _mockThumbnailRepository.Verify(
+            r => r.GetByModelHashAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
     public async Task EnqueueEnvironmentMapThumbnailAsync_WhenNoExistingJob_ShouldCreateNewJob()
     {
         var job = ThumbnailJob.CreateForEnvironmentMap(5, 8, DateTime.UtcNow);
@@ -138,6 +246,54 @@ public class ThumbnailQueueTests
         Assert.Equal(8, result.EnvironmentMapVariantId);
         _mockRepository.Verify(r => r.AddAsync(It.IsAny<ThumbnailJob>(), It.IsAny<CancellationToken>()), Times.Once);
         _mockQueueNotificationService.Verify(s => s.NotifyJobEnqueuedAsync(job, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task EnqueueVfxThumbnailAsync_WhenNoExistingJob_ShouldCreateJobAndNotifyWorkers()
+    {
+        var job = ThumbnailJob.CreateForVfx(6, DateTime.UtcNow);
+        _mockRepository.Setup(r => r.GetByVfxIdAsync(6, It.IsAny<CancellationToken>()))
+            .ReturnsAsync((ThumbnailJob?)null);
+        _mockRepository.Setup(r => r.AddAsync(It.IsAny<ThumbnailJob>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(job);
+
+        var result = await _thumbnailQueue.EnqueueVfxThumbnailAsync(6);
+
+        Assert.Equal("Vfx", result.AssetType);
+        Assert.Equal(6, result.VfxId);
+        _mockQueueNotificationService.Verify(s => s.NotifyJobEnqueuedAsync(job, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    // Regression: re-rendering after an edit must reuse the effect's one job (the unique
+    // VfxId index rejects a second row) and put it back in the queue.
+    [Fact]
+    public async Task EnqueueVfxThumbnailAsync_WhenForced_ShouldResetTheExistingJobInsteadOfAddingAnother()
+    {
+        var existing = ThumbnailJob.CreateForVfx(6, DateTime.UtcNow.AddHours(-1));
+        existing.TryClaim("worker", DateTime.UtcNow.AddMinutes(-30));
+        existing.MarkAsCompleted(DateTime.UtcNow.AddMinutes(-29));
+        _mockRepository.Setup(r => r.GetByVfxIdAsync(6, It.IsAny<CancellationToken>())).ReturnsAsync(existing);
+
+        var result = await _thumbnailQueue.EnqueueVfxThumbnailAsync(6, forceRegenerate: true);
+
+        Assert.Same(existing, result);
+        Assert.Equal(ThumbnailJobStatus.Pending, existing.Status);
+        _mockRepository.Verify(r => r.AddAsync(It.IsAny<ThumbnailJob>(), It.IsAny<CancellationToken>()), Times.Never);
+        _mockQueueNotificationService.Verify(s => s.NotifyJobEnqueuedAsync(existing, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task EnqueueVfxThumbnailAsync_WhenNotForcedAndJobIsDone_ShouldLeaveItAlone()
+    {
+        var existing = ThumbnailJob.CreateForVfx(6, DateTime.UtcNow.AddHours(-1));
+        existing.TryClaim("worker", DateTime.UtcNow.AddMinutes(-30));
+        existing.MarkAsCompleted(DateTime.UtcNow.AddMinutes(-29));
+        _mockRepository.Setup(r => r.GetByVfxIdAsync(6, It.IsAny<CancellationToken>())).ReturnsAsync(existing);
+
+        await _thumbnailQueue.EnqueueVfxThumbnailAsync(6);
+
+        Assert.Equal(ThumbnailJobStatus.Done, existing.Status);
+        _mockQueueNotificationService.Verify(s => s.NotifyJobEnqueuedAsync(It.IsAny<ThumbnailJob>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]

@@ -1,4 +1,4 @@
-import { screen, waitFor } from '@testing-library/react'
+import { fireEvent, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { ConfirmDialog } from 'primereact/confirmdialog'
 
@@ -93,6 +93,10 @@ describe('ProjectList load and deletion states', () => {
     actions.focus()
     await userEvent.keyboard('{Enter}')
 
+    // The actions button opens the shared context menu; Delete is a menu item
+    // that only then opens the confirmation.
+    await userEvent.click(await screen.findByText('Delete'))
+
     const dialog = await screen.findByRole('dialog')
     expect(dialog).toHaveTextContent('Lantern Harbor')
     expect(dialog).toHaveTextContent('Assets in the project will remain')
@@ -105,6 +109,20 @@ describe('ProjectList load and deletion states', () => {
     ).toBeVisible()
   })
 
+  it('right-click never deletes directly: it opens the shared menu', async () => {
+    // Regression: the kebab used to jump straight into the delete confirm, so a
+    // right-click (or a stray click) could delete with one more keystroke and no
+    // way to reach the other card actions.
+    api.getAllProjects.mockResolvedValue([project()])
+    renderList()
+
+    const card = await screen.findByText('Lantern Harbor')
+    fireEvent.contextMenu(card)
+
+    expect(await screen.findByText('Open')).toBeInTheDocument()
+    expect(api.deleteProject).not.toHaveBeenCalled()
+  })
+
   it('deletes only after the named Project is explicitly confirmed', async () => {
     api.getAllProjects.mockResolvedValue([project()])
     renderList()
@@ -114,6 +132,7 @@ describe('ProjectList load and deletion states', () => {
         name: 'Project actions for Lantern Harbor',
       })
     )
+    await userEvent.click(await screen.findByText('Delete'))
     expect(await screen.findByRole('dialog')).toHaveTextContent(
       'Lantern Harbor'
     )

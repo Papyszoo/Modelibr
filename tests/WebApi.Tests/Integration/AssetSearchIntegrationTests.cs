@@ -151,6 +151,118 @@ public class AssetSearchIntegrationTests : IClassFixture<ModelibrWebFactory>
     }
 
     [Fact]
+    public async Task RarerWord_OutranksCommonerWord_WhenBothMatchOneWord()
+    {
+        // "ancient stone statue" used to put a stone mace first: every hit matched exactly one
+        // word, coverage could not separate them, and "stone" is as common as "ancient" is
+        // rare. The rarer word is the better evidence, so the asset carrying it leads. The
+        // names are chosen so the fallback (alphabetical) order would put the commoner first -
+        // only the rarity weight can reverse it.
+        await SeedAsync(
+            Doc(92011, tokens: "rarityancient idol", displayName: "Zzz Ancient Idol"),
+            Doc(92012, tokens: "raritystone block", displayName: "Aaa Stone Block A"),
+            Doc(92013, tokens: "raritystone block", displayName: "Aaa Stone Block B"),
+            Doc(92014, tokens: "raritystone block", displayName: "Aaa Stone Block C"));
+
+        var result = await SearchAsync(Request("rarityancient raritystone"));
+
+        var ids = result.Hits.Select(h => h.AssetId).ToList();
+        var rare = ids.IndexOf(92011);
+        var common = ids.IndexOf(92012);
+        Assert.True(rare >= 0 && common >= 0, "Both the rare-word and common-word assets should be returned.");
+        Assert.True(rare < common,
+            $"The asset matching the rarer word must rank above the commoner one (rare@{rare}, common@{common}).");
+    }
+
+    [Fact]
+    public async Task MatchingTwoWords_OutranksMatchingOnlyTheRarest()
+    {
+        // Coverage still decides first: an asset carrying both words answers the query better
+        // than one carrying only the rarer word, however rare that word is.
+        await SeedAsync(
+            Doc(92021, tokens: "rarityancient raritystone relic", displayName: "Both Words"),
+            Doc(92022, tokens: "rarityancient idol", displayName: "Rarest Only"),
+            Doc(92023, tokens: "raritystone block", displayName: "Common Only"));
+
+        var result = await SearchAsync(Request("rarityancient raritystone"));
+
+        var ids = result.Hits.Select(h => h.AssetId).ToList();
+        var both = ids.IndexOf(92021);
+        var rarest = ids.IndexOf(92022);
+        Assert.True(both >= 0 && rarest >= 0, "Both the two-word and one-word assets should be returned.");
+        Assert.True(both < rarest,
+            $"The asset matching two words must rank above the one matching only the rarest (both@{both}, rarest@{rarest}).");
+    }
+
+    /// <summary>
+    /// Numbered variants of one idea are folded into a single hit, exactly as identical
+    /// geometry is. A query that used to return Thing_01, Thing_02 and Thing_03 now returns
+    /// one slot, with the other two ids named in <c>variants</c>.
+    /// </summary>
+    [Fact]
+    public async Task NumberedVariants_AreFoldedIntoOneHit()
+    {
+        await SeedAsync(
+            Doc(93001, tokens: "numberedvariant", displayName: "Thing_01"),
+            Doc(93002, tokens: "numberedvariant", displayName: "Thing_02"),
+            Doc(93003, tokens: "numberedvariant", displayName: "Thing_03"));
+
+        var result = await SearchAsync(Request("numberedvariant"));
+
+        var mine = result.Hits.Where(h => h.AssetId is 93001 or 93002 or 93003).ToList();
+        Assert.Single(mine);
+        var hit = mine[0];
+        // The best-ranked member is the hit; the rest ride along as variants.
+        Assert.Equal(93001, hit.AssetId);
+        Assert.NotNull(hit.Variants);
+        Assert.Equal(new[] { 93002, 93003 }, hit.Variants!.OrderBy(v => v).ToArray());
+    }
+
+    /// <summary>
+    /// "Small" is part of the base name, not a separator before the number, so
+    /// Thing_Small_01 is a different asset from Thing_01 and keeps its own slot.
+    /// </summary>
+    [Fact]
+    public async Task NumberedVariant_DifferentStem_IsNotFolded()
+    {
+        await SeedAsync(
+            Doc(93011, tokens: "stemsplit", displayName: "Thing_01"),
+            Doc(93012, tokens: "stemsplit", displayName: "Thing_Small_01"));
+
+        var result = await SearchAsync(Request("stemsplit"));
+
+        var mine = result.Hits.Where(h => h.AssetId is 93011 or 93012).ToList();
+        Assert.Equal(2, mine.Count);
+        Assert.All(mine, h => Assert.Null(h.Variants));
+    }
+
+    /// <summary>
+    /// The fold is a numbering idiom, not a prefix match: a name with no trailing number
+    /// ("Thing") is its own asset and never joins the Thing_NN group.
+    /// </summary>
+    [Fact]
+    public async Task NameWithoutTrailingNumber_IsNeverFolded()
+    {
+        await SeedAsync(
+            Doc(93021, tokens: "nofoldname", displayName: "Thing"),
+            Doc(93022, tokens: "nofoldname", displayName: "Thing_01"),
+            Doc(93023, tokens: "nofoldname", displayName: "Thing_02"));
+
+        var result = await SearchAsync(Request("nofoldname"));
+
+        var mine = result.Hits.Where(h => h.AssetId is 93021 or 93022 or 93023).ToList();
+        Assert.Equal(2, mine.Count);
+
+        var plain = mine.Single(h => h.AssetId == 93021);
+        Assert.Null(plain.Variants);
+
+        var numbered = mine.Single(h => h.AssetId is 93022 or 93023);
+        Assert.Equal(93022, numbered.AssetId);
+        Assert.Equal(new[] { 93023 }, numbered.Variants!.ToArray());
+        Assert.DoesNotContain(93021, numbered.Variants!);
+    }
+
+    [Fact]
     public async Task NonAsciiIdentifier_IsIndexedLiterally()
     {
         await SeedAsync(Doc(90201, tokens: "ściana brick", browseSummary: "wall segment"));

@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Application.Abstractions;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
@@ -10,7 +11,10 @@ namespace Application.Materials;
 /// <summary>
 /// A patch: every field is optional and an omitted one is left alone. Only
 /// <c>CategoryId</c> needs a way to say "clear it", hence <c>ClearCategory</c> -
-/// a null id alone cannot be told apart from "not mentioned".
+/// a null id alone cannot be told apart from "not mentioned". <c>ClearEffects</c> exists
+/// for the same reason: a null <c>Effects</c> cannot be told apart from an omitted one, so
+/// <c>ClearEffects = true</c> clears and a null or omitted <c>Effects</c> leaves the document
+/// as it was.
 /// </summary>
 public record UpdateMaterialCommand(
     int Id,
@@ -19,7 +23,9 @@ public record UpdateMaterialCommand(
     MaterialParametersRequest? Parameters = null,
     int? CategoryId = null,
     bool ClearCategory = false,
-    string? PreviewGeometryType = null) : ICommand<MaterialDto>;
+    string? PreviewGeometryType = null,
+    JsonElement? Effects = null,
+    bool ClearEffects = false) : ICommand<MaterialDto>;
 
 internal sealed class UpdateMaterialCommandHandler : ICommandHandler<UpdateMaterialCommand, MaterialDto>
 {
@@ -48,6 +54,11 @@ internal sealed class UpdateMaterialCommandHandler : ICommandHandler<UpdateMater
             return Result.Failure<MaterialDto>(
                 new Error("MaterialNotFound", $"Material with ID {command.Id} was not found."));
         }
+
+        // Validate before mutating: a rejected document leaves the material exactly as it was.
+        var effects = MaterialEffectsDefinition.Read(command.Effects);
+        if (!command.ClearEffects && effects.Problems.Count > 0)
+            return Result.Failure<MaterialDto>(MaterialEffects.InvalidError(effects.Problems));
 
         var now = _dateTimeProvider.UtcNow;
 
@@ -86,6 +97,15 @@ internal sealed class UpdateMaterialCommandHandler : ICommandHandler<UpdateMater
                 }
 
                 material.UpdateCategory(command.CategoryId.Value, now);
+            }
+
+            if (command.ClearEffects)
+            {
+                material.ClearEffects(now);
+            }
+            else if (effects.Definition is { } effectsJson)
+            {
+                material.SetEffects(MaterialEffectsDefinition.Serialize(effectsJson), now);
             }
         }
         catch (ArgumentException ex)

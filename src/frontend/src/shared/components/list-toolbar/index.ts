@@ -1,4 +1,5 @@
 export {
+  ListSelectionBar,
   ListToolbar,
   ListToolbarActions,
   ListToolbarButton,

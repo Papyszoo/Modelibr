@@ -54,8 +54,10 @@ internal class CreateTextureSetWithFileCommandHandler : ICommandHandler<CreateTe
     {
         try
         {
-            // 1. Validate and get file type for texture
-            var fileTypeResult = FileType.ValidateForUpload(command.FileUpload.FileName);
+            // 1. Validate and get file type for texture. Resolved in the texture-set
+            // context: a .webp or .ktx2 is a texture here even though the global
+            // extension map calls the former a sprite and has no entry for the latter.
+            var fileTypeResult = FileType.ValidateForTextureUpload(command.FileUpload.FileName);
             if (fileTypeResult.IsFailure)
             {
                 return Result.Failure<CreateTextureSetWithFileResponse>(fileTypeResult.Error);

@@ -37,6 +37,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
 import { OBJLoader } from 'three/addons/loaders/OBJLoader.js'
 import { STLLoader } from 'three/addons/loaders/STLLoader.js'
 
+import { mergeMaterialChannels } from '../../../../asset-processor/lib/materialChannels.js'
 import {
   buildSceneLights,
   DEFAULT_LIGHTING,
@@ -407,6 +408,11 @@ async function applyTextureMaps(
 
   model.traverse(child => {
     if (child instanceof Mesh) {
+      // Kept before the replacement, so the merge below can carry over every
+      // channel the texture set does not set (and COLOR_0). Same shared rule as
+      // the viewer and the real worker thumbnail.
+      const originalMaterial = child.material
+
       const material = new MeshStandardMaterial({
         color: cfg.hasBaseColorMap
           ? new Color(1, 1, 1)
@@ -430,6 +436,7 @@ async function applyTextureMaps(
         material.transparent = true
       }
       child.material = material
+      mergeMaterialChannels(originalMaterial, material, child.geometry)
       // AO needs the second UV set or it collapses indirect light (shared helper).
       if (aoMap) ensureAoMapUv2(child.geometry)
       child.castShadow = true

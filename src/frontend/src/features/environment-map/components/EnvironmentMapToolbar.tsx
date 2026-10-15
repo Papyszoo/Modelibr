@@ -5,6 +5,7 @@ import { InputSwitch } from 'primereact/inputswitch'
 import { MultiSelect } from 'primereact/multiselect'
 
 import {
+  ListSelectionBar,
   ListToolbar,
   ListToolbarActions,
   ListToolbarButton,
@@ -12,9 +13,6 @@ import {
   ListToolbarPanel,
   ListToolbarRow,
   ListToolbarSearchInput,
-  ListToolbarSelectionActions,
-  ListToolbarSelectionBar,
-  ListToolbarSelectionSummary,
   OptionsButton,
 } from '@/shared/components/list-toolbar'
 
@@ -135,12 +133,6 @@ export function EnvironmentMapToolbar({
             showThumbnailAnimation={false}
           />
           <ListToolbarButton
-            icon="pi pi-check-square"
-            label="Select all"
-            onClick={onSelectAllClick}
-            disabled={visibleCount === 0}
-          />
-          <ListToolbarButton
             icon="pi pi-upload"
             label="Upload"
             onClick={onUploadClick}
@@ -173,34 +165,21 @@ export function EnvironmentMapToolbar({
         />
       </ListToolbarRow>
 
-      {selectedCount > 0 ? (
-        <ListToolbarSelectionBar>
-          <ListToolbarSelectionSummary>
-            {selectedCount} environment map{selectedCount === 1 ? '' : 's'}{' '}
-            selected.
-          </ListToolbarSelectionSummary>
-          <ListToolbarSelectionActions>
-            <ListToolbarButton
-              icon="pi pi-ellipsis-h"
-              label="Bulk actions"
-              active
-              onClick={onBulkActionsClick}
-              ariaLabel="Bulk actions"
-            />
-            <ListToolbarButton
-              icon="pi pi-times"
-              label="Clear"
-              onClick={onDeselectAllClick}
-            />
-          </ListToolbarSelectionActions>
-        </ListToolbarSelectionBar>
-      ) : null}
+      <ListSelectionBar
+        count={selectedCount}
+        visibleCount={visibleCount}
+        unitLabel="environment map"
+        onBulkActionsClick={onBulkActionsClick}
+        onSelectAllClick={onSelectAllClick}
+        onDeselectAllClick={onDeselectAllClick}
+      />
 
       <ListToolbarPanel id="environment-map-search-panel" open={isSearchOpen}>
         <ListToolbarSearchInput
           value={searchQuery}
           onChange={onSearchChange}
           placeholder="Search environment maps..."
+          autoFocus={isSearchOpen}
         />
       </ListToolbarPanel>
 
@@ -262,6 +241,7 @@ export function EnvironmentMapToolbar({
             <Button
               icon="pi pi-times"
               className="p-button-text p-button-sm list-filters-clear"
+              aria-label="Clear all filters"
               tooltip="Clear all filters"
               tooltipOptions={{ position: 'bottom' }}
               onClick={() => {

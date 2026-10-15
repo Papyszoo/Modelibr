@@ -122,7 +122,7 @@ Then(
             if (!scene) return -1;
             let vertices = 0;
             scene.traverse((obj: any) => {
-              // Skip Stage's shadow plane / helpers: only count geometry
+              // Skip shadow planes / helpers: only count geometry
               // that came out of the loaded model.
               if (!obj.isMesh || !obj.geometry?.attributes?.position) return;
               if (obj.userData?.__modelibrHelper) return;

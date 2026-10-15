@@ -40,6 +40,23 @@ export interface ContainerDto {
   textureSets: { id: number; name: string }[]
   sprites: { id: number; name: string }[]
   environmentMaps?: { id: number; name: string }[]
+  vfxCount?: number
+  vfx?: { id: number; name: string }[]
+}
+
+/** The asset families a container card can stand for. */
+export type ContainerAssetType =
+  | 'model'
+  | 'textureSet'
+  | 'sprite'
+  | 'sound'
+  | 'environmentMap'
+  | 'vfx'
+
+export interface ContainerAssetRef {
+  type: ContainerAssetType
+  id: number
+  name: string
 }
 
 export interface ContainerDetailsRenderProps {
@@ -109,4 +126,17 @@ export interface ContainerAdapter {
     packId?: number
     projectId?: number
   }
+
+  /**
+   * VFX membership. Only a project holds effects, so a container without
+   * these shows no VFX tab.
+   */
+  addVfx?: (containerId: number, vfxId: number) => Promise<void>
+  removeVfx?: (containerId: number, vfxId: number) => Promise<void>
+
+  /**
+   * A small control drawn on each asset card, such as a comments count. The
+   * container stays unaware of what it is.
+   */
+  renderAssetAccessory?: (asset: ContainerAssetRef) => ReactNode
 }

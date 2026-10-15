@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Application.Abstractions;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
@@ -15,7 +16,8 @@ public record CreateMaterialCommand(
     string? Description = null,
     int? CategoryId = null,
     string? PreviewGeometryType = null,
-    IReadOnlyCollection<string>? Tags = null) : ICommand<CreateMaterialResponse>;
+    IReadOnlyCollection<string>? Tags = null,
+    JsonElement? Effects = null) : ICommand<CreateMaterialResponse>;
 
 public record CreateMaterialResponse(int Id, string Name);
 
@@ -63,6 +65,12 @@ internal sealed class CreateMaterialCommandHandler : ICommandHandler<CreateMater
             if (categoryResult.IsFailure)
                 return Result.Failure<CreateMaterialResponse>(categoryResult.Error);
 
+            // Validate the whole effects document before anything is created: a rejected
+            // document must not leave a half-made material behind.
+            var effects = MaterialEffectsDefinition.Read(command.Effects);
+            if (effects.Problems.Count > 0)
+                return Result.Failure<CreateMaterialResponse>(MaterialEffects.InvalidError(effects.Problems));
+
             var parameters = (command.Parameters ?? new MaterialParametersRequest())
                 .ApplyTo(MaterialParameters.Default);
 
@@ -74,9 +82,12 @@ internal sealed class CreateMaterialCommandHandler : ICommandHandler<CreateMater
                 command.CategoryId,
                 command.PreviewGeometryType);
 
+            if (effects.Definition is { } effectsJson)
+                material.SetEffects(MaterialEffectsDefinition.Serialize(effectsJson), _dateTimeProvider.UtcNow);
+
             if (command.Tags is { Count: > 0 })
             {
-                var tags = await MaterialTags.ResolveAsync(
+                var tags = await AssetTagResolver.ResolveAsync(
                     _modelTagRepository, command.Tags, _dateTimeProvider.UtcNow, cancellationToken);
                 material.SetTags(tags, _dateTimeProvider.UtcNow);
             }

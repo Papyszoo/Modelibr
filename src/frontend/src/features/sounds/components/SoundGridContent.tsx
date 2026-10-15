@@ -2,6 +2,7 @@ import { Button } from 'primereact/button'
 import { type DragEvent, type MouseEvent, type RefObject } from 'react'
 
 import { EmptyState } from '@/shared/components/feedback'
+import { AreaSelectionBox } from '@/shared/components/selection'
 import { type SoundDto } from '@/types'
 
 import { SoundCard } from './SoundCard'
@@ -99,15 +100,7 @@ export function SoundGridContent({
           ))}
         </div>
         {isAreaSelecting && selectionBox && (
-          <div
-            className="selection-box"
-            style={{
-              left: Math.min(selectionBox.startX, selectionBox.currentX),
-              top: Math.min(selectionBox.startY, selectionBox.currentY),
-              width: Math.abs(selectionBox.currentX - selectionBox.startX),
-              height: Math.abs(selectionBox.currentY - selectionBox.startY),
-            }}
-          />
+          <AreaSelectionBox box={selectionBox} className="selection-box" />
         )}
       </div>
 

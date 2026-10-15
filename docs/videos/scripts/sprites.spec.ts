@@ -1,193 +1,121 @@
-import { test, expect, type Locator, type Page } from "@playwright/test";
-import path from "path";
-import { fileURLToPath } from "url";
-import fs from "fs";
+import { test, expect } from "@playwright/test";
 import {
     ciVideoTimeout,
-    shortPause,
+    caption,
+    focusOn,
+    glideClick,
+    holdOn,
     mediumPause,
-    viewerPause,
+    shortPause,
     navigateTo,
     clearAllData,
-    disableHighlights,
     startFeatureRecording,
     stopFeatureRecording,
 } from "../helpers/video-helpers";
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const assetsDir = path.resolve(__dirname, "../../../tests/e2e/assets");
+import { demoArt, renderSvg } from "../helpers/demo-art";
 
 const API_BASE_URL = process.env.API_BASE_URL || "http://127.0.0.1:8090";
 
-async function getLocatorCenter(locator: Locator) {
-    await locator.waitFor({ state: "visible", timeout: ciVideoTimeout });
-    // Raw mouse events don't auto-scroll like locator.click does; an
-    // off-screen target would make the synthetic click miss silently.
-    await locator.scrollIntoViewIfNeeded();
-    const box = await locator.boundingBox();
-    if (!box) {
-        throw new Error("Could not resolve visible bounding box for locator");
-    }
-
-    return {
-        x: box.x + box.width / 2,
-        y: box.y + box.height / 2,
-    };
-}
-
-async function moveToLocator(page: Page, locator: Locator, steps = 18) {
-    const { x, y } = await getLocatorCenter(locator);
-    await page.mouse.move(x, y, { steps });
-}
-
-async function clickLocator(
-    page: Page,
-    locator: Locator,
-    options?: { button?: "left" | "right"; pauseMs?: number },
-) {
-    await moveToLocator(page, locator);
-    await viewerPause(page, options?.pauseMs ?? 180);
-
-    const { x, y } = await getLocatorCenter(locator);
-    await page.mouse.click(x, y, { button: options?.button ?? "left" });
-    await shortPause(page);
-}
-
 test.describe("Sprites", () => {
-    test("Sprites Video", async ({ page: setupPage }, testInfo) => {
-        let heroSpriteId: number | null = null;
-        await clearAllData(setupPage);
+    test("Sprites Video", async ({ page }, testInfo) => {
+        await clearAllData(page);
+
+        const createCategoryResponse = await page.request.post(
+            `${API_BASE_URL}/sprite-categories`,
+            { data: { name: "UI Kit" } },
+        );
+        expect(createCategoryResponse.ok()).toBeTruthy();
+        const uiKitCategoryId = Number((await createCategoryResponse.json()).id);
 
         const sprites = [
-            { file: "texture.png", name: "button-base" },
-            { file: "red_color.png", name: "damage-hit" },
-            { file: "green_color.png", name: "health-pickup" },
+            { name: "button-base", svg: demoArt.playButton, category: uiKitCategoryId },
+            { name: "coin-spin", svg: demoArt.coin },
+            { name: "heart-full", svg: demoArt.heart },
+            { name: "gem-green", svg: demoArt.gem },
         ];
-
         for (const sprite of sprites) {
-            const filePath = path.join(assetsDir, sprite.file);
-            const buffer = fs.readFileSync(filePath);
-            const response = await setupPage.request.post(
+            const response = await page.request.post(
                 `${API_BASE_URL}/sprites/with-file?name=${encodeURIComponent(sprite.name)}`,
                 {
                     multipart: {
                         file: {
-                            name: path.basename(filePath),
+                            name: `${sprite.name}.png`,
                             mimeType: "image/png",
-                            buffer,
+                            buffer: await renderSvg(page, sprite.svg),
                         },
                     },
                 },
             );
-
             expect(response.ok()).toBeTruthy();
-            const createdSprite = await response.json();
-            if (sprite.name === "button-base") {
-                heroSpriteId = Number(createdSprite.spriteId ?? createdSprite.id);
+            if (sprite.category) {
+                const created = await response.json();
+                const moved = await page.request.put(
+                    `${API_BASE_URL}/sprites/${Number(created.spriteId ?? created.id)}`,
+                    { data: { name: sprite.name, spriteType: 1, categoryId: sprite.category } },
+                );
+                expect(moved.ok()).toBeTruthy();
             }
         }
 
-        if (!heroSpriteId) {
-            throw new Error("Could not determine hero sprite id");
-        }
-
-        const createCategoryResponse = await setupPage.request.post(
-            `${API_BASE_URL}/sprite-categories`,
-            {
-                data: { name: "UI Kit" },
-            },
-        );
-        expect(createCategoryResponse.ok()).toBeTruthy();
-        const createdCategory = await createCategoryResponse.json();
-        const uiKitCategoryId = Number(createdCategory.id);
-
-        const moveHeroResponse = await setupPage.request.put(
-            `${API_BASE_URL}/sprites/${heroSpriteId}`,
-            {
-                data: {
-                    name: "button-base",
-                    spriteType: 1,
-                    categoryId: uiKitCategoryId,
-                },
-            },
-        );
-        expect(moveHeroResponse.ok()).toBeTruthy();
-
-        const page = setupPage;
-
         await navigateTo(page, "/?leftTabs=sprites&activeLeft=sprites");
-        await disableHighlights(page);
-
         const spriteCards = page.locator(".sprite-card");
-        // The default category bucket is "All", so the categorized hero
-        // sprite (button-base, moved to UI Kit above) shows alongside the
-        // two unassigned ones.
-        await expect(spriteCards).toHaveCount(3, { timeout: ciVideoTimeout });
-        await mediumPause(page);
-        await startFeatureRecording(page, testInfo, { slug: "sprites" });
+        await expect(spriteCards).toHaveCount(4, { timeout: ciVideoTimeout });
+        await expect(spriteCards.locator("img").first()).toBeVisible({ timeout: ciVideoTimeout });
 
-        for (let i = 0; i < 2; i++) {
-            await moveToLocator(page, spriteCards.nth(i));
-            await viewerPause(page, 220);
-        }
+        await startFeatureRecording(page, testInfo, {
+            slug: "sprites",
+            caption: "Keep 2D sprites in categories you define",
+        });
 
-        // Categories live in the shared CategoryTreePanel sidebar.
-        const uiKitTab = page
+        const uiKit = page
             .locator(".sprite-category-sidebar .p-treenode-content")
             .filter({ hasText: /UI Kit/i })
             .first();
-        await expect(uiKitTab).toBeVisible({ timeout: ciVideoTimeout });
-        await expect(uiKitTab).toContainText("(1)");
-        await mediumPause(page);
-
-        await clickLocator(page, uiKitTab);
+        await expect(uiKit).toContainText("(1)");
+        await glideClick(page, uiKit);
         await expect(spriteCards).toHaveCount(1, { timeout: ciVideoTimeout });
         await mediumPause(page);
 
-        const renamedCard = spriteCards
-            .filter({ hasText: /button-base/i })
-            .first();
-        await clickLocator(page, renamedCard);
-
+        const heroCard = spriteCards.filter({ hasText: /button-base/i }).first();
         const spriteModal = page.getByTestId("sprite-detail-modal");
-        await expect(spriteModal).toBeVisible({ timeout: ciVideoTimeout });
+        await glideClick(page, heroCard, {
+            cutUntil: () => expect(spriteModal).toBeVisible({ timeout: ciVideoTimeout }),
+        });
+        // Frame the modal from its title down to the info rows, so the rename
+        // row has headroom and the caption sits below the details.
+        await page.waitForTimeout(300);
+        const modalBox = await spriteModal.boundingBox();
+        const infoBox = await spriteModal.getByText(/^Category:?/).first().boundingBox();
+        if (modalBox && infoBox) {
+            await focusOn(page, {
+                x: modalBox.x,
+                y: modalBox.y,
+                width: modalBox.width,
+                height: infoBox.y + infoBox.height - modalBox.y,
+            });
+        }
+        caption(page, "Rename it right in the preview");
+        await shortPause(page);
 
-        await clickLocator(page, page.getByTestId("sprite-name-edit"));
-        const spriteNameInput = page.getByTestId("sprite-name-input");
-        await expect(spriteNameInput).toBeVisible();
-        await spriteNameInput.press(
-            process.platform === "darwin" ? "Meta+A" : "Control+A",
-        );
+        await glideClick(page, page.getByTestId("sprite-name-edit"));
+        const nameInput = page.getByTestId("sprite-name-input");
+        await expect(nameInput).toBeVisible();
+        await nameInput.press(process.platform === "darwin" ? "Meta+A" : "Control+A");
         await page.keyboard.press("Backspace");
-        await page.keyboard.type("Primary Button", { delay: 55 });
-        await viewerPause(page, 220);
-        await clickLocator(page, page.getByTestId("sprite-name-save"));
-        await expect(page.getByTestId("sprite-name-display")).toContainText(
-            "Primary Button",
-            { timeout: ciVideoTimeout },
-        );
+        await page.keyboard.type("Play Button", { delay: 45 });
+        await shortPause(page);
+        await glideClick(page, page.getByTestId("sprite-name-save"));
+        await expect(page.getByTestId("sprite-name-display")).toContainText("Play Button", {
+            timeout: ciVideoTimeout,
+        });
+        await mediumPause(page);
+
         await page.keyboard.press("Escape");
         await expect(spriteModal).toBeHidden({ timeout: ciVideoTimeout });
-        await mediumPause(page);
-
-        const unassignedTab = page
-            .locator(".sprite-category-sidebar .category-tree-unassigned")
-            .first();
-        await clickLocator(page, unassignedTab);
-        await expect(
-            page.locator(".sprite-card").filter({ hasText: /Primary Button/i }),
-        ).toHaveCount(0, { timeout: ciVideoTimeout });
-        await expect(
-            page.locator(".sprite-card").filter({ hasText: /damage-hit/i }).first(),
-        ).toBeVisible({ timeout: ciVideoTimeout });
-        await mediumPause(page);
-
-        await clickLocator(page, uiKitTab);
-        const primaryButtonCard = spriteCards
-            .filter({ hasText: /Primary Button/i })
-            .first();
-        await expect(primaryButtonCard).toBeVisible({ timeout: ciVideoTimeout });
-        await viewerPause(page, 1200);
+        const renamedCard = spriteCards.filter({ hasText: /Play Button/i }).first();
+        await expect(renamedCard).toBeVisible({ timeout: ciVideoTimeout });
+        caption(page, "Filed under UI Kit with its new name");
+        await holdOn(page, renamedCard, { zoom: 1.8 });
         await stopFeatureRecording(page);
     });
 });

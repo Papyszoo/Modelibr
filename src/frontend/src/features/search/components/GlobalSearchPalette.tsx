@@ -49,10 +49,12 @@ export function GlobalSearchPalette({
     // A visible affordance (e.g. a toolbar button) opens the palette by
     // dispatching this event, so the button need not own the open state.
     const onOpenRequest = () => setVisible(true)
-    window.addEventListener('keydown', onKeyDown)
+    // Capture phase: some panels (e.g. the project comment badge) stop keydown
+    // propagation, which would otherwise make Cmd/Ctrl+K dead inside them.
+    window.addEventListener('keydown', onKeyDown, true)
     window.addEventListener(OPEN_SEARCH_EVENT, onOpenRequest)
     return () => {
-      window.removeEventListener('keydown', onKeyDown)
+      window.removeEventListener('keydown', onKeyDown, true)
       window.removeEventListener(OPEN_SEARCH_EVENT, onOpenRequest)
     }
   }, [])

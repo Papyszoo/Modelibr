@@ -1,3 +1,4 @@
+using Application.Abstractions;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
 using Application.Models;
@@ -16,13 +17,23 @@ public class CollapseDuplicateAssetsCommandHandlerTests
 
     private readonly Mock<IAssetSearchDocumentRepository> _searchDocuments = new();
     private readonly Mock<ICommandHandler<SoftDeleteModelCommand, SoftDeleteModelResponse>> _softDelete = new();
+    private readonly Mock<IUnitOfWork> _unitOfWork = new();
     private readonly CollapseDuplicateAssetsCommandHandler _handler;
 
     public CollapseDuplicateAssetsCommandHandlerTests()
     {
         _softDelete.Setup(h => h.Handle(It.IsAny<SoftDeleteModelCommand>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(Result.Success(new SoftDeleteModelResponse(true, "ok")));
-        _handler = new CollapseDuplicateAssetsCommandHandler(_searchDocuments.Object, _softDelete.Object);
+        // Run the work inline, as the real transaction would - the test is about what the
+        // handler puts inside it, not about the transaction itself.
+        _unitOfWork
+            .Setup(u => u.InTransactionAsync(
+                It.IsAny<Func<CancellationToken, Task<Result<CollapseDuplicateAssetsResponse>>>>(),
+                It.IsAny<CancellationToken>()))
+            .Returns((Func<CancellationToken, Task<Result<CollapseDuplicateAssetsResponse>>> work,
+                CancellationToken ct) => work(ct));
+        _handler = new CollapseDuplicateAssetsCommandHandler(
+            _searchDocuments.Object, _softDelete.Object, _unitOfWork.Object);
     }
 
     private void Fingerprinted(int modelId, string? geometryKey)
@@ -53,6 +64,28 @@ public class CollapseDuplicateAssetsCommandHandlerTests
         _softDelete.Verify(
             h => h.Handle(It.Is<SoftDeleteModelCommand>(c => c.ModelId == 1), It.IsAny<CancellationToken>()),
             Times.Never);
+    }
+
+    [Fact]
+    public async Task Handle_Runs_The_Recycling_Inside_One_Transaction()
+    {
+        // Sequential soft deletes each commit on their own; a failure partway through left the
+        // earlier copies recycled while the response reported a failure. One transaction is
+        // what makes the failure roll the whole collapse back.
+        Fingerprinted(1, Fingerprint);
+        Fingerprinted(2, Fingerprint);
+        Fingerprinted(3, Fingerprint);
+
+        var result = await _handler.Handle(
+            new CollapseDuplicateAssetsCommand(1, new[] { 2, 3 }), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(new[] { 2, 3 }, result.Value.Recycled);
+        _unitOfWork.Verify(
+            u => u.InTransactionAsync(
+                It.IsAny<Func<CancellationToken, Task<Result<CollapseDuplicateAssetsResponse>>>>(),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
     }
 
     [Fact]

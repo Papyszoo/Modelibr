@@ -90,9 +90,14 @@ frontend-patterns skill was corrected.)
 
 ## E2E trick worth reusing
 
-`store-fixture-e2e` container with `network_mode: service:webapi-e2e` so ONE URL
-`http://localhost:9280` is the store for **both** the browser (host publish on
-webapi-e2e) and the backend importer (loopback = the http-dev exception).
+`store-fixture-e2e` runs with `network_mode: service:webapi-e2e` and serves the
+same handler twice: plain http on `:9280` for the backend importer (reached via
+the test-only `MODELIBR_STORE_BASE_URL_OVERRIDE`, loopback = the http-dev
+exception) and https on `:9443` for the browser. The store address is a fixed
+build constant now, so the browser cannot be repointed with `VITE_STORE_URL`;
+`page.route` is not an option either (Chromium does not expose CORS preflight to
+route handlers), so the Playwright config maps `store.modelibr.com:443` to the
+fixture's TLS listener with `--host-resolver-rules` + `ignoreHTTPSErrors`.
 Manifest URLs are same-host so the token is actually sent.
 
 **Trap:** the store fixture originally served the shared

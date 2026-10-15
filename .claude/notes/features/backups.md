@@ -80,9 +80,34 @@ step that failed in CI now passes. The unit lane also gained
 env-var states, so this specific regression can no longer hide behind Docker
 suites.
 
-The remaining gap is deliberate and documented: automatic pre-migration backups
-do not work in the packaged desktop build until the client tools are bundled.
-Bundling them (a separate client artifact, not the server package) is the
-follow-up.
+## Closed in 0.7: the app dumps itself (no client tools at all)
 
-Related: [[desktop-installer.md]]
+The gap above was left open with a deliberate plan to bundle PostgreSQL client
+binaries. It was solved the other way instead: **Modelibr writes and reads its
+own dumps through Npgsql**, the driver it already uses to reach the server.
+
+Why this beat bundling, which is worth remembering as a decision:
+
+- **Size.** EDB-style client distributions are 40MB+ per platform _before_
+  compression, against a server bundle that is already the largest thing in the
+  installer.
+- **It removes the class of bug, not the instance.** Every tool invocation was a
+  place the packaged app could break: a missing binary, a `libpq` that would not
+  resolve, a `PG_DUMP_PATH` pointing at a file that was never shipped. There are
+  now none of those code paths to keep working.
+- **It is testable here.** A round trip can be exercised against any PostgreSQL
+  the CI already runs, on any platform, with no download step.
+
+What it cost, honestly: the dump is **data, not schema**. The archive records the
+migration it was taken at, and a restore migrates the database to that migration
+before loading rows, which is the same upgrade path a `pg_dump` DDL restore took.
+A `pg_dump` custom dump from an older build still restores wherever the client
+tools are installed - `BackupManifest.DatabaseDumpFormat` is what tells the two
+apart, and its absence means `pgdump-custom` so old archives keep working.
+
+The removed surface: `BackupService.GetToolAvailability`,
+`GET /backups/capabilities`, `PostgresToolPaths`, `PG_DUMP_PATH`/`PSQL_PATH`,
+`pg_isready` in the boot-time restore, and the Settings warning that disabled
+**Create backup**. A backup that runs and fails still aborts startup; the "the
+tooling was never shipped, carry on without a snapshot" case no longer exists
+because there is nothing to be missing.

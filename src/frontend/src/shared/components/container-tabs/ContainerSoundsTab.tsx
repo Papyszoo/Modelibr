@@ -148,7 +148,7 @@ export function ContainerSoundsTab({
           <ListToolbarSearchInput
             value={localSearch}
             onChange={setLocalSearch}
-            placeholder="Search sounds…"
+            placeholder="Search sounds..."
           />
         </ListToolbarPanel>
       </ListToolbar>
@@ -165,6 +165,11 @@ export function ContainerSoundsTab({
               <AssetTile
                 key={sound.id}
                 name={sound.name}
+                accessory={adapter.renderAssetAccessory?.({
+                  type: 'sound',
+                  id: sound.id,
+                  name: sound.name,
+                })}
                 meta={formatDuration(sound.duration)}
                 media={<AssetTilePlaceholder icon="pi pi-volume-up" />}
                 onClick={() => sn.openModal(sound)}

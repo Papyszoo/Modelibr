@@ -122,4 +122,78 @@ public class SettingValidatorTests
         // Assert
         Assert.Equal(shouldSucceed, result.IsSuccess);
     }
+
+    [Theory]
+    [InlineData("0", true)] // Never
+    [InlineData("30", true)]
+    [InlineData("365", true)] // Max
+    [InlineData("-1", false)]
+    [InlineData("366", false)]
+    [InlineData("invalid", false)]
+    public void ValidateSetting_CleanRecycledFilesAfterDays_ValidatesCorrectly(string value, bool shouldSucceed)
+    {
+        var result = SettingValidator.ValidateSetting(SettingKeys.CleanRecycledFilesAfterDays, value);
+
+        Assert.Equal(shouldSucceed, result.IsSuccess);
+    }
+
+    [Theory]
+    [InlineData("1", true)]
+    [InlineData("3", true)]
+    [InlineData("10", true)] // Max
+    [InlineData("0", false)]
+    [InlineData("11", false)]
+    [InlineData("invalid", false)]
+    public void ValidateSetting_PreMigrationBackupRetention_ValidatesCorrectly(string value, bool shouldSucceed)
+    {
+        var result = SettingValidator.ValidateSetting(SettingKeys.PreMigrationBackupRetention, value);
+
+        Assert.Equal(shouldSucceed, result.IsSuccess);
+    }
+
+    [Theory]
+    [InlineData("transparent", true)]
+    [InlineData("TRANSPARENT", true)]
+    [InlineData("#ffffff", true)]
+    [InlineData("#A1B2C3", true)]
+    [InlineData("white", false)]
+    [InlineData("#fff", false)]
+    [InlineData("#gggggg", false)]
+    [InlineData("", false)]
+    public void ValidateSetting_ThumbnailBackground_ValidatesCorrectly(string value, bool shouldSucceed)
+    {
+        var result = SettingValidator.ValidateSetting(SettingKeys.ThumbnailBackground, value);
+
+        Assert.Equal(shouldSucceed, result.IsSuccess);
+    }
+
+    [Theory]
+    [InlineData("1", true)] // Min
+    [InlineData("15", true)] // Default
+    [InlineData("240", true)] // Max
+    [InlineData("0", false)]
+    [InlineData("241", false)]
+    [InlineData("invalid", false)]
+    public void ValidateSetting_BlenderOperationTimeoutMinutes_ValidatesCorrectly(string value, bool shouldSucceed)
+    {
+        var result = SettingValidator.ValidateSetting(SettingKeys.BlenderOperationTimeoutMinutes, value);
+
+        Assert.Equal(shouldSucceed, result.IsSuccess);
+    }
+
+    [Theory]
+    [InlineData(SettingKeys.AutoAssignOnImport)]
+    [InlineData(SettingKeys.PreMigrationBackupEnabled)]
+    [InlineData(SettingKeys.SkipDuplicateThumbnails)]
+    [InlineData(SettingKeys.McpEnabled)]
+    [InlineData(SettingKeys.McpWriteEnabled)]
+    [InlineData(SettingKeys.McpDestructiveEnabled)]
+    public void ValidateSetting_NewBooleanKeys_AcceptTrueFalseOnly(string key)
+    {
+        Assert.True(SettingValidator.ValidateSetting(key, "true").IsSuccess);
+        Assert.True(SettingValidator.ValidateSetting(key, "false").IsSuccess);
+        Assert.True(SettingValidator.ValidateSetting(key, "True").IsSuccess);
+        Assert.False(SettingValidator.ValidateSetting(key, "yes").IsSuccess);
+        Assert.False(SettingValidator.ValidateSetting(key, "1").IsSuccess);
+    }
 }

@@ -7,9 +7,9 @@ import { expect, type Locator, type Page } from "@playwright/test";
  * Settings tab type is reached by clicking the picker's "Settings" tile.
  * This mirrors the main e2e suite's `openTabViaMenu` helper.
  *
- * Since PR #508 the Settings tab is a grid of section cards → detail view (no
- * accordion). Backup lives behind the "Backup & Restore" card, which opens a
- * `.section-detail` that renders the `.backups-section` body.
+ * Since PR #508 the Settings tab is a section nav + content pane. Backup lives
+ * behind the "Backup & Restore" nav item, which selects a `.section-detail`
+ * that renders the `.backups-section` body.
  */
 export class SettingsPage {
     constructor(public readonly page: Page) {}
@@ -51,29 +51,18 @@ export class SettingsPage {
             await expect(newtabPage).toBeHidden({ timeout: 10000 });
         }
 
-        // The redesigned Settings (PR #508) renders inside `.settings-container`,
-        // opening on the grid of section cards.
+        // The redesigned Settings (PR #508) renders inside `.settings-container`
+        // with the section nav on the left.
         await expect(this.page.locator(".settings-container")).toBeVisible({
             timeout: 30000,
         });
     }
 
     private async openBackupSection(): Promise<void> {
-        // Land on the grid. A leftover section-detail from an earlier run is
-        // dismissed via the Back button so the Backup card is reachable.
-        const grid = this.page.locator(".settings-grid");
-        if (!(await grid.isVisible())) {
-            const back = this.page.locator(".btn-back");
-            if (await back.count()) await back.click();
-        }
-        await expect(grid).toBeVisible({ timeout: 10000 });
-
-        // Open the "Backup & Restore" section card → detail view. (Real,
-        // non-demo stack, so the card is enabled and renders BackupsSection.)
+        // Select the "Backup & Restore" nav item → its section content. (Real,
+        // non-demo stack, so the item is enabled and renders BackupsSection.)
         await this.page
-            .locator(".setting-card")
-            .filter({ hasText: /backup\s*&\s*restore/i })
-            .first()
+            .locator('[data-testid="settings-nav-backup"]')
             .click();
 
         const list = this.page.locator(".backups-section");

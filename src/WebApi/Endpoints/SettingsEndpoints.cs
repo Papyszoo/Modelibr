@@ -1,4 +1,5 @@
 using Application.Abstractions.Messaging;
+using Application.Abstractions.Repositories;
 using Application.Abstractions.Services;
 using Application.Settings;
 
@@ -103,6 +104,7 @@ public static class SettingsEndpoints
                 size = result.Value.ThumbnailSize,
                 frameCount = result.Value.ThumbnailFrameCount,
                 isAnimated = result.Value.GenerateAnimatedThumbnail,
+                backgroundColor = result.Value.ThumbnailBackground,
             });
         })
         .WithName("Get Thumbnail Render Settings")
@@ -110,6 +112,7 @@ public static class SettingsEndpoints
 
         app.MapGet("/settings/blender-enabled", async (
             IQueryHandler<GetSettingsQuery, GetSettingsQueryResponse> queryHandler,
+            ISettingRepository settingRepository,
             IBlenderInstallationService installService,
             CancellationToken cancellationToken) =>
         {
@@ -123,6 +126,12 @@ public static class SettingsEndpoints
             var isInstalled = status.State == "installed";
             var isBlocked = status.State == "downloading" || status.State == "extracting";
 
+            // Only sent when the user has chosen a value: absent means the worker
+            // keeps its env-derived BLENDER_OPERATION_TIMEOUT_MS fallback.
+            var timeoutSetting = await settingRepository.GetByKeyAsync(
+                SettingKeys.BlenderOperationTimeoutMinutes, cancellationToken);
+            var timeoutMinutes = SettingResolution.ParsePositiveInt(timeoutSetting?.Value);
+
             return Results.Ok(new
             {
                 enableBlender = result.Value.BlenderEnabled && !isBlocked,
@@ -130,6 +139,7 @@ public static class SettingsEndpoints
                 settingEnabled = result.Value.BlenderEnabled,
                 installed = isInstalled,
                 installedVersion = status.InstalledVersion,
+                operationTimeoutMs = timeoutMinutes.HasValue ? timeoutMinutes.Value * 60_000 : (int?)null,
             });
         })
         .WithName("Get Blender Enabled")

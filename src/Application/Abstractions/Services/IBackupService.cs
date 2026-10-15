@@ -87,27 +87,32 @@ public interface IBackupService
     /// user-initiated backups.
     /// </summary>
     void CleanupSnapshots(string fileNamePrefix, int keepCount);
-
-    /// <summary>
-    /// Reports whether the PostgreSQL client tooling (<c>pg_dump</c>/<c>psql</c>) this
-    /// deployment would actually invoke exists.
-    ///
-    /// This exists to separate two very different failures. A backup that runs and
-    /// fails is a safety problem and must abort startup. Tooling that was never shipped
-    /// - e.g. a trimmed embedded PostgreSQL distribution that carries only
-    /// <c>initdb</c>/<c>pg_ctl</c>/<c>postgres</c> - is a packaging gap, and aborting
-    /// startup on it would leave the app permanently unable to start. Callers that
-    /// need to degrade gracefully should consult this first.
-    /// </summary>
-    BackupToolAvailability GetToolAvailability();
 }
 
 /// <summary>
-/// Outcome of probing the configured PostgreSQL client tooling. <see cref="Reason"/>
-/// is operator-facing: it names the missing path so the warning in the log says which
-/// file to install rather than failing with a bare "file not found".
+/// The readers a <c>database.dump</c> entry can need.
 /// </summary>
-public sealed record BackupToolAvailability(bool Available, string? Reason);
+/// <remarks>
+/// Two formats exist because the app changed its mind once. Keeping both is not
+/// nostalgia: an archive a user still has on disk has to stay restorable, and the
+/// only thing that distinguishes them is this field.
+/// </remarks>
+public static class BackupDatabaseDumpFormats
+{
+    /// <summary>
+    /// A <c>pg_dump -Fc</c> archive. Needs the PostgreSQL client tools, so it can
+    /// only be restored where they are installed - a source checkout, or the
+    /// Docker stack. This is what an archive with no
+    /// <see cref="BackupManifest.DatabaseDumpFormat"/> carries.
+    /// </summary>
+    public const string PgDumpCustom = "pgdump-custom";
+
+    /// <summary>
+    /// COPY text this app writes and reads itself, needing no external tool. See
+    /// <c>Infrastructure.Services.ManagedDumpFormat</c>.
+    /// </summary>
+    public const string CopyText = "copy-text-v1";
+}
 
 /// <summary>
 /// Canonical backup manifest written into every archive as <c>manifest.json</c>.
@@ -121,12 +126,20 @@ public sealed record BackupToolAvailability(bool Available, string? Reason);
 /// processor refuses any archive whose <c>ManifestVersion</c> does not match
 /// the value baked into the running app.
 /// </summary>
+/// <param name="DatabaseDumpFormat">
+/// Which reader the <c>database.dump</c> entry needs - see
+/// <see cref="BackupDatabaseDumpFormats"/>. Optional on purpose: an archive written
+/// before this field existed carries a <c>pg_dump</c> custom-format dump, and a
+/// missing value has to keep meaning exactly that, so old archives stay restorable
+/// and the manifest version does not have to move.
+/// </param>
 public sealed record BackupManifest(
     int ManifestVersion,
     DateTime CreatedAtUtc,
     int PostgresMajorVersion,
     BackupManifestScope Scope,
-    BackupManifestStats Stats);
+    BackupManifestStats Stats,
+    string? DatabaseDumpFormat = null);
 
 public sealed record BackupManifestScope(bool Database, bool Uploads, bool Thumbnails);
 
@@ -137,8 +150,8 @@ public sealed record BackupManifestStats(
     long ThumbnailsBytes,
     long DatabaseDumpBytes,
     // SHA-256 of the database.dump entry's bytes as written into the archive.
-    // Restore-on-boot verifies this against the extracted bytes before invoking
-    // pg_restore, so a truncated or corrupted dump cannot silently produce a
+    // Restore-on-boot verifies this against the extracted bytes before loading
+    // them, so a truncated or corrupted dump cannot silently produce a
     // partially-restored database.
     string DatabaseDumpSha256);
 

@@ -1,6 +1,9 @@
 import { http, HttpResponse } from 'msw'
 
+import { type MaterialEffectsDocument } from '@/shared/three/materialEffects'
+
 import {
+  addRecycledItem,
   type DemoEnvironmentMap,
   type DemoModel,
   type DemoScript,
@@ -12,6 +15,7 @@ import {
   getAllRecycledItems,
   getAllUploadHistory,
   getById,
+  nextId,
   now,
   put,
   recomputePackCounts,
@@ -40,6 +44,11 @@ interface DemoScene {
   /** The project this scene belongs to, or null (v0.6 prompt 13-C). */
   projectId: number | null
   projectName: string | null
+  /** The level of that project this scene is filed under, or null (v0.7). */
+  projectLevelId: number | null
+  projectLevelName: string | null
+  /** At most one scene per level is the level's primary; the rest are versions. */
+  isPrimaryLevelScene: boolean
 }
 
 /** What a person has typed about an asset in this demo session. */
@@ -271,6 +280,106 @@ const emptySceneDocument = JSON.stringify({
   lights: [],
 })
 
+/**
+ * A node that places one library model, in the shape a scene document stores.
+ *
+ * A Model asset must pin a versionId (the real document validator refuses one
+ * that does not), so the version is passed explicitly rather than left out.
+ */
+function demoSceneNode(
+  id: string,
+  name: string,
+  assetId: number,
+  versionId: number,
+  position: [number, number, number] = [0, 0, 0]
+) {
+  return {
+    id,
+    name,
+    transform: {
+      position: { x: position[0], y: position[1], z: position[2] },
+      rotationEuler: { x: 0, y: 0, z: 0 },
+      scale: { x: 1, y: 1, z: 1 },
+    },
+    asset: { assetType: 'Model', assetId, versionId },
+    visible: true,
+  }
+}
+
+/**
+ * Two scenes filed under the demo project's first level, seeded once per
+ * session.
+ *
+ * The point is the shape a level's asset view has to survive: one primary scene
+ * and one secondary scene that both place a model, so the same asset appears
+ * once with two scenes named. A demo with a single scene per level could not
+ * show that at all, which is the one thing the view is for.
+ *
+ * Seeded lazily on the first scene list read, because the level they belong to
+ * lives in IndexedDB and the seeded project's levels are regenerated with it.
+ */
+let demoScenesSeeded = false
+async function seedDemoScenes() {
+  if (demoScenesSeeded) return
+  demoScenesSeeded = true
+
+  const project = (await getAll('projects'))[0]
+  const level = project?.levels?.[0]
+  if (!project || !level) return
+
+  const timestamp = now()
+  const seeded: DemoScene[] = [
+    {
+      id: nextDemoSceneId++,
+      name: 'Crossing Layout',
+      description: 'The blockout of the rope crossing.',
+      schemaVersion: 1,
+      revision: 1,
+      documentJson: JSON.stringify({
+        schemaVersion: 1,
+        nodes: [
+          demoSceneNode('deck', 'Rope Bridge Deck', 1, 1, [0, 0, 4]),
+          demoSceneNode('bell', 'Bell Tower', 2, 2, [-6, 0, 2]),
+        ],
+        lights: [],
+      }),
+      createdAt: timestamp,
+      updatedAt: timestamp,
+      projectId: project.id,
+      projectName: project.name,
+      projectLevelId: level.id,
+      projectLevelName: level.name,
+      isPrimaryLevelScene: true,
+    },
+    {
+      id: nextDemoSceneId++,
+      name: 'Crossing Dressing',
+      description: 'Props added after the layout was signed off.',
+      schemaVersion: 1,
+      revision: 1,
+      documentJson: JSON.stringify({
+        schemaVersion: 1,
+        nodes: [
+          demoSceneNode('deck-again', 'Rope Bridge Deck', 1, 1, [0, 0, 4]),
+          demoSceneNode('shrub', 'Shrub', 4, 4, [3, 0, 1]),
+        ],
+        lights: [],
+      }),
+      createdAt: timestamp,
+      updatedAt: timestamp,
+      projectId: project.id,
+      projectName: project.name,
+      projectLevelId: level.id,
+      projectLevelName: level.name,
+      isPrimaryLevelScene: false,
+    },
+  ]
+
+  for (const scene of seeded) {
+    demoScenes.set(scene.id, scene)
+  }
+}
+
 function demoSceneSummary(scene: DemoScene) {
   const document = JSON.parse(scene.documentJson) as {
     nodes: unknown[]
@@ -294,6 +403,9 @@ function demoSceneSummary(scene: DemoScene) {
     stage: document.stage ?? null,
     projectId: scene.projectId,
     projectName: scene.projectName,
+    projectLevelId: scene.projectLevelId,
+    projectLevelName: scene.projectLevelName,
+    isPrimaryLevelScene: scene.isPrimaryLevelScene,
   }
 }
 
@@ -379,6 +491,7 @@ function demoMaterial(
     tags: [],
     createdAt: now(),
     updatedAt: now(),
+    effects: null as MaterialEffectsDocument | null,
     parameters: {
       baseColorR: channel(1),
       baseColorG: channel(3),
@@ -476,6 +589,7 @@ export const systemHandlers = [
             previewGeometryType: material.previewGeometryType,
             hasThumbnail: false,
             parameters: material.parameters,
+            effects: material.effects,
             tiling: null,
             tags: material.tags,
             createdAt: material.createdAt,
@@ -502,6 +616,7 @@ export const systemHandlers = [
               previewGeometryType: set.previewGeometryType ?? 'sphere',
               hasThumbnail: Boolean(set.thumbnailPath),
               parameters: null,
+              effects: null,
               tiling: {
                 tilingScaleX: set.tilingScaleX ?? 1,
                 tilingScaleY: set.tilingScaleY ?? 1,
@@ -543,6 +658,7 @@ export const systemHandlers = [
       name: string
       description?: string | null
       parameters?: Record<string, unknown>
+      effects?: MaterialEffectsDocument | null
     }
 
     const nextId = DEMO_MATERIALS.reduce((max, m) => Math.max(max, m.id), 0) + 1
@@ -551,6 +667,7 @@ export const systemHandlers = [
       body.parameters
     )
     created.description = body.description ?? null
+    if (body.effects !== undefined) created.effects = body.effects
     DEMO_MATERIALS.push(created)
 
     return HttpResponse.json(
@@ -574,19 +691,40 @@ export const systemHandlers = [
       name?: string
       description?: string | null
       parameters?: Record<string, unknown>
+      effects?: MaterialEffectsDocument | null
+      clearEffects?: boolean
     }
 
     if (body.name !== undefined) material.name = body.name
     if (body.description !== undefined) material.description = body.description
     applyParameters(material, body.parameters)
+    // Matches the server: an explicit clear wins, otherwise a supplied document
+    // replaces the stored one, and an omitted effects field changes nothing.
+    if (body.clearEffects === true) material.effects = null
+    else if (body.effects !== undefined) material.effects = body.effects
     material.updatedAt = now()
 
     return HttpResponse.json(material)
   }),
 
+  // Recycle a material the same way the real API does: record it for the
+  // recycle bin (so Undo can restore it) and drop it from the live list.
   http.delete('*/materials/:id', async ({ params }) => {
-    const index = DEMO_MATERIALS.findIndex(m => m.id === Number(params.id))
-    if (index >= 0) DEMO_MATERIALS.splice(index, 1)
+    const id = Number(params.id)
+    const index = DEMO_MATERIALS.findIndex(m => m.id === id)
+    if (index >= 0) {
+      const material = DEMO_MATERIALS[index]
+      const recycledId = await nextId('recycledItems')
+      await addRecycledItem({
+        id: recycledId,
+        type: 'material',
+        entityId: id,
+        name: material.name,
+        deletedAt: now(),
+        entity: { ...material } as unknown as Record<string, unknown>,
+      })
+      DEMO_MATERIALS.splice(index, 1)
+    }
 
     return new HttpResponse(null, { status: 204 })
   }),
@@ -607,6 +745,7 @@ export const systemHandlers = [
   // ════════════════════════════════════════════════════════════════════════
 
   http.get('*/scenes', async () => {
+    await seedDemoScenes()
     return HttpResponse.json({
       scenes: [...demoScenes.values()]
         .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
@@ -913,6 +1052,54 @@ export const systemHandlers = [
     })
   }),
 
+  // Filing a scene under a level, with the same two rules the API enforces:
+  // the level must exist and belong to the scene's project. The demo would
+  // otherwise accept a link the app refuses, and the level row would look
+  // broken for a reason the demo made up.
+  http.put('*/scenes/:id/level', async ({ params, request }) => {
+    const scene = demoScenes.get(Number(params.id))
+    if (!scene) {
+      return HttpResponse.json(
+        { error: 'SceneNotFound', message: 'No such scene.' },
+        { status: 404 }
+      )
+    }
+
+    const body = (await request.json()) as { projectLevelId: number | null }
+    const previousLevelId = scene.projectLevelId
+
+    if (body.projectLevelId !== null) {
+      const levels = await getAll('projectLevels')
+      const level = levels.find(
+        candidate => candidate.id === body.projectLevelId
+      )
+      if (!level || level.projectId !== scene.projectId) {
+        return HttpResponse.json(
+          {
+            error: 'LevelNotUsable',
+            message:
+              'That level is not part of the project this scene belongs to.',
+          },
+          { status: 400 }
+        )
+      }
+      scene.projectLevelId = level.id as number
+    } else {
+      scene.projectLevelId = null
+    }
+
+    scene.isPrimaryLevelScene = scene.projectLevelId !== null
+    scene.revision += 1
+    scene.updatedAt = now()
+
+    return HttpResponse.json({
+      sceneId: scene.id,
+      projectLevelId: scene.projectLevelId,
+      previousLevelId,
+      revision: scene.revision,
+    })
+  }),
+
   http.get('*/scenes/:id/slots', async ({ params }) => {
     const scene = demoScenes.get(Number(params.id))
     return scene
@@ -954,6 +1141,9 @@ export const systemHandlers = [
       updatedAt: timestamp,
       projectId: null,
       projectName: null,
+      projectLevelId: null,
+      projectLevelName: null,
+      isPrimaryLevelScene: false,
     }
     demoScenes.set(scene.id, scene)
 
@@ -1022,37 +1212,6 @@ export const systemHandlers = [
   }),
 
   // ════════════════════════════════════════════════════════════════════════
-  //  STAGES
-  // ════════════════════════════════════════════════════════════════════════
-
-  http.get('*/stages', async () => {
-    return HttpResponse.json({ stages: [] })
-  }),
-
-  http.get('*/stages/:id', async () => {
-    return HttpResponse.json({
-      id: 1,
-      name: 'Default',
-      configurationJson: '{}',
-      createdAt: now(),
-      updatedAt: now(),
-    })
-  }),
-
-  http.post('*/stages', async ({ request }) => {
-    const body = (await request.json()) as { name: string }
-    return HttpResponse.json(
-      { id: Date.now(), name: body.name },
-      { status: 201 }
-    )
-  }),
-
-  http.put('*/stages/:id', async ({ request }) => {
-    const body = (await request.json()) as { configurationJson: string }
-    return HttpResponse.json({ id: Number('1'), name: 'Stage', ...body })
-  }),
-
-  // ════════════════════════════════════════════════════════════════════════
   //  SETTINGS
   // ════════════════════════════════════════════════════════════════════════
 
@@ -1068,9 +1227,25 @@ export const systemHandlers = [
       blenderPath: 'blender',
       blenderEnabled: false,
       duplicateNamePolicy: 'Allow',
+      autoAssignOnImport: true,
+      cleanRecycledFilesAfterDays: 0,
+      preMigrationBackupEnabled: true,
+      preMigrationBackupRetention: 3,
+      skipDuplicateThumbnails: false,
+      mcpEnabled: true,
+      mcpWriteEnabled: false,
+      mcpDestructiveEnabled: false,
+      thumbnailBackground: 'transparent',
+      blenderOperationTimeoutMinutes: 15,
       createdAt: '2025-01-15T10:00:00Z',
       updatedAt: '2025-01-15T10:00:00Z',
     })
+  }),
+
+  // The native desktop host's runtime endpoint. Demo mode is a browser, so the
+  // Desktop section stays hidden; answering 404 keeps MSW quiet about it.
+  http.get('*/native/runtime', async () => {
+    return new HttpResponse(null, { status: 404 })
   }),
 
   http.get('*/settings/blender-enabled', async () => {
@@ -1158,6 +1333,59 @@ export const systemHandlers = [
   http.put('*/settings', async ({ request }) => {
     const body = await request.json()
     return HttpResponse.json({ ...(body as object), updatedAt: now() })
+  }),
+
+  http.get('*/mcp-agents', async () => {
+    return HttpResponse.json([
+      {
+        name: 'stylist',
+        description: 'Edits materials and texture sets',
+        families: ['Model', 'TextureSet'],
+        tools: [
+          {
+            name: 'bind_texture_set',
+            description: 'Bind a texture set to a model version',
+          },
+          {
+            name: 'create_material',
+            description: 'Create a global material',
+          },
+        ],
+      },
+      {
+        name: 'librarian',
+        description: 'Organises models, packs and projects',
+        families: ['Model', 'Pack', 'Project'],
+        tools: [
+          { name: 'tag_asset', description: 'Apply tags to an asset' },
+          { name: 'move_to_pack', description: 'Move a model into a pack' },
+          { name: 'create_project', description: 'Create a project' },
+          {
+            name: 'set_project_thumbnail',
+            description: 'Set a project thumbnail',
+          },
+        ],
+      },
+    ])
+  }),
+
+  // Every tool the server registers. The first six are assigned to the mock
+  // agents above; the last two belong to no agent, so the explorer's "no agent"
+  // chip and its "used by no agent" filter are both exercised in demo mode.
+  http.get('*/mcp-tools', async () => {
+    return HttpResponse.json([
+      {
+        name: 'bind_texture_set',
+        description: 'Bind a texture set to a model version',
+      },
+      { name: 'create_material', description: 'Create a global material' },
+      { name: 'tag_asset', description: 'Apply tags to an asset' },
+      { name: 'move_to_pack', description: 'Move a model into a pack' },
+      { name: 'create_project', description: 'Create a project' },
+      { name: 'set_project_thumbnail', description: 'Set a project thumbnail' },
+      { name: 'search_assets', description: 'Search the library' },
+      { name: 'render_scene', description: 'Render a scene preview' },
+    ])
   }),
 
   // ════════════════════════════════════════════════════════════════════════
@@ -1284,6 +1512,11 @@ export const systemHandlers = [
               await recomputeProjectCounts(project)
               await put('projects', project)
             }
+          }
+        } else if (type === 'material') {
+          const material = item.entity as (typeof DEMO_MATERIALS)[number]
+          if (!DEMO_MATERIALS.some(existing => existing.id === material.id)) {
+            DEMO_MATERIALS.push(material)
           }
         }
       }

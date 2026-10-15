@@ -10,13 +10,14 @@ import {
   EquirectangularReflectionMapping,
   SRGBColorSpace,
   type Texture,
-  TextureLoader,
 } from 'three'
-import { EXRLoader } from 'three/examples/jsm/loaders/EXRLoader.js'
-import { RGBELoader } from 'three-stdlib'
 
 import { type EnvironmentMapPreviewOption } from '@/features/environment-map/utils/environmentMapUtils'
 import { CanvasErrorBoundary } from '@/features/model-viewer/components/CanvasErrorBoundary'
+import {
+  environmentMapLoader,
+  isHdrEnvironmentExtension,
+} from '@/shared/three/environmentMapLoader'
 
 type LoadedEnvironmentTexture = Texture | CubeTexture | DataTexture
 
@@ -148,37 +149,18 @@ export function EnvironmentMapPreviewCanvas({
 
       const extension = getExtension(option.fileName, option.assetUrl)
 
-      if (extension === 'hdr') {
-        new RGBELoader().load(
-          option.assetUrl,
-          texture => {
-            texture.mapping = EquirectangularReflectionMapping
-            handleLoadedTexture(texture)
-          },
-          undefined,
-          handleError
-        )
-        return
-      }
-
-      if (extension === 'exr') {
-        new EXRLoader().load(
-          option.assetUrl,
-          texture => {
-            texture.mapping = EquirectangularReflectionMapping
-            handleLoadedTexture(texture)
-          },
-          undefined,
-          handleError
-        )
-        return
-      }
-
-      new TextureLoader().load(
+      // Loader choice comes from the shared extension map, so the preview and
+      // the scene viewport can never disagree about a format.
+      const Loader = environmentMapLoader(extension)
+      const loader = new Loader()
+      loader.load(
         option.assetUrl,
         texture => {
           texture.mapping = EquirectangularReflectionMapping
-          texture.colorSpace = SRGBColorSpace
+          // HDR/EXR carry linear float data; tagging it sRGB would wash it out.
+          if (!isHdrEnvironmentExtension(extension)) {
+            texture.colorSpace = SRGBColorSpace
+          }
           handleLoadedTexture(texture)
         },
         undefined,

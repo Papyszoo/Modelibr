@@ -29,7 +29,9 @@ public sealed record ScenePlacementRequest(
     string? AnchorTo = null,
     string? AnchorAlign = null,
     bool Suspended = false,
-    int? OnSurface = null)
+    int? OnSurface = null,
+    SceneAnimation? Animation = null,
+    IReadOnlyDictionary<string, double>? ShapeKeys = null)
 {
     public SceneAssetRef Reference => new(AssetType, AssetId, VersionId);
 }
@@ -178,12 +180,13 @@ public static class ScenePlacementRules
         // so the surface becomes the difference between the two. That keeps one meaning of
         // "offset" in the document rather than a second one that only surface anchors use.
         Vec3? offset;
-        if (anchor.Offset is { } stated)
+        if (anchor.Offset is not null)
         {
-            offset = new Vec3(
-                stated.X + (point.X - reference.X),
-                stated.Y + (point.Y - reference.Y),
-                stated.Z + (point.Z - reference.Z));
+            // A surface seats the node at an absolute point, so the offset is the vector from
+            // the anchor's reference point to that point. It is deliberately not added to the
+            // offset the node already carried: doing so double-counted it, so re-seating a
+            // node on the same surface walked it further away on every repeat.
+            offset = new Vec3(point.X - reference.X, point.Y - reference.Y, point.Z - reference.Z);
         }
         else
         {
@@ -281,7 +284,9 @@ public static class ScenePlacementRules
             Suspended: placement.Suspended ? true : null,
             FrontAxis: frontAxis,
             FaceToward: placement.FaceToward,
-            Anchor: anchor);
+            Anchor: anchor,
+            Animation: placement.Animation,
+            ShapeKeys: placement.ShapeKeys);
 
         return ApplyGridSnap(node, facts, placement.SnapToGrid);
     }

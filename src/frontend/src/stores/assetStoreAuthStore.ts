@@ -2,8 +2,8 @@ import { create } from 'zustand'
 import { createJSONStorage, persist } from 'zustand/middleware'
 
 import {
-  getConfiguredStoreUrl,
   normalizeStoreUrl,
+  STORE_URL,
 } from '@/features/asset-store/lib/storeConfig'
 import { queryClient } from '@/lib/react-query'
 
@@ -15,9 +15,9 @@ import { queryClient } from '@/lib/react-query'
  * refreshes the stale access token and re-arms the proactive refresh loop.
  *
  * Tokens are BOUND to the store origin they were minted for (`storeOrigin`).
- * Bearer credentials are origin-scoped secrets: if VITE_STORE_URL later points
- * somewhere else, the persisted session is dropped on rehydrate rather than
- * replayed against a different store.
+ * Bearer credentials are origin-scoped secrets: a session persisted for a
+ * different store (an older build, or a store the app no longer uses) is dropped
+ * on rehydrate rather than replayed against Modelibr's store.
  */
 
 export type AssetStoreAuthStatus = 'loggedOut' | 'loggingIn' | 'loggedIn'
@@ -74,7 +74,7 @@ export const useAssetStoreAuthStore = create<AssetStoreAuthState>()(
           accessToken,
           refreshToken,
           username,
-          storeOrigin: normalizeStoreUrl(getConfiguredStoreUrl()),
+          storeOrigin: normalizeStoreUrl(STORE_URL),
           error: null,
         }),
 
@@ -118,12 +118,12 @@ export const useAssetStoreAuthStore = create<AssetStoreAuthState>()(
       }),
       merge: (persisted, current) => {
         const saved = (persisted as Partial<AssetStoreAuthState>) ?? {}
-        const configuredOrigin = normalizeStoreUrl(getConfiguredStoreUrl())
-        // Only a session WITH both tokens, minted for the CURRENTLY configured
-        // store, counts as logged in on rehydrate. A changed or removed
-        // VITE_STORE_URL invalidates the persisted tokens instead of letting them
-        // be sent to a different origin. (Sessions saved before storeOrigin
-        // existed have none recorded and are likewise discarded - one re-login.)
+        const configuredOrigin = normalizeStoreUrl(STORE_URL)
+        // Only a session WITH both tokens, minted for the store this app now uses,
+        // counts as logged in on rehydrate. A session saved for any other origin
+        // is discarded instead of being sent to a different store. (Sessions saved
+        // before storeOrigin existed have none recorded and are likewise discarded
+        // - one re-login.)
         const loggedIn =
           saved.status === 'loggedIn' &&
           !!saved.accessToken &&

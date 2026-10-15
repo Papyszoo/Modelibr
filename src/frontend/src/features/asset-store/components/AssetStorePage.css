@@ -31,6 +31,14 @@
   min-height: 100%;
 }
 
+/* Sign-in form plus its "back to browsing" action. */
+.asset-store-login-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--mod-space-sm);
+}
+
 /* Sign-in form - quiet block, no card-in-card framing. */
 .asset-store-login {
   display: flex;

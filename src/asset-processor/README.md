@@ -40,7 +40,7 @@ The service is configured via environment variables. See `.env.example` for all 
 - `RENDER_WIDTH`: Output image width in pixels (default: `256`)
 - `RENDER_HEIGHT`: Output image height in pixels (default: `256`)
 - `RENDER_FORMAT`: Output format: png, jpg, jpeg, webp (default: `png`)
-- `RENDER_BACKGROUND`: Background color or 'transparent' for transparent background (default: `transparent`)
+- `RENDER_BACKGROUND`: Background color or 'transparent' for transparent background (default: `transparent`). The Settings page (Thumbnail Generation) overrides this at runtime; the env value is only the worker's boot fallback.
 - `CAMERA_DISTANCE`: Camera distance from model (default: `5`)
 - `ENABLE_ANTIALIASING`: Enable antialiasing (default: `true`)
 

@@ -213,19 +213,16 @@
   font-weight: 500;
 }
 
+/* The name + counts strip is always visible - that is the Models tab identity
+   (`AssetTile`), and hover-only labels left the grid a wall of anonymous
+   thumbnails on desktop and on touch. */
 .texture-set-card-overlay {
   position: absolute;
   bottom: 0;
   left: 0;
   right: 0;
-  background: linear-gradient(to top, rgba(0, 0, 0, 0.8), transparent);
+  background: var(--asset-card-overlay-gradient);
   padding: 2rem 1rem 0.75rem;
-  opacity: 0;
-  transition: opacity 0.3s ease;
-}
-
-.texture-set-card:hover .texture-set-card-overlay {
-  opacity: 1;
 }
 
 .texture-set-card-name {
@@ -393,8 +390,7 @@
     font-size: 0.75rem;
   }
 
-  /* Touch - overlays + checkbox always visible. */
-  .texture-set-card-overlay,
+  /* Touch - no hover, so the select checkbox stays visible. */
   .texture-set-card .texture-set-select-checkbox {
     opacity: 1;
   }

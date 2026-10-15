@@ -354,6 +354,32 @@ public class ThumbnailJobDomainTests
     }
 
     [Fact]
+    public void CreateForVfx_WithValidParameters_ShouldCreateVfxJob()
+    {
+        var job = ThumbnailJob.CreateForVfx(9, DateTime.UtcNow);
+
+        Assert.Equal("Vfx", job.AssetType);
+        Assert.Equal(9, job.VfxId);
+        Assert.Equal(ThumbnailJobStatus.Pending, job.Status);
+
+        // A vfx job names only the effect; the worker photographs the app, so no file
+        // identity from another asset type may leak in.
+        Assert.Null(job.ModelId);
+        Assert.Null(job.ModelHash);
+        Assert.Null(job.SoundId);
+        Assert.Null(job.TextureSetId);
+        Assert.Null(job.SceneId);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-3)]
+    public void CreateForVfx_WithNonPositiveVfxId_ShouldThrow(int vfxId)
+    {
+        Assert.Throws<ArgumentException>(() => ThumbnailJob.CreateForVfx(vfxId, DateTime.UtcNow));
+    }
+
+    [Fact]
     public void CreateForScene_WithValidParameters_ShouldCreateSceneRenderJob()
     {
         // Arrange

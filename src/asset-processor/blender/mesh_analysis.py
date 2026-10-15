@@ -37,7 +37,17 @@ from model_io import import_model  # noqa: E402
 
 
 def fail(message):
-    print(f"MESH_ANALYSIS_ERROR: {message}", file=sys.stderr, flush=True)
+    """Print a clearly-marked error line and exit non-zero.
+
+    Single-line on purpose: the worker reads the marked line out of Blender's output, and
+    a Blender RuntimeError carries the whole Python traceback. Printed verbatim, everything
+    after the first line was dropped, so the reported failure named no actual exception.
+    """
+    print(
+        f"MESH_ANALYSIS_ERROR: {' | '.join(str(message).splitlines())}",
+        file=sys.stderr,
+        flush=True,
+    )
     sys.exit(1)
 
 

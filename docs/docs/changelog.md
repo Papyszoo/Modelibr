@@ -1,4 +1,5 @@
 ---
+description: Modelibr release highlights by version. Full, always-current release notes live on GitHub Releases, which is the canonical changelog.
 sidebar_position: 100
 title: Changelog
 ---

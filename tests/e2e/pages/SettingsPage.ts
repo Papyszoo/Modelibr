@@ -1,10 +1,10 @@
 import { Page } from "@playwright/test";
 
 /**
- * Page object for the new grid + detail Settings UI. Getters/setters for
- * section-scoped fields automatically navigate into their section so callers
- * don't have to remember the new two-level layout. Use openGrid()/openSection()
- * directly when the test is specifically about navigation.
+ * Page object for the section-nav Settings UI. Getters/setters for
+ * section-scoped fields automatically select their section in the left nav so
+ * callers don't have to remember the layout. Use openSection() directly when
+ * the test is specifically about navigation.
  */
 export type SettingsSectionKey =
     | "appearance"
@@ -49,17 +49,17 @@ export class SettingsPage {
     private readonly errorBanner = ".settings-error";
     private readonly successBanner = ".settings-success";
 
-    // Grid view
-    private readonly settingsGrid = ".settings-grid";
-    private readonly settingCard = ".setting-card";
+    // Section nav
+    private readonly settingsNav = ".settings-nav";
+    private readonly navItem = ".settings-nav-item";
+    private readonly navLabel = ".settings-nav-label";
     private readonly searchInput = ".settings-search";
     private readonly searchResults = ".search-results";
     private readonly searchResultItem = ".search-result-item";
 
-    // Detail view
+    // Section content
     private readonly sectionDetail = ".section-detail";
     private readonly sectionDetailTitle = ".section-detail-title";
-    private readonly backButton = ".btn-back";
     private readonly saveButton = 'button[type="submit"]';
     private readonly discardButton = ".section-detail-footer .btn-secondary";
     private readonly unsavedChanges = ".settings-unsaved-changes";
@@ -110,17 +110,13 @@ export class SettingsPage {
     }
 
     async getTitle(): Promise<string | null> {
-        // Title only exists on the grid view; navigate there first if needed.
-        if (!(await this.isOnGrid())) {
-            await this.openGrid();
-        }
         return await this.page.locator(this.title).textContent();
     }
 
-    // ── Grid navigation ────────────────────────────────────────────────
+    // ── Section navigation ─────────────────────────────────────────────
 
-    async isOnGrid(): Promise<boolean> {
-        return await this.page.locator(this.settingsGrid).isVisible();
+    async isNavVisible(): Promise<boolean> {
+        return await this.page.locator(this.settingsNav).isVisible();
     }
 
     async isInSection(key: SettingsSectionKey): Promise<boolean> {
@@ -132,77 +128,33 @@ export class SettingsPage {
         return titleText?.includes(SECTION_LABELS[key]) ?? false;
     }
 
-    async openGrid(): Promise<void> {
-        if (await this.isOnGrid()) return;
-        await this.page.locator(this.backButton).click();
-        await this.page
-            .locator(this.settingsGrid)
-            .waitFor({ state: "visible", timeout: 5000 });
-    }
-
     async openSection(key: SettingsSectionKey): Promise<void> {
         if (await this.isInSection(key)) return;
-        if (!(await this.isOnGrid())) {
-            await this.openGrid();
-        }
-        await this.page
-            .locator(`${this.settingCard}:has-text("${SECTION_LABELS[key]}")`)
-            .first()
-            .click();
+        await this.page.locator(`[data-testid="settings-nav-${key}"]`).click();
         await this.page
             .locator(`${this.sectionDetailTitle}:has-text("${SECTION_LABELS[key]}")`)
             .waitFor({ state: "visible", timeout: 5000 });
     }
 
-    async clickBack(): Promise<void> {
-        await this.page.locator(this.backButton).click();
-    }
-
-    async getVisibleCardLabels(): Promise<string[]> {
-        const cards = this.page.locator(
-            `${this.settingCard}:not(.dimmed) .card-title`,
-        );
-        const count = await cards.count();
+    async getSectionLabels(): Promise<string[]> {
+        const items = this.page.locator(`${this.navItem} ${this.navLabel}`);
+        const count = await items.count();
         const labels: string[] = [];
         for (let i = 0; i < count; i++) {
-            const text = await cards.nth(i).textContent();
+            const text = await items.nth(i).textContent();
             if (text) labels.push(text.trim());
         }
         return labels;
     }
 
-    async getAllCardLabels(): Promise<string[]> {
-        const cards = this.page.locator(`${this.settingCard} .card-title`);
-        const count = await cards.count();
-        const labels: string[] = [];
-        for (let i = 0; i < count; i++) {
-            const text = await cards.nth(i).textContent();
-            if (text) labels.push(text.trim());
-        }
-        return labels;
-    }
-
-    async getDimmedCardLabels(): Promise<string[]> {
-        const cards = this.page.locator(
-            `${this.settingCard}.dimmed .card-title`,
+    async getDimmedSectionLabels(): Promise<string[]> {
+        const items = this.page.locator(
+            `${this.navItem}.is-dimmed ${this.navLabel}`,
         );
-        const count = await cards.count();
+        const count = await items.count();
         const labels: string[] = [];
         for (let i = 0; i < count; i++) {
-            const text = await cards.nth(i).textContent();
-            if (text) labels.push(text.trim());
-        }
-        return labels;
-    }
-
-    async getLockedCardLabels(): Promise<string[]> {
-        const cards = this.page.locator(
-            `${this.settingCard}.locked .card-title`,
-        );
-        const count = await cards.count();
-        const labels: string[] = [];
-        for (let i = 0; i < count; i++) {
-            const text = await cards.nth(i).textContent();
+            const text = await items.nth(i).textContent();
             if (text) labels.push(text.trim());
         }
         return labels;
@@ -211,7 +163,6 @@ export class SettingsPage {
     // ── Search ────────────────────────────────────────────────────────
 
     async searchFor(text: string): Promise<void> {
-        if (!(await this.isOnGrid())) await this.openGrid();
         const input = this.page.locator(this.searchInput);
         await input.click();
         await input.fill(text);

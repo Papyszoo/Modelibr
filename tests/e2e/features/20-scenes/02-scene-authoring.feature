@@ -106,6 +106,104 @@ Feature: Scene authoring
     And the scene should hold 1 node
     And the scene should have unsaved changes
 
+  @scene-tab-per-scene
+  Scenario: Two scenes stay open at once, each keeping its own unsaved work
+    # One editor at a time meant comparing a level's scene against another one
+    # was save-and-reload: the second open threw the first one's draft away. Each
+    # scene now edits in a tab of its own, and switching between them is what
+    # proves the drafts are kept per scene rather than one global draft the last
+    # tab overwrote.
+    Given a scene named "Comparand Scene" is open
+    And I have placed the test model into the scene
+    And a scene named "Subject Scene" exists
+    When I open another scene named "Subject Scene" from the list
+    Then the scene editor for "Subject Scene" should be in its own tab
+    And there should be 2 scene editor tabs open
+    When I return to the tab of the scene named "Comparand Scene"
+    Then the scene editor should be visible
+    And the scene should hold 1 node
+    And the scene should have unsaved changes
+
+  @scene-tab-list-stays
+  Scenario: Opening a scene from the list leaves the list open
+    # The list used to BE the editor: opening a scene replaced its content, and
+    # the only way back was a Back button that also closed the editor and threw
+    # the draft away. Opening a scene adds a tab; the list stays where it is, and
+    # the way back to it does not cost the draft.
+    Given a scene named "List Keeper Scene" is open
+    And a scene named "Second Opened Scene" exists
+    When I show the scenes list from the editor
+    Then the scene list should be visible
+    And the scene editor tab should still be open
+    When I open another scene named "Second Opened Scene" from the list
+    Then there should be 2 scene editor tabs open
+
+  @scene-tab-list-nav
+  Scenario: The way back to the list does not discard the unsaved draft
+    # The same gesture, asked about the thing that matters: the draft the user was
+    # working on is still in the editor afterwards.
+    Given a scene named "Draft Keeper Scene" is open
+    And I have placed the test model into the scene
+    When I show the scenes list from the editor
+    And I return to the tab of the scene named "Draft Keeper Scene"
+    Then the scene should hold 1 node
+    And the scene should have unsaved changes
+
+  @scene-tab-dirty-close
+  Scenario: Closing a scene with unsaved changes asks what to do
+    # Not a browser confirm: a product decision with three answers, because
+    # "Save and close" and "Discard" are not the same decision and collapsing them
+    # is how a saveable scene becomes a lost one.
+    Given a scene named "Unsaved Scene" is open
+    And I have placed the test model into the scene
+    When I close the editor tab of "Unsaved Scene"
+    Then the unsaved-changes decision should be offered
+    When I choose to cancel closing
+    Then the scene editor should be visible
+    And the scene should have unsaved changes
+
+  @scene-tab-dirty-discard
+  Scenario: Discarding from the close decision closes the scene
+    Given a scene named "Discarded Scene" is open
+    And I have placed the test model into the scene
+    When I close the editor tab of "Discarded Scene"
+    And I choose to discard
+    Then there should be no scene editor tabs open
+
+  @scene-tab-dirty-save-close
+  Scenario: Saving from the close decision closes the scene with its work
+    Given a scene named "Saved Scene" is open
+    And I have placed the test model into the scene
+    When I close the editor tab of "Saved Scene"
+    And I choose to save and close
+    Then there should be no scene editor tabs open
+    And the saved scene "Saved Scene" should hold 1 node on the server
+
+  @scene-tab-restore
+  Scenario: A restored workspace reopens the list and each scene editor
+    # Two editor tabs and the list, persisted and restored by id. A layout that
+    # came back with one tab, or with the list turned into an editor, would lose
+    # the workspace the user left.
+    Given a scene named "Restored Scene" is open
+    And I have placed the test model into the scene
+    And a scene named "Restored Second Scene" exists
+    When I open another scene named "Restored Second Scene" from the list
+    And I reload the workspace
+    Then there should be 2 scene editor tabs open
+    And the scene editor for "Restored Second Scene" should be in its own tab
+
+  @scene-tab-missing-scene
+  Scenario: A scene deleted while its tab is open leaves the rest of the workspace alone
+    # A restored tab can name a scene that is gone. Dropping the whole layout for
+    # one missing scene would take every other open scene with it.
+    Given a scene named "Vanishing Scene" is open
+    And a scene named "Surviving Scene" exists
+    When I open another scene named "Surviving Scene" from the list
+    And the scene "Vanishing Scene" is deleted
+    And I return to the tab of the scene named "Vanishing Scene"
+    Then the missing-scene notice should be shown
+    And there should be 2 scene editor tabs open
+
   @scene-dressing
   Scenario: Dressing a node with a material persists on the saved document
     # Applying a material to a slot was MCP-only until the editor grew this
@@ -150,6 +248,19 @@ Feature: Scene authoring
     And I save the scene
     And I reopen the scene "Blockout Scene"
     Then the scene should hold 1 node
+
+  @scene-place
+  Scenario: A blockout box added beside a model lands clear of it
+    # Regression: the next node's x was count x its own width, so a 1 m box
+    # dropped beside a 2 m model landed inside it and the server reported an
+    # overlap the user did not create. Placement now starts at the right edge
+    # of the server's own footprints.
+    Given a scene named "Spread Scene" is open
+    And I have placed the test model into the scene
+    When I add a blockout box
+    And I save the scene
+    And I reopen the scene "Spread Scene"
+    Then no scene node should be flagged as overlapping
 
   # Linking a scene to a project is one of the few things this editor sends
   # straight to the server, and it MOVES THE SCENE'S REVISION. The draft the

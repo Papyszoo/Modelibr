@@ -375,6 +375,34 @@ export class JobApiClient {
   }
 
   /**
+   * Read one model version, including its files and which of them is renderable.
+   *
+   * The Blender operations use this to pick their input. A `.blend` upload has the
+   * automatically converted `.glb` added to its version, and the renderable-file
+   * endpoint prefers that derivative - which is not the file a bake or an unwrap is
+   * about, and whether it exists yet is a race with the conversion.
+   *
+   * @param {number} modelId
+   * @param {number} versionId
+   * @returns {Promise<Object>} The version, with its `files` array.
+   */
+  async getModelVersion(modelId, versionId) {
+    try {
+      const response = await this.apiClient.get(
+        `/models/${modelId}/versions/${versionId}`
+      )
+      return response.data
+    } catch (error) {
+      logger.error('Failed to get model version', {
+        modelId,
+        versionId,
+        error: error.message,
+      })
+      throw error
+    }
+  }
+
+  /**
    * Get sound file for processing
    * @param {number} soundId - The sound ID
    * @returns {Promise<Object>} Sound file response with stream

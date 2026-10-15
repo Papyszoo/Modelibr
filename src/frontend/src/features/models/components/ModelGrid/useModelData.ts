@@ -9,6 +9,7 @@ import {
   usePacksQuery,
   useProjectsQuery,
 } from '@/features/models/api/queries'
+import { isTriangleRangeInverted } from '@/features/models/utils/triangleRange'
 import { useDebouncedValue } from '@/shared/hooks'
 import {
   isRealCategoryId,
@@ -68,6 +69,15 @@ export function useModelData({
   // Client-side filtering in useModelFilters keeps the visual snappy.
   const debouncedSearchName = useDebouncedValue(searchQuery.trim(), 300)
 
+  // An inverted triangle range (Min > Max) is impossible; don't send it. The
+  // filter panel shows the inline error instead of an empty, unexplained list.
+  const triangleRangeInverted = isTriangleRangeInverted(
+    minTriangleCount,
+    maxTriangleCount
+  )
+  const appliedMinTriangles = triangleRangeInverted ? null : minTriangleCount
+  const appliedMaxTriangles = triangleRangeInverted ? null : maxTriangleCount
+
   const {
     data: paginatedData,
     fetchNextPage,
@@ -87,8 +97,8 @@ export function useModelData({
         tags: sortedTagNames,
         hasConceptImages,
         animatedOnly,
-        minTriangleCount,
-        maxTriangleCount,
+        minTriangleCount: appliedMinTriangles,
+        maxTriangleCount: appliedMaxTriangles,
         uvStatus,
         searchName: debouncedSearchName || undefined,
       },
@@ -105,8 +115,8 @@ export function useModelData({
         tags: sortedTagNames.length > 0 ? sortedTagNames : undefined,
         hasConceptImages: hasConceptImages || undefined,
         hasAnimations: animatedOnly || undefined,
-        minTriangleCount: minTriangleCount ?? undefined,
-        maxTriangleCount: maxTriangleCount ?? undefined,
+        minTriangleCount: appliedMinTriangles ?? undefined,
+        maxTriangleCount: appliedMaxTriangles ?? undefined,
         uvStatus: uvStatus ?? undefined,
         searchName: debouncedSearchName || undefined,
       }),

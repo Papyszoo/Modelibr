@@ -67,7 +67,7 @@ public class FinishSceneRenderJobCommandHandler : ICommandHandler<FinishSceneRen
         {
             job.MarkAsFailed(command.ErrorMessage ?? "Scene render failed", now);
             _logger.LogWarning("Scene render job {JobId} failed for SceneId {SceneId}: {Error}",
-                command.JobId, job.SceneId, command.ErrorMessage);
+                command.JobId, job.SceneId, LogSanitizer.Sanitize(command.ErrorMessage));
         }
 
         await _thumbnailJobRepository.UpdateAsync(job, cancellationToken);

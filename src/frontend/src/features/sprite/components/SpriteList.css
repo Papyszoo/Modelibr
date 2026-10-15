@@ -302,10 +302,27 @@
 .sprite-select-checkbox {
   position: absolute;
   top: 0.5rem;
-  right: 0.5rem;
+  left: 0.5rem;
   z-index: 2;
   opacity: 0;
   transition: opacity 0.2s;
+  width: 1.25rem;
+  height: 1.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid var(--surface-border);
+  border-radius: 4px;
+  padding: 0;
+  color: var(--text-color);
+  appearance: none;
+  -webkit-appearance: none;
+  cursor: pointer;
+}
+
+.sprite-select-checkbox i {
+  font-size: 1rem;
 }
 
 .sprite-card:hover .sprite-select-checkbox,
@@ -313,16 +330,8 @@
   opacity: 1;
 }
 
-.sprite-select-checkbox .p-checkbox {
-  width: 1.25rem;
-  height: 1.25rem;
-}
-
-.sprite-select-checkbox .p-checkbox .p-checkbox-box {
-  width: 1.25rem;
-  height: 1.25rem;
-  background: rgba(255, 255, 255, 0.9);
-  border-radius: 4px;
+.sprite-card.selected .sprite-select-checkbox {
+  color: var(--primary-color);
 }
 
 /* Selected sprite card */

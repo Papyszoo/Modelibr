@@ -361,3 +361,43 @@ export async function setDefaultTextureSet(
   })
   return response.data
 }
+
+/**
+ * A queued Blender operation, as the REST endpoint returns it after accepting
+ * the request. `jobId` is what `GET /operation-jobs/{jobId}` is polled with.
+ */
+export interface BlenderOperationRequested {
+  jobId: number
+  operation: string
+  modelId: number
+  versionId: number
+  alreadyQueued: boolean
+}
+
+/**
+ * Queue one Blender operation (uv-unwrap, bake-textures, convert-format,
+ * mesh-analysis) on a model version. Returns as soon as the job is queued - the
+ * work runs in the worker and writes a new version, which is why the caller
+ * only gets a job id back.
+ *
+ * `parametersJson` is the operation's own inputs as a JSON string: the endpoint
+ * takes one opaque blob and validates it per operation server-side. Bake for
+ * web is a `convert-format` with `{"format":"glb","bake":true}`.
+ *
+ * On a server without Blender the endpoint answers 409 `Blender.NotAvailable`;
+ * the rejected error carries that code in its body (`details.error`).
+ */
+export async function requestModelBlenderOperation(
+  modelId: number,
+  operation: string,
+  options: { versionId?: number | null; parametersJson?: string } = {}
+): Promise<BlenderOperationRequested> {
+  const response = await client.post<BlenderOperationRequested>(
+    `/models/${modelId}/blender/${operation}`,
+    {
+      versionId: options.versionId ?? null,
+      parametersJson: options.parametersJson ?? null,
+    }
+  )
+  return response.data
+}

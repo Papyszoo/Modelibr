@@ -5,7 +5,6 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Button } from 'primereact/button'
 import { Checkbox } from 'primereact/checkbox'
 import { Dialog } from 'primereact/dialog'
-import { InputText } from 'primereact/inputtext'
 import { Toast } from 'primereact/toast'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
@@ -13,6 +12,7 @@ import { useModelsQuery } from '@/features/models/api/queries'
 import { associateTextureSetWithAllModelVersions } from '@/features/texture-set/api/textureSetApi'
 import { useTabContext } from '@/hooks/useTabContext'
 import { CardWidthSlider } from '@/shared/components/CardWidthSlider'
+import { ListToolbarSearchInput } from '@/shared/components/list-toolbar'
 import { ThumbnailDisplay } from '@/shared/thumbnail'
 import { useCardWidthStore } from '@/stores/cardWidthStore'
 import { type Model } from '@/utils/fileUtils'
@@ -88,16 +88,13 @@ export function TextureSetModelList({
           padding: '0.5rem 0',
         }}
       >
-        <span className="p-input-icon-left" style={{ flex: 1 }}>
-          <i className="pi pi-search" />
-          <InputText
-            type="text"
-            placeholder="Search models..."
+        <div style={{ flex: 1 }}>
+          <ListToolbarSearchInput
             value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
-            style={{ width: '100%' }}
+            onChange={setSearchQuery}
+            placeholder="Search models..."
           />
-        </span>
+        </div>
         <Button
           icon="pi pi-refresh"
           className="p-button-text p-button-sm"

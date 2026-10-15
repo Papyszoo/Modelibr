@@ -1,0 +1,55 @@
+.project-workspace {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mod-space-sm);
+  padding-bottom: var(--mod-space-md);
+  border-bottom: 1px solid var(--surface-border);
+}
+
+/*
+ * A tab bar, not a website nav: same row the dock uses for its tabs, one border
+ * under the whole strip, and no rounded pill backgrounds - this competes with the
+ * container's own tab bar above it, so it stays quieter than that one.
+ */
+.project-workspace-nav {
+  display: flex;
+  align-items: stretch;
+  gap: var(--mod-space-2xs);
+  border-bottom: 1px solid var(--surface-border);
+}
+
+.project-workspace-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--mod-space-2xs);
+  padding: var(--mod-space-2xs) var(--mod-space-xs);
+  margin-bottom: -1px;
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: none;
+  color: var(--text-color-secondary);
+  font-size: var(--mod-text-sm);
+  cursor: pointer;
+}
+
+.project-workspace-tab:hover {
+  color: var(--text-color);
+  background: var(--surface-hover);
+}
+
+.project-workspace-tab.is-active {
+  color: var(--text-color);
+  border-bottom-color: var(--primary-color);
+}
+
+.project-workspace-count {
+  color: var(--text-color-secondary);
+  font-size: var(--mod-text-xs);
+}
+
+.project-workspace-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mod-space-sm);
+  min-width: 0;
+}

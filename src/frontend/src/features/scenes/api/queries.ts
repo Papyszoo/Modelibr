@@ -11,15 +11,16 @@ import { useSceneLinkHoldStore } from '@/stores'
 
 import type { SceneDocument, SceneRecommendationChoice } from '../types'
 import {
+  acceptSceneRecommendations,
   createScene,
   deleteScene,
   getSceneById,
   getScenes,
   getSceneSlots,
-  acceptSceneRecommendations,
   rejectSceneCandidates,
   renameScene,
   resolveSceneSlot,
+  setSceneLevel,
   setSceneProject,
   updateSceneDocument,
 } from './scenesApi'
@@ -28,6 +29,12 @@ export function getScenesQueryOptions() {
   return queryOptions({
     queryKey: ['scenes'] as const,
     queryFn: () => getScenes(),
+    // Same reason as the detail query below: a scene is written from outside
+    // this browser (an agent over MCP, or the level's own scene control in
+    // another tab), so the list must not be served from a five-minute cache.
+    // Without this, returning to the list after a scene was created out of band
+    // showed the list as it was when the tab was last mounted.
+    staleTime: 0,
   })
 }
 
@@ -45,6 +52,30 @@ export function useScenesQuery({
 }
 
 /**
+ * True when a scene request failed because the scene no longer exists.
+ *
+ * A scene deleted while its tab is open answers 404; retrying that (and
+ * refetching it on every window focus) only produced repeated 404s. Other
+ * failures still retry normally.
+ */
+function isSceneNotFound(error: unknown): boolean {
+  return error instanceof ApiClientError && error.status === 404
+}
+
+/**
+ * The retry/window-focus policy shared by every per-scene query. One definition
+ * so the detail and slots queries cannot drift apart.
+ */
+function sceneNotFoundQueryPolicy() {
+  return {
+    retry: (failureCount: number, error: unknown) =>
+      !isSceneNotFound(error) && failureCount < 3,
+    refetchOnWindowFocus: (query: { state: { error: unknown } }) =>
+      !isSceneNotFound(query.state.error),
+  }
+}
+
+/**
  * A scene is written from outside this browser, so it is never served stale.
  *
  * The global default holds a query fresh for five minutes, which is right for a
@@ -59,6 +90,7 @@ export function getSceneByIdQueryOptions(sceneId: number) {
     queryKey: ['scenes', 'detail', sceneId] as const,
     queryFn: () => getSceneById(sceneId),
     staleTime: 0,
+    ...sceneNotFoundQueryPolicy(),
   })
 }
 
@@ -151,6 +183,9 @@ export function getSceneSlotsQueryOptions(sceneId: number) {
     queryKey: ['scenes', 'slots', sceneId] as const,
     queryFn: () => getSceneSlots(sceneId),
     staleTime: 0,
+    // Same as the detail query: a scene that no longer exists is not retried
+    // or refetched on focus.
+    ...sceneNotFoundQueryPolicy(),
   })
 }
 
@@ -383,6 +418,40 @@ export function isDefiniteWriteRefusal(error: unknown): boolean {
  * unresolved - no matter what is mounted.
  * </p>
  */
+
+/**
+ * Files a scene under a level, or lifts it back out, with no write hold.
+ *
+ * The guarded path exists to stop a link landing while a *draft* is unresolved: a
+ * draft carries the revision it was based on, and a link moves that revision out
+ * from under it. That is the only hazard here, and it is why this is not simply
+ * the same mutation with its guard removed.
+ *
+ * Neither link endpoint takes an expected revision - they carry a project id or a
+ * level id and nothing else - so two of them in sequence cannot conflict with each
+ * other. And the hold is released by the scene editor's own reconciliation, which
+ * means a hold opened for a scene nobody is editing never clears. A freshly
+ * created scene is exactly that scene: guarding its second link would wait for a
+ * reconciliation no component is in a position to perform, and the level would
+ * silently never be filed.
+ *
+ * So the caller states the precondition instead: use this when the scene has no
+ * open editor, and use the guarded mutation when it has one.
+ */
+export function useFileSceneUnderLevel(): (
+  sceneId: number,
+  projectLevelId: number | null,
+  isPrimary: boolean
+) => Promise<void> {
+  const queryClient = useQueryClient()
+
+  return async (sceneId, projectLevelId, isPrimary) => {
+    await setSceneLevel(sceneId, projectLevelId, isPrimary)
+    void queryClient.invalidateQueries({ queryKey: ['scenes'] })
+    void queryClient.invalidateQueries({ queryKey: ['projects'] })
+  }
+}
+
 export function useSetSceneProjectMutation() {
   const queryClient = useQueryClient()
 

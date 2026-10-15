@@ -1,0 +1,46 @@
+.vfx-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--mod-space-sm);
+  padding: var(--mod-space-md);
+  height: 100%;
+  overflow-y: auto;
+}
+
+.vfx-list-grid {
+  align-content: start;
+}
+
+/* Placeholder art while an effect has no rendered thumbnail yet. */
+.vfx-list-tile-media {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--mod-color-surface);
+  color: var(--mod-color-text-muted);
+  font-size: var(--mod-text-2xl);
+}
+
+.vfx-list-types {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--mod-space-2xs);
+}
+
+.vfx-list-types .pi {
+  font-size: var(--mod-text-xs);
+}
+
+.vfx-list-confirm {
+  margin: 0;
+  font-size: var(--mod-text-sm);
+  color: var(--mod-color-text);
+}
+
+.vfx-list-error {
+  margin: 0;
+  font-size: var(--mod-text-sm);
+  color: var(--mod-color-danger);
+}

@@ -50,6 +50,22 @@ public class GetMaterialLibraryQueryHandlerTests
     }
 
     [Fact]
+    public async Task Entries_CarryTheStoredEffectsDocument()
+    {
+        var material = Material.Create("Glow Jelly", MaterialParameters.Default, Now);
+        material.SetEffects(
+            """{"version":1,"effects":[{"type":"rim","color":"#7CFF2A","power":3,"intensity":1}]}""", Now);
+        GivenMaterials(material);
+        GivenGlobalMaterials();
+
+        var result = await Handler().Handle(new GetMaterialLibraryQuery(), CancellationToken.None);
+
+        var entry = Assert.Single(result.Value.Entries);
+        Assert.NotNull(entry.Effects);
+        Assert.Equal("#7CFF2A", entry.Effects!.Value.GetProperty("effects")[0].GetProperty("color").GetString());
+    }
+
+    [Fact]
     public async Task Entries_CarryRequiresUvs_SoACallerNeverHasToKnowTheTable()
     {
         GivenMaterials(Material.Create("Brass", MaterialParameters.Default, Now));
@@ -133,6 +149,27 @@ public class GetMaterialLibraryQueryHandlerTests
 
         Assert.Equal(new[] { "C material", "D global" }, result.Value.Entries.Select(e => e.Name));
         Assert.Equal(4, result.Value.TotalCount);
+        Assert.Equal(2, result.Value.TotalPages);
+    }
+
+    [Fact]
+    public async Task PageSize_Alone_PagesFromTheFirstPage()
+    {
+        // The scene's material picker sends pageSize alone. Reading that as "no paging"
+        // returned the whole library for one page's worth of cards.
+        GivenMaterials(
+            Material.Create("A material", MaterialParameters.Default, Now),
+            Material.Create("B material", MaterialParameters.Default, Now),
+            Material.Create("C material", MaterialParameters.Default, Now));
+        GivenGlobalMaterials();
+
+        var result = await Handler().Handle(
+            new GetMaterialLibraryQuery(PageSize: 2), CancellationToken.None);
+
+        Assert.Equal(new[] { "A material", "B material" }, result.Value.Entries.Select(e => e.Name));
+        Assert.Equal(3, result.Value.TotalCount);
+        Assert.Equal(1, result.Value.Page);
+        Assert.Equal(2, result.Value.PageSize);
         Assert.Equal(2, result.Value.TotalPages);
     }
 

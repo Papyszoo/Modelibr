@@ -3,6 +3,27 @@
  * the concept board above it. No height of its own and no nested scroll box -
  * the column already scrolls.
  */
+.project-profile-disclosure {
+  border-top: 1px solid var(--mod-color-border);
+  border-bottom: 1px solid var(--mod-color-border);
+}
+
+.project-profile-disclosure > summary {
+  padding: var(--mod-space-sm) 0;
+  color: var(--mod-color-text-muted);
+  cursor: pointer;
+  font-size: var(--mod-text-sm);
+  font-weight: var(--mod-font-weight-semibold);
+}
+
+.project-profile-disclosure[open] > summary {
+  color: var(--text-color);
+}
+
+.project-profile-disclosure > .container-rich-block {
+  padding-top: 0;
+}
+
 .project-profile {
   display: flex;
   flex-direction: column;
@@ -47,6 +68,24 @@
   flex-direction: column;
   gap: 2px;
   min-width: 12rem;
+}
+
+/* The shared NumberInput renders a bare input; give it the same chrome the
+   neighbouring themed fields get. */
+.project-profile-budget-field .project-profile-budget-input {
+  width: 100%;
+  padding: var(--mod-space-2xs) var(--mod-space-xs);
+  font: inherit;
+  font-size: var(--mod-text-sm);
+  color: var(--mod-color-text);
+  background: var(--mod-color-surface);
+  border: 1px solid var(--mod-color-border);
+  border-radius: var(--mod-radius-sm);
+}
+
+.project-profile-budget-field .project-profile-budget-input:focus {
+  border-color: var(--mod-color-primary);
+  outline: none;
 }
 
 .project-profile-budget-field label {

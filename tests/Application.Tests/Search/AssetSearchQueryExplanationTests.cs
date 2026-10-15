@@ -144,6 +144,21 @@ public class AssetSearchQueryExplanationTests
     }
 
     [Fact]
+    public async Task A_Zero_Match_Word_Is_Named_Even_When_The_Search_Answered()
+    {
+        // The note used to be reserved for a thin result. A caller that got plenty of hits
+        // still has to be told when one of its words is not in the library at all - otherwise
+        // the results read as if that word had contributed to them.
+        _totalCount = 40;
+        _diagnostics.Add(new SearchTermDiagnostic("settee", 0, Array.Empty<string>()));
+
+        var query = await Explain("brown settee");
+
+        Assert.Contains("'settee'", query!.Note);
+        Assert.Contains("the search ran on the rest", query.Note);
+    }
+
+    [Fact]
     public async Task A_Blank_Query_Has_Nothing_To_Explain()
     {
         // Blank means "everything matching the filters". An empty explanation on every

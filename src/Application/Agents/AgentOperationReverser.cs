@@ -6,6 +6,7 @@ using Application.EnvironmentMaps;
 using Application.Metadata;
 using Application.Models;
 using Application.Packs;
+using Application.Projects;
 using Application.Scenes;
 using Application.Sounds;
 using Application.Sprites;
@@ -115,6 +116,7 @@ internal sealed class AgentOperationReverser : IAgentOperationReverser
     private readonly ICommandHandler<RestoreSceneRecommendationsCommand, SceneRecommendationsResponse> _restoreSceneRecommendations;
     private readonly ICommandHandler<SetSceneProjectCommand, SetSceneProjectResponse> _setSceneProject;
     private readonly ICommandHandler<SetAssetMetadataCommand, AssetMetadataResponse> _setAssetMetadata;
+    private readonly ICommandHandler<RemoveAssetFromProjectCommand> _removeFromProject;
 
     public AgentOperationReverser(
         IAgentAudit audit,
@@ -144,7 +146,8 @@ internal sealed class AgentOperationReverser : IAgentOperationReverser
         ICommandHandler<RestoreSceneSlotCommand, SceneSummary> restoreSceneSlot,
         ICommandHandler<RestoreSceneRecommendationsCommand, SceneRecommendationsResponse> restoreSceneRecommendations,
         ICommandHandler<SetSceneProjectCommand, SetSceneProjectResponse> setSceneProject,
-        ICommandHandler<SetAssetMetadataCommand, AssetMetadataResponse> setAssetMetadata)
+        ICommandHandler<SetAssetMetadataCommand, AssetMetadataResponse> setAssetMetadata,
+        ICommandHandler<RemoveAssetFromProjectCommand> removeFromProject)
     {
         _audit = audit;
         _unitOfWork = unitOfWork;
@@ -174,6 +177,7 @@ internal sealed class AgentOperationReverser : IAgentOperationReverser
         _restoreSceneRecommendations = restoreSceneRecommendations;
         _setSceneProject = setSceneProject;
         _setAssetMetadata = setAssetMetadata;
+        _removeFromProject = removeFromProject;
     }
 
     public async Task<Result<ReversalPlan>> PlanAsync(
@@ -400,6 +404,10 @@ internal sealed class AgentOperationReverser : IAgentOperationReverser
             supported: entry.PayloadAfter is not null,
             blocker: "The pack this model was added to was not recorded."),
 
+        "add-to-project" => Step(entry, $"Remove {entry.AssetType} {entry.AssetId} from the project it was added to.", destructive: false,
+            supported: entry.PayloadAfter is not null,
+            blocker: "The project this asset was added to was not recorded."),
+
         "create-pack" => Step(entry, $"Delete pack {entry.AssetId}.", destructive: true,
             supported: entry.AssetId is > 0,
             blocker: "The created pack's id was not recorded."),
@@ -603,12 +611,37 @@ internal sealed class AgentOperationReverser : IAgentOperationReverser
                 continue;
             }
 
-            values[key.GetString()!] = TryGetPropertyInsensitive(field, "value", out var value)
-                ? value.Clone()
-                : null;
+            values[key.GetString()!] = NormalizeFieldValue(
+                key.GetString()!,
+                TryGetPropertyInsensitive(field, "value", out var value) ? value.Clone() : null);
         }
 
         return values;
+    }
+
+    /// <summary>
+    /// A recorded field value in the shape the write accepts.
+    ///
+    /// <para>
+    /// Only <c>category</c> needs this: it reads back as an object (<c>{id, name}</c>) because
+    /// a picker needs the name, while <c>set_asset_metadata</c> takes the id. Without the
+    /// conversion, undoing a category change built a patch the write refuses with
+    /// "'category' expects a category id, or null to clear it".
+    /// </para>
+    /// </summary>
+    private static JsonElement? NormalizeFieldValue(string key, JsonElement? value)
+    {
+        if (value is not { } element
+            || !string.Equals(key, "category", StringComparison.Ordinal)
+            || element.ValueKind != JsonValueKind.Object)
+        {
+            return value;
+        }
+
+        // A cleared category reads back as the object with a null id, which is a clear.
+        return TryGetPropertyInsensitive(element, "id", out var id) && id.ValueKind != JsonValueKind.Null
+            ? id.Clone()
+            : null;
     }
 
     /// <summary>
@@ -855,6 +888,33 @@ internal sealed class AgentOperationReverser : IAgentOperationReverser
                 return result.IsFailure
                     ? Result.Failure<string>(result.Error)
                     : Result.Success($"Removed model {entry.AssetId} from pack {packId}.");
+            }
+
+            case "add-to-project":
+            {
+                var after = Read(entry.PayloadAfter);
+                var projectId = after is null ? null : ReadInt(after.Value, "projectId");
+                var assetType = after is null ? null : ReadString(after.Value, "assetType");
+                if (projectId is null || assetType is null)
+                {
+                    return Result.Failure<string>(new Error(
+                        "NoProjectRecorded", "The project this asset was added to was not recorded."));
+                }
+
+                // An asset that was already in the project stays: the write added nothing,
+                // so its inverse removes nothing.
+                var before = Read(entry.PayloadBefore);
+                if (before is not null && ReadBool(before.Value, "wasMember") == true)
+                {
+                    return Result.Success($"{assetType} {entry.AssetId} was already in project {projectId} beforehand - left in place.");
+                }
+
+                var result = await _removeFromProject.Handle(
+                    new RemoveAssetFromProjectCommand(projectId.Value, assetType, entry.AssetId!.Value), cancellationToken);
+
+                return result.IsFailure
+                    ? Result.Failure<string>(result.Error)
+                    : Result.Success($"Removed {assetType} {entry.AssetId} from project {projectId}.");
             }
 
             case "create-pack":
@@ -1212,9 +1272,10 @@ internal sealed class AgentOperationReverser : IAgentOperationReverser
                 // claiming a decision nobody ever opened.
                 var slot = ReadPayload<SceneSlot>(before.Value, "slot");
                 var node = ReadPayload<SceneSlotNodeState>(before.Value, "node");
+                var produced = ReadPayload<SceneSlotProduced>(before.Value, "produced");
 
                 var result = await _restoreSceneSlot.Handle(
-                    new RestoreSceneSlotCommand(entry.AssetId!.Value, slotId, slot, node), cancellationToken);
+                    new RestoreSceneSlotCommand(entry.AssetId!.Value, slotId, slot, node, produced), cancellationToken);
 
                 return result.IsFailure
                     ? Result.Failure<string>(result.Error)
@@ -1277,7 +1338,10 @@ internal sealed class AgentOperationReverser : IAgentOperationReverser
             case "delete-scene":
             {
                 var before = Read(entry.PayloadBefore);
-                var document = before is null ? null : ReadString(before.Value, "document");
+                // The scene document is recorded as an object, not a string - the writer
+                // stores the whole SceneDocument. Reading it as a string returned null for
+                // every real row, so undoing a delete always answered NoPriorState.
+                var document = before is null ? null : ReadPayload<SceneDocument>(before.Value, "document");
                 if (document is null)
                 {
                     return Result.Failure<string>(new Error(
@@ -1289,7 +1353,7 @@ internal sealed class AgentOperationReverser : IAgentOperationReverser
                 var description = before is null ? null : ReadString(before.Value, "description");
 
                 var result = await _createScene.Handle(
-                    new CreateSceneCommand(name, description, document), cancellationToken);
+                    new CreateSceneCommand(name, description, SceneDocumentCodec.Serialize(document)), cancellationToken);
 
                 // The new id is said out loud rather than glossed over. A scene comes back
                 // with its content intact and its identity changed, and a caller that assumed

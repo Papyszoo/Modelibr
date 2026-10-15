@@ -9,8 +9,9 @@
  */
 import { type DBSchema, type IDBPDatabase, openDB } from 'idb'
 
-import { buildBaseMeshSeed } from './baseMeshesSeed'
 import { type UvStatus } from '@/shared/types/uvStatus'
+
+import { buildBaseMeshSeed } from './baseMeshesSeed'
 
 // ─── Schema ─────────────────────────────────────────────────────────────
 
@@ -46,12 +47,27 @@ export interface DemoModel {
 }
 
 export interface DemoConceptImage {
+  id?: number
+  projectLevelId?: number | null
+  title?: string
   fileId: number
   fileName: string
   previewUrl: string
   fileUrl: string
   sortOrder: number
   mimeType?: string
+}
+
+export interface DemoUnbakedRig {
+  objectConstraints: number
+  boneConstraints: number
+  ikConstraints: number
+  objectDrivers: number
+  armatureDrivers: number
+  shapeKeyDrivers: number
+  shapeKeyActions: number
+  droppedModifiers: string[]
+  hasRigFeatures: boolean
 }
 
 export interface DemoModelVersion {
@@ -71,6 +87,12 @@ export interface DemoModelVersion {
   animationCount?: number | null
   animationNames?: string[]
   boneCount?: number | null
+  /**
+   * Rig features a .blend source carries that the web viewer cannot run, as the
+   * backend's `unbakedRig` rollup. Present only on the demo's stand-in for a
+   * rigged .blend source; every other demo version leaves it off.
+   */
+  unbakedRig?: DemoUnbakedRig | null
   /** UV layout, as the search projection classifies it. See `@/shared/types/uvStatus`. */
   uvStatus?: UvStatus | null
   technicalDetailsUpdatedAt?: string | null
@@ -288,6 +310,94 @@ export interface DemoPack {
   environmentMaps?: { id: number; name: string }[]
 }
 
+export interface DemoProjectLevel {
+  id: number
+  projectId: number
+  name: string
+  description: string | null
+  productionStatus: 'planned' | 'in_progress' | 'review' | 'blocked' | 'done'
+  sortOrder: number
+  createdAt: string
+  updatedAt: string
+}
+
+/** A project comment. Stored under `productionNotes`, its name before comments had a status. */
+export interface DemoProjectComment {
+  id: number
+  projectId: number
+  levelId: number | null
+  referenceImageId: number | null
+  characterId?: number | null
+  modelId?: number | null
+  textureSetId?: number | null
+  spriteId?: number | null
+  soundId?: number | null
+  environmentMapId?: number | null
+  vfxId?: number | null
+  title: string
+  body: string
+  isPinned: boolean
+  status?: 'open' | 'resolved'
+  resolution?: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export interface DemoProjectCharacter {
+  id: number
+  projectId: number
+  name: string
+  description: string | null
+  tags: string[]
+  images: {
+    id: number
+    fileId: number | null
+    fileName: string | null
+    title: string | null
+    caption: string | null
+    previewUrl: string | null
+    fileUrl: string | null
+    sortOrder: number
+  }[]
+  models: {
+    id: number
+    modelId: number | null
+    modelName: string | null
+    label: string | null
+    sortOrder: number
+  }[]
+  abilities: {
+    id: number
+    name: string
+    description: string | null
+    sortOrder: number
+  }[]
+  variants: {
+    id: number
+    name: string
+    description: string | null
+    projectLevelId: number | null
+    projectLevelName: string | null
+    sortOrder: number
+  }[]
+  imageCount: number
+  modelCount: number
+  abilityCount: number
+  variantCount: number
+  createdAt: string
+  updatedAt: string
+}
+
+export interface DemoProjectReferenceLink {
+  id: number
+  projectId: number
+  /** `ProjectConceptImage.id` - the seeded id falls back to the file id. */
+  referenceImageId: number
+  projectLevelId: number | null
+  projectCharacterId: number | null
+  createdAt: string
+}
+
 export interface DemoProject {
   id: number
   name: string
@@ -306,12 +416,17 @@ export interface DemoProject {
   customThumbnailFileId?: number | null
   customThumbnailUrl?: string | null
   conceptImages: DemoConceptImage[]
+  levels?: DemoProjectLevel[]
+  productionNotes?: DemoProjectComment[]
+  characters?: DemoProjectCharacter[]
+  referenceLinks?: DemoProjectReferenceLink[]
   models: { id: number; name: string }[]
   textureSets: { id: number; name: string }[]
   sprites: { id: number; name: string }[]
   sounds: { id: number; name: string }[]
   scripts: { id: number; name: string }[]
   environmentMaps?: { id: number; name: string }[]
+  vfx?: { id: number; name: string }[]
   /**
    * The project profile as the demo stores it (v0.6 prompt 13). Optional, because
    * every seeded project predates it and a project with no profile is a real and
@@ -867,6 +982,20 @@ export async function seedIfEmpty(): Promise<void> {
       animationCount: 2,
       animationNames: ['Idle', 'Walk'],
       boneCount: 18,
+      // Demo stand-in for a rigged .blend source. The real pipeline only emits
+      // this for .blend files; the demo file cannot be one (the browser cannot
+      // render it), so the rig counts are carried on this version by hand.
+      unbakedRig: {
+        objectConstraints: 1,
+        boneConstraints: 1,
+        ikConstraints: 1,
+        objectDrivers: 0,
+        armatureDrivers: 0,
+        shapeKeyDrivers: 1,
+        shapeKeyActions: 1,
+        droppedModifiers: ['Morph:Array (ARRAY)'],
+        hasRigFeatures: true,
+      },
       technicalDetailsUpdatedAt: now,
       thumbnailUrl: null,
       pngThumbnailUrl: null,
@@ -1116,7 +1245,7 @@ export async function seedIfEmpty(): Promise<void> {
           textureType: 2,
           sourceChannel: 5,
           fileId: 302,
-          fileName: 'normal.exr',
+          fileName: 'store-texture-brick_normal.webp',
           createdAt: now,
           proxies: [],
         },
@@ -1125,7 +1254,7 @@ export async function seedIfEmpty(): Promise<void> {
           textureType: 5,
           sourceChannel: 5,
           fileId: 303,
-          fileName: 'roughness.exr',
+          fileName: 'store-texture-brick_roughness.png',
           createdAt: now,
           proxies: [],
         },
@@ -1396,6 +1525,32 @@ public class Enemy : MonoBehaviour
           fileUrl: '/files/210',
           sortOrder: 0,
           mimeType: 'image/png',
+        },
+      ],
+      // The studio's whole production shape is levels - a level's assets are
+      // derived from the scenes linked to it - so the demo project ships two.
+      // Without them the studio opens empty and the level asset view has nothing
+      // to show but its own empty state.
+      levels: [
+        {
+          id: 1,
+          projectId: 1,
+          name: 'Forest Crossing',
+          description: 'Fog, rope bridges, and a bell tower.',
+          productionStatus: 'in_progress' as const,
+          sortOrder: 0,
+          createdAt: now,
+          updatedAt: now,
+        },
+        {
+          id: 2,
+          projectId: 1,
+          name: 'Ruined Keep',
+          description: 'The opening level, still blocked out.',
+          productionStatus: 'planned' as const,
+          sortOrder: 1,
+          createdAt: now,
+          updatedAt: now,
         },
       ],
       models: [

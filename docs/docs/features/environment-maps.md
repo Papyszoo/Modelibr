@@ -1,5 +1,6 @@
 ---
-sidebar_position: 11
+description: Upload HDR panoramas and six-face cube maps, keep multiple size variants, pick the preview variant, and reuse environment maps across packs and projects.
+sidebar_position: 14
 ---
 
 # Environment Maps

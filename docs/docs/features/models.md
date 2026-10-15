@@ -1,4 +1,5 @@
 ---
+description: Upload and organize 3D models in Modelibr. Supported formats are GLB, GLTF, FBX, OBJ, STL, 3MF, and Blend, with animated thumbnails and version history.
 sidebar_position: 1
 ---
 
@@ -7,9 +8,18 @@ sidebar_position: 1
 Modelibr helps you organize and manage your 3D model library with automatic thumbnails, version control, and easy navigation.
 
 <div className="feature-video-container">
-  <video controls width="100%" autoPlay muted loop>
+  <video
+    controls
+    width="100%"
+    autoPlay
+    muted
+    loop
+    playsInline
+    preload="metadata"
+    poster="/img/videos/model-management-poster.webp"
+  >
     <source src="/videos/model-management.webm" type="video/webm" />
-    <p className="video-fallback">Demo video is being generated...</p>
+    <p className="video-fallback">A short screen recording of uploading and previewing a model in Modelibr</p>
   </video>
 </div>
 
@@ -19,9 +29,13 @@ Modelibr helps you organize and manage your 3D model library with automatic thum
 
 The easiest way to upload models is to drag and drop files directly onto the Model Library panel.
 
-![Model List](/img/screenshots/model-list.png)
+![The Modelibr library grid showing uploaded 3D models with tags, versions, and categories](/img/screenshots/model-list.png)
 
 **Supported formats:** GLB, GLTF, FBX, OBJ, STL, 3MF, Blend
+
+The upload dialog accepts those seven; the server also accepts 3ds Max (`.max`)
+and Maya (`.ma`, `.mb`) files, which are stored as project files rather than
+rendered.
 
 ### What Happens After Upload
 
@@ -30,6 +44,11 @@ The easiest way to upload models is to drag and drop files directly onto the Mod
    waiting for its picture
 3. **Thumbnail Generated** - The worker service renders a preview image
 4. **Ready to View** - Click to open in the 3D viewer
+
+Thumbnail rendering has its own settings under **Settings → Thumbnail
+Generation**: resolution, frame count, a transparent or solid background, and
+whether an upload of a file that already has a rendered thumbnail reuses it
+instead of rendering again.
 
 :::tip Batch Upload
 You can drag multiple files at once. Each file becomes a separate model.
@@ -81,6 +100,10 @@ The folder is known for imports that come from a path or an archive. A file
 dragged into the browser carries a name and nothing else, so those models are
 classified from their name alone.
 
+Auto-tagging can be turned off in **Settings → File Upload → Auto-tag on
+import**. Turning it off stops new imports from being classified; what was
+already applied stays.
+
 ## Organizing with Categories
 
 Use the category sidebar (left of the grid) to organize models into groups:
@@ -103,7 +126,7 @@ and projects are not category-filtered.
 
 Click any model card to open it in the 3D viewer:
 
-![Model Viewer](/img/screenshots/model-viewer.png)
+![The Modelibr model viewer showing a 3D model in the browser with the version list beside it](/img/screenshots/model-viewer.png)
 
 ### Viewer Controls
 
@@ -126,6 +149,10 @@ The viewer includes floating control buttons:
 - **Model Hierarchy** - Explore mesh structure
 - **Thumbnail Details** - View and regenerate thumbnail
 - **UV Map** - Preview UV mapping
+
+If the model carries animation clips or shape keys, the **Model Info** panel grows
+an **Animation** section with playback and shape-key controls. See
+[Animations and Shape Keys](./animations) for what plays per format.
 
 ### Metadata
 

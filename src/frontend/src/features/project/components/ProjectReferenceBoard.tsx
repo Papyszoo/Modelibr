@@ -1,0 +1,550 @@
+import './ProjectReferenceBoard.css'
+
+import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { Button } from 'primereact/button'
+import { confirmDialog } from 'primereact/confirmdialog'
+import { InputText } from 'primereact/inputtext'
+import { useMemo, useRef, useState } from 'react'
+
+import { uploadFile } from '@/features/models/api/modelApi'
+import {
+  addProjectConceptImage,
+  removeProjectConceptImage,
+} from '@/features/project/api/projectApi'
+import {
+  addProjectReferenceLink,
+  type ProjectReferenceDto,
+  removeProjectReferenceLink,
+  updateProjectReference,
+} from '@/features/project/api/projectStudioApi'
+import {
+  useProjectCharactersQuery,
+  useProjectLevelsQuery,
+  useProjectReferencesQuery,
+} from '@/features/project/api/projectStudioQueries'
+import { resolveApiAssetUrl } from '@/lib/apiBase'
+import {
+  EmptyState,
+  ErrorState,
+  LoadingState,
+} from '@/shared/components/feedback'
+import { ImageLightboxDialog } from '@/shared/components/ImageLightboxDialog'
+
+import { ProjectCommentThread } from './ProjectCommentThread'
+
+interface ProjectReferenceBoardProps {
+  projectId: number
+  onChanged?: () => void
+  /**
+   * Pins the board to one Level or Character and drops the filter control.
+   *
+   * The Level workspace's References view *is* "this level's references", so
+   * offering a picker there would let the user filter their way out of the level
+   * they opened. The server-side filter is reused, so the view and the API can
+   * never disagree about what a link means.
+   */
+  fixedTarget?: string
+}
+
+type LinkTarget = 'level' | 'character'
+
+const ALL_TARGETS = 'all'
+const LEVEL_PREFIX = 'level:'
+const CHARACTER_PREFIX = 'character:'
+
+export function ProjectReferenceBoard({
+  projectId,
+  fixedTarget,
+  onChanged,
+}: ProjectReferenceBoardProps) {
+  const queryClient = useQueryClient()
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
+  const [target, setTarget] = useState(ALL_TARGETS)
+  // A pinned target wins over the local one: the workspace opened on a level, so
+  // that is the only target its References view is about.
+  const effectiveTarget = fixedTarget ?? target
+  // Server-side filtering, not a client-side pass over every image: the board
+  // and the endpoint can never disagree about what a link means.
+  const filterOptions = useMemo(() => {
+    if (effectiveTarget.startsWith(LEVEL_PREFIX)) {
+      return { levelId: Number(effectiveTarget.slice(LEVEL_PREFIX.length)) }
+    }
+    if (effectiveTarget.startsWith(CHARACTER_PREFIX)) {
+      return {
+        characterId: Number(effectiveTarget.slice(CHARACTER_PREFIX.length)),
+      }
+    }
+    return {}
+  }, [effectiveTarget])
+  const filtering = effectiveTarget !== ALL_TARGETS
+  const referencesQuery = useProjectReferencesQuery(projectId, filterOptions)
+  // The unfiltered count is what the "n of m" header needs, and it is only
+  // worth the second request while a filter is on.
+  const allReferencesQuery = useProjectReferencesQuery(
+    projectId,
+    {},
+    !filtering
+  )
+  const levelsQuery = useProjectLevelsQuery(projectId)
+  const charactersQuery = useProjectCharactersQuery(projectId)
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null)
+
+  const invalidate = async () => {
+    await Promise.all([
+      queryClient.invalidateQueries({
+        queryKey: ['projects', projectId, 'references'],
+      }),
+      // A reference image linked to a character changes that character's
+      // server-computed imageCount, so its list must refresh too.
+      queryClient.invalidateQueries({
+        queryKey: ['projects', projectId, 'characters'],
+      }),
+      onChanged?.(),
+    ])
+  }
+
+  const uploadImages = useMutation({
+    mutationFn: async (files: File[]) => {
+      for (const file of files) {
+        // Upload to the library first, then attach the file to the project -
+        // the same two steps the project card has always taken.
+        const uploaded = await uploadFile(file, { uploadType: 'file' })
+        await addProjectConceptImage(projectId, uploaded.fileId)
+      }
+    },
+    onSuccess: invalidate,
+  })
+
+  const renameReference = useMutation({
+    mutationFn: (input: { referenceId: number; title: string }) =>
+      updateProjectReference(projectId, input.referenceId, {
+        title: input.title,
+      }),
+    onSuccess: invalidate,
+  })
+
+  const addLink = useMutation({
+    mutationFn: (input: {
+      referenceId: number
+      link: {
+        projectLevelId?: number | null
+        projectCharacterId?: number | null
+      }
+    }) => addProjectReferenceLink(projectId, input.referenceId, input.link),
+    onSuccess: invalidate,
+  })
+
+  const removeLink = useMutation({
+    mutationFn: (input: { referenceId: number; linkId: number }) =>
+      removeProjectReferenceLink(projectId, input.referenceId, input.linkId),
+    onSuccess: invalidate,
+  })
+
+  const removeImage = useMutation({
+    mutationFn: (fileId: number) =>
+      removeProjectConceptImage(projectId, fileId),
+    onSuccess: invalidate,
+  })
+
+  const queryError =
+    referencesQuery.error ?? levelsQuery.error ?? charactersQuery.error
+  if (queryError) {
+    return (
+      <ErrorState
+        title="Could not load references"
+        message={
+          queryError instanceof Error
+            ? queryError.message
+            : 'The reference request failed.'
+        }
+        onRetry={() => {
+          void Promise.all([
+            referencesQuery.refetch(),
+            allReferencesQuery.refetch(),
+            levelsQuery.refetch(),
+            charactersQuery.refetch(),
+          ])
+        }}
+      />
+    )
+  }
+  if (referencesQuery.isLoading) {
+    return <LoadingState message="Loading references…" />
+  }
+
+  const references = referencesQuery.data ?? []
+  const levels = levelsQuery.data ?? []
+  const characters = charactersQuery.data ?? []
+  // Unfiltered total, so "3 of 12" stays honest while a target filter is on.
+  const totalReferences = filtering
+    ? (allReferencesQuery.data?.length ?? references.length)
+    : references.length
+  const filterOptionsList = [
+    ...levels.map(level => ({
+      value: `${LEVEL_PREFIX}${level.id}`,
+      label: `Level: ${level.name}`,
+    })),
+    ...characters.map(character => ({
+      value: `${CHARACTER_PREFIX}${character.id}`,
+      label: `Character: ${character.name}`,
+    })),
+  ]
+  const lightboxImages = references.map(reference => ({
+    id: reference.fileId,
+    name: reference.title || reference.fileName,
+    // Resolution can only fail on an empty URL, in which case the API's own
+    // path is the honest answer - the dialog has no placeholder for a broken one.
+    previewUrl:
+      resolveApiAssetUrl(reference.previewUrl) ?? reference.previewUrl,
+    fullUrl: resolveApiAssetUrl(reference.fileUrl) ?? reference.fileUrl,
+  }))
+
+  return (
+    <section
+      className="project-reference-board"
+      data-testid="project-reference-board"
+    >
+      <div className="project-reference-header">
+        <div>
+          <span className="container-rich-kicker">Visual direction</span>
+          <h3>Reference Board</h3>
+        </div>
+        <div className="project-reference-header-actions">
+          {fixedTarget === undefined && filterOptionsList.length > 0 ? (
+            <select
+              className="project-reference-filter"
+              data-testid="project-reference-filter"
+              aria-label="Filter references by target"
+              value={target}
+              onChange={event => setTarget(event.target.value)}
+            >
+              <option value={ALL_TARGETS}>All targets</option>
+              {filterOptionsList.map(option => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          ) : null}
+          <span
+            className="project-studio-count"
+            data-testid="project-reference-count"
+          >
+            {filtering
+              ? `${references.length} of ${totalReferences}`
+              : references.length}
+          </span>
+          <Button
+            icon="pi pi-plus"
+            text
+            rounded
+            aria-label="Add reference images"
+            title="Add reference images"
+            disabled={uploadImages.isPending}
+            onClick={() => fileInputRef.current?.click()}
+          />
+        </div>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          multiple
+          hidden
+          data-testid="project-reference-upload"
+          aria-label="Reference images to upload"
+          onChange={event => {
+            const files = Array.from(event.target.files ?? [])
+            if (files.length > 0) uploadImages.mutate(files)
+            event.target.value = ''
+          }}
+        />
+      </div>
+
+      <ImageLightboxDialog
+        visible={lightboxIndex !== null}
+        title="Project reference"
+        images={lightboxImages}
+        activeIndex={lightboxIndex ?? 0}
+        onIndexChange={setLightboxIndex}
+        onHide={() => setLightboxIndex(null)}
+      />
+
+      {references.length === 0 ? (
+        filtering ? (
+          <EmptyState
+            icon="pi pi-filter-slash"
+            title="No references linked here yet"
+            message="Link an image to this level or character, or switch the filter back to all targets."
+          />
+        ) : (
+          <EmptyState
+            icon="pi pi-images"
+            title="No reference images yet"
+            message="Add concept art, mood references, and character sheets here, then link each image to the level or character it belongs to."
+          />
+        )
+      ) : (
+        <div className="project-reference-grid">
+          {references.map((reference, index) => (
+            <ReferenceCard
+              key={reference.id}
+              reference={reference}
+              index={index}
+              levels={levels}
+              characters={characters}
+              projectId={projectId}
+              onOpen={() => setLightboxIndex(index)}
+              onRename={title =>
+                renameReference.mutate({
+                  referenceId: reference.id,
+                  title,
+                })
+              }
+              onAddLink={link =>
+                addLink.mutate({ referenceId: reference.id, link })
+              }
+              onRemoveLink={linkId =>
+                removeLink.mutate({ referenceId: reference.id, linkId })
+              }
+              onRemove={() => {
+                confirmDialog({
+                  header: 'Remove reference image',
+                  message: `Remove ${reference.title || reference.fileName} from this project? The file stays in your library.`,
+                  icon: 'pi pi-exclamation-triangle',
+                  acceptLabel: 'Remove',
+                  rejectLabel: 'Cancel',
+                  acceptClassName: 'p-button-danger',
+                  accept: () => removeImage.mutate(reference.fileId),
+                })
+              }}
+            />
+          ))}
+        </div>
+      )}
+    </section>
+  )
+}
+
+function ReferenceCard({
+  reference,
+  index,
+  levels,
+  characters,
+  projectId,
+  onOpen,
+  onRename,
+  onAddLink,
+  onRemoveLink,
+  onRemove,
+}: {
+  reference: ProjectReferenceDto
+  index: number
+  levels: Array<{ id: number; name: string }>
+  characters: Array<{ id: number; name: string }>
+  projectId: number
+  onOpen: () => void
+  onRename: (title: string) => void
+  onAddLink: (link: {
+    projectLevelId?: number | null
+    projectCharacterId?: number | null
+  }) => void
+  onRemoveLink: (linkId: number) => void
+  onRemove: () => void
+}) {
+  const [title, setTitle] = useState(reference.title)
+  const [picker, setPicker] = useState<LinkTarget | null>(null)
+
+  const levelLinks = reference.links.filter(link => link.targetType === 'level')
+  const characterLinks = reference.links.filter(
+    link => link.targetType === 'character'
+  )
+  const linkedLevelIds = new Set(
+    levelLinks.map(link => link.projectLevelId).filter(Boolean)
+  )
+  const linkedCharacterIds = new Set(
+    characterLinks.map(link => link.projectCharacterId).filter(Boolean)
+  )
+
+  return (
+    <article
+      className="project-reference-card"
+      data-testid="project-reference-card"
+      data-file-id={reference.fileId}
+    >
+      <div className="project-reference-preview-wrap">
+        <button
+          type="button"
+          className="project-reference-preview"
+          aria-label={`Open reference ${index + 1}`}
+          onClick={onOpen}
+        >
+          <img
+            src={
+              resolveApiAssetUrl(reference.previewUrl) ?? reference.previewUrl
+            }
+            alt={reference.title || reference.fileName}
+          />
+        </button>
+        <Button
+          icon="pi pi-times"
+          text
+          rounded
+          severity="danger"
+          className="project-reference-remove"
+          aria-label={`Remove reference ${reference.title || reference.fileName}`}
+          title="Remove from project"
+          onClick={onRemove}
+        />
+      </div>
+
+      <div className="project-reference-body">
+        <InputText
+          aria-label={`Title for ${reference.fileName}`}
+          className="project-reference-title"
+          data-testid="project-reference-title"
+          value={title}
+          placeholder={reference.fileName}
+          onChange={event => setTitle(event.target.value)}
+          onBlur={() => {
+            if (title.trim() !== reference.title) onRename(title.trim())
+          }}
+          onKeyDown={event => {
+            if (event.key === 'Enter') event.currentTarget.blur()
+          }}
+        />
+
+        <LinkRow
+          label="Levels"
+          links={levelLinks}
+          open={picker === 'level'}
+          options={levels
+            .filter(level => !linkedLevelIds.has(level.id))
+            .map(level => ({ id: level.id, name: level.name }))}
+          emptyText="No levels yet"
+          onToggle={() => setPicker(picker === 'level' ? null : 'level')}
+          onPick={levelId => {
+            onAddLink({ projectLevelId: levelId, projectCharacterId: null })
+            setPicker(null)
+          }}
+          onRemove={onRemoveLink}
+        />
+
+        <LinkRow
+          label="Characters"
+          links={characterLinks}
+          open={picker === 'character'}
+          options={characters
+            .filter(character => !linkedCharacterIds.has(character.id))
+            .map(character => ({ id: character.id, name: character.name }))}
+          emptyText="No characters yet"
+          onToggle={() =>
+            setPicker(picker === 'character' ? null : 'character')
+          }
+          onPick={characterId => {
+            onAddLink({ projectLevelId: null, projectCharacterId: characterId })
+            setPicker(null)
+          }}
+          onRemove={onRemoveLink}
+        />
+
+        <div className="project-reference-comments">
+          <ProjectCommentThread
+            projectId={projectId}
+            target={{ kind: 'referenceImageId', id: reference.id }}
+            targetName={reference.title || reference.fileName}
+            itemTestId="project-reference-comment"
+            bodyPlaceholder="What does this image say about the project?"
+          />
+        </div>
+      </div>
+    </article>
+  )
+}
+
+function LinkRow({
+  label,
+  links,
+  open,
+  options,
+  emptyText,
+  onToggle,
+  onPick,
+  onRemove,
+}: {
+  label: string
+  links: Array<{
+    id: number
+    projectLevelId: number | null
+    projectLevelName: string | null
+    projectCharacterId: number | null
+    projectCharacterName: string | null
+  }>
+  open: boolean
+  options: Array<{ id: number; name: string }>
+  emptyText: string
+  onToggle: () => void
+  onPick: (id: number) => void
+  onRemove: (linkId: number) => void
+}) {
+  const nameFor = (link: (typeof links)[number]) =>
+    link.projectLevelName ?? link.projectCharacterName ?? 'Linked target'
+
+  return (
+    <div className="project-reference-link-row">
+      <div className="project-reference-link-head">
+        <span>{label}</span>
+        <Button
+          icon="pi pi-plus"
+          text
+          rounded
+          aria-label={`Link ${label.toLowerCase().replace(/s$/, '')}`}
+          title={`Link a ${label.toLowerCase().replace(/s$/, '')}`}
+          onClick={onToggle}
+        />
+      </div>
+      {links.length > 0 ? (
+        <div className="project-reference-chips">
+          {links.map(link => (
+            <span
+              className="project-reference-chip"
+              key={link.id}
+              data-testid="project-reference-chip"
+              data-target-type={
+                link.projectLevelId != null ? 'level' : 'character'
+              }
+            >
+              {nameFor(link)}
+              <button
+                type="button"
+                aria-label={`Unlink ${nameFor(link)}`}
+                onClick={() => onRemove(link.id)}
+              >
+                <i className="pi pi-times" />
+              </button>
+            </span>
+          ))}
+        </div>
+      ) : null}
+      {open ? (
+        <div
+          className="project-reference-picker"
+          data-testid="project-reference-picker"
+        >
+          {options.length === 0 ? (
+            <span className="project-reference-picker-empty">{emptyText}</span>
+          ) : (
+            options.map(option => (
+              <button
+                type="button"
+                key={option.id}
+                onClick={() => onPick(option.id)}
+              >
+                {option.name}
+              </button>
+            ))
+          )}
+        </div>
+      ) : null}
+    </div>
+  )
+}

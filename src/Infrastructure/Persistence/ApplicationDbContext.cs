@@ -82,21 +82,29 @@ namespace Infrastructure.Persistence
         public DbSet<Texture> Textures => Set<Texture>();
         public DbSet<TextureSet> TextureSets => Set<TextureSet>();
         public DbSet<Material> Materials => Set<Material>();
+        public DbSet<Vfx> Vfx => Set<Vfx>();
         public DbSet<Pack> Packs => Set<Pack>();
         public DbSet<Project> Projects => Set<Project>();
+        public DbSet<ProjectLevel> ProjectLevels => Set<ProjectLevel>();
+        public DbSet<ProjectCharacter> ProjectCharacters => Set<ProjectCharacter>();
+        public DbSet<ProjectCharacterTag> ProjectCharacterTags => Set<ProjectCharacterTag>();
+        public DbSet<ProjectCharacterImage> ProjectCharacterImages => Set<ProjectCharacterImage>();
+        public DbSet<ProjectCharacterModel> ProjectCharacterModels => Set<ProjectCharacterModel>();
+        public DbSet<CharacterAbility> CharacterAbilities => Set<CharacterAbility>();
+        public DbSet<CharacterVariant> CharacterVariants => Set<CharacterVariant>();
+        public DbSet<ProjectComment> ProjectComments => Set<ProjectComment>();
         public DbSet<ModelCategory> ModelCategories => Set<ModelCategory>();
         public DbSet<TextureSetCategory> TextureSetCategories => Set<TextureSetCategory>();
         public DbSet<ModelTag> ModelTags => Set<ModelTag>();
         public DbSet<ModelConceptImage> ModelConceptImages => Set<ModelConceptImage>();
         public DbSet<ProjectConceptImage> ProjectConceptImages => Set<ProjectConceptImage>();
-        public DbSet<Stage> Stages => Set<Stage>();
+        public DbSet<ProjectReferenceLink> ProjectReferenceLinks => Set<ProjectReferenceLink>();
         public DbSet<Scene> Scenes => Set<Scene>();
         public DbSet<SceneRender> SceneRenders => Set<SceneRender>();
         public DbSet<SceneAssetUsage> SceneAssetUsages => Set<SceneAssetUsage>();
         public DbSet<Thumbnail> Thumbnails => Set<Thumbnail>();
         public DbSet<ThumbnailJob> ThumbnailJobs => Set<ThumbnailJob>();
         public DbSet<ThumbnailJobEvent> ThumbnailJobEvents => Set<ThumbnailJobEvent>();
-        public DbSet<ApplicationSettings> ApplicationSettings => Set<ApplicationSettings>();
         public DbSet<Setting> Settings => Set<Setting>();
         public DbSet<BatchUpload> BatchUploads => Set<BatchUpload>();
         public DbSet<Sprite> Sprites => Set<Sprite>();
@@ -231,6 +239,11 @@ namespace Infrastructure.Persistence
                 .HasMany(e => e.Projects)
                 .WithMany(p => p.EnvironmentMaps)
                 .UsingEntity(j => j.ToTable("ProjectEnvironmentMaps"));
+
+            modelBuilder.Entity<Vfx>()
+                .HasMany(v => v.Projects)
+                .WithMany(p => p.Vfx)
+                .UsingEntity(j => j.ToTable("ProjectVfx"));
 
             modelBuilder.Entity<EnvironmentMap>(entity =>
             {
@@ -608,6 +621,9 @@ namespace Infrastructure.Persistence
                     .HasDefaultValue("sphere");
                 entity.Property(m => m.ThumbnailPath).HasMaxLength(500);
                 entity.Property(m => m.PngThumbnailPath).HasMaxLength(500);
+                // The v1 effects document, stored whole - effects are authored and rendered
+                // as a unit and nothing filters on their internals. Null means no effects.
+                entity.Property(m => m.EffectsJson).HasColumnType("jsonb").IsRequired(false);
                 entity.Property(m => m.CreatedAt).IsRequired();
                 entity.Property(m => m.UpdatedAt).IsRequired();
                 entity.Property(m => m.IsDeleted).IsRequired();
@@ -672,6 +688,23 @@ namespace Infrastructure.Persistence
                 entity.HasIndex(m => m.IsDeleted);
 
                 entity.HasQueryFilter(m => !m.IsDeleted);
+            });
+
+            // Configure Vfx - a visual effect stored as one validated JSON definition.
+            // No tags, categories or soft delete: it is a small authored document,
+            // browsed and deleted as a unit. Its animated thumbnail is a path to a file.
+            modelBuilder.Entity<Vfx>(entity =>
+            {
+                entity.HasKey(v => v.Id);
+                entity.ToTable("Vfx");
+                entity.Property(v => v.Name).IsRequired().HasMaxLength(200);
+                entity.Property(v => v.Description).HasMaxLength(1000);
+                entity.Property(v => v.DefinitionJson).IsRequired().HasColumnType("jsonb");
+                entity.Property(v => v.ThumbnailPath).HasMaxLength(500);
+                entity.Property(v => v.CreatedAt).IsRequired();
+                entity.Property(v => v.UpdatedAt).IsRequired();
+
+                entity.HasIndex(v => v.Name);
             });
 
             // Configure Pack entity
@@ -762,8 +795,258 @@ namespace Infrastructure.Persistence
                     .HasForeignKey(ci => ci.ProjectId)
                     .OnDelete(DeleteBehavior.Cascade);
 
+                entity.HasMany(p => p.Levels)
+                    .WithOne(level => level.Project)
+                    .HasForeignKey(level => level.ProjectId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasMany(p => p.Characters)
+                    .WithOne(character => character.Project)
+                    .HasForeignKey(character => character.ProjectId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasMany(p => p.CharacterTags)
+                    .WithOne(tag => tag.Project)
+                    .HasForeignKey(tag => tag.ProjectId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasMany(p => p.Comments)
+                    .WithOne(comment => comment.Project)
+                    .HasForeignKey(comment => comment.ProjectId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
                 // Create index for efficient querying by name
                 entity.HasIndex(p => p.Name);
+            });
+
+            modelBuilder.Entity<ProjectLevel>(entity =>
+            {
+                entity.ToTable("ProjectLevels", table =>
+                    table.HasCheckConstraint(
+                        "CK_ProjectLevels_ProductionStatus",
+                        "\"ProductionStatus\" IN ('planned', 'in_progress', 'review', 'blocked', 'done')"));
+
+                entity.HasKey(level => level.Id);
+                entity.Property(level => level.Name).IsRequired().HasMaxLength(200);
+                entity.Property(level => level.Description).HasMaxLength(2000);
+                entity.Property(level => level.ProductionStatus).IsRequired().HasMaxLength(20);
+                entity.Property(level => level.SortOrder).IsRequired();
+                entity.Property(level => level.CreatedAt).IsRequired();
+                entity.Property(level => level.UpdatedAt).IsRequired();
+
+                entity.HasIndex(level => new { level.ProjectId, level.Name }).IsUnique();
+                entity.HasIndex(level => new { level.ProjectId, level.SortOrder });
+            });
+
+            // Project comments keep the table they had as production notes.
+            modelBuilder.Entity<ProjectComment>(entity =>
+            {
+                entity.ToTable("ProductionNotes", table =>
+                {
+                    table.HasCheckConstraint(
+                        "CK_ProductionNotes_OneTarget",
+                        string.Join(" + ", new[]
+                        {
+                            "LevelId", "ReferenceImageId", "CharacterId", "ModelId", "TextureSetId",
+                            "SpriteId", "SoundId", "EnvironmentMapId", "VfxId",
+                        }.Select(column => $"(CASE WHEN \"{column}\" IS NOT NULL THEN 1 ELSE 0 END)")) + " <= 1");
+                    table.HasCheckConstraint(
+                        "CK_ProductionNotes_Status",
+                        "\"Status\" IN ('open', 'resolved')");
+                });
+
+                entity.HasKey(comment => comment.Id);
+                entity.Property(comment => comment.Title).IsRequired().HasMaxLength(200);
+                entity.Property(comment => comment.Body).IsRequired().HasMaxLength(10_000);
+                entity.Property(comment => comment.IsPinned).IsRequired();
+                entity.Property(comment => comment.Status).IsRequired().HasMaxLength(20).HasDefaultValue("open");
+                entity.Property(comment => comment.Resolution).HasMaxLength(ProjectComment.MaxResolutionLength);
+                entity.Property(comment => comment.CreatedAt).IsRequired();
+                entity.Property(comment => comment.UpdatedAt).IsRequired();
+                entity.Ignore(comment => comment.Target);
+
+                entity.HasIndex(comment => new { comment.ProjectId, comment.UpdatedAt });
+                entity.HasIndex(comment => new { comment.ProjectId, comment.LevelId });
+                entity.HasIndex(comment => new { comment.ProjectId, comment.ReferenceImageId });
+                entity.HasIndex(comment => new { comment.ProjectId, comment.CharacterId });
+                entity.HasIndex(comment => new { comment.ProjectId, comment.IsPinned });
+                entity.HasIndex(comment => new { comment.ProjectId, comment.Status });
+
+                entity.HasOne(comment => comment.Level)
+                    .WithMany(level => level.Comments)
+                    .HasForeignKey(comment => comment.LevelId)
+                    .OnDelete(DeleteBehavior.SetNull);
+
+                entity.HasOne(comment => comment.ReferenceImage)
+                    .WithMany(reference => reference.Comments)
+                    .HasForeignKey(comment => comment.ReferenceImageId)
+                    .OnDelete(DeleteBehavior.SetNull);
+
+                entity.HasOne(comment => comment.Character)
+                    .WithMany(character => character.Comments)
+                    .HasForeignKey(comment => comment.CharacterId)
+                    .OnDelete(DeleteBehavior.SetNull);
+
+                // Library assets outlive any one project. A hard-deleted asset leaves its
+                // comments on the project rather than taking them with it.
+                entity.HasOne<Model>().WithMany().HasForeignKey(comment => comment.ModelId).OnDelete(DeleteBehavior.SetNull);
+                entity.HasOne<TextureSet>().WithMany().HasForeignKey(comment => comment.TextureSetId).OnDelete(DeleteBehavior.SetNull);
+                entity.HasOne<Sprite>().WithMany().HasForeignKey(comment => comment.SpriteId).OnDelete(DeleteBehavior.SetNull);
+                entity.HasOne<Sound>().WithMany().HasForeignKey(comment => comment.SoundId).OnDelete(DeleteBehavior.SetNull);
+                entity.HasOne<EnvironmentMap>().WithMany().HasForeignKey(comment => comment.EnvironmentMapId).OnDelete(DeleteBehavior.SetNull);
+                entity.HasOne<Vfx>().WithMany().HasForeignKey(comment => comment.VfxId).OnDelete(DeleteBehavior.SetNull);
+            });
+
+            modelBuilder.Entity<ProjectCharacter>(entity =>
+            {
+                entity.HasKey(character => character.Id);
+                entity.Property(character => character.Name).IsRequired().HasMaxLength(200);
+                entity.Property(character => character.Description).HasMaxLength(2000);
+                entity.Property(character => character.CreatedAt).IsRequired();
+                entity.Property(character => character.UpdatedAt).IsRequired();
+
+                entity.HasIndex(character => new { character.ProjectId, character.Name }).IsUnique();
+                entity.HasIndex(character => new { character.ProjectId, character.UpdatedAt });
+            });
+
+            modelBuilder.Entity<ProjectCharacterTag>(entity =>
+            {
+                entity.HasKey(tag => tag.Id);
+                entity.Property(tag => tag.Name).IsRequired().HasMaxLength(100);
+                entity.Property(tag => tag.NormalizedName).IsRequired().HasMaxLength(100);
+                entity.Property(tag => tag.CreatedAt).IsRequired();
+                entity.Property(tag => tag.UpdatedAt).IsRequired();
+                entity.HasIndex(tag => new { tag.ProjectId, tag.NormalizedName }).IsUnique();
+
+                entity.HasMany(tag => tag.Characters)
+                    .WithMany(character => character.Tags)
+                    .UsingEntity<Dictionary<string, object>>(
+                        "ProjectCharacterTagAssignment",
+                        right => right
+                            .HasOne<ProjectCharacter>()
+                            .WithMany()
+                            .HasForeignKey("ProjectCharacterId")
+                            .OnDelete(DeleteBehavior.Cascade),
+                        left => left
+                            .HasOne<ProjectCharacterTag>()
+                            .WithMany()
+                            .HasForeignKey("ProjectCharacterTagId")
+                            .OnDelete(DeleteBehavior.Cascade),
+                        join =>
+                        {
+                            join.ToTable("ProjectCharacterTagAssignments");
+                            join.HasKey("ProjectCharacterId", "ProjectCharacterTagId");
+                            join.HasIndex("ProjectCharacterTagId");
+                        });
+            });
+
+            modelBuilder.Entity<ProjectCharacterImage>(entity =>
+            {
+                entity.ToTable("ProjectCharacterImages", table =>
+                    table.HasCheckConstraint(
+                        "CK_ProjectCharacterImages_SortOrder",
+                        "\"SortOrder\" >= 0"));
+                entity.HasKey(image => image.Id);
+                entity.Property(image => image.FileId).IsRequired(false);
+                entity.Property(image => image.Title).HasMaxLength(200);
+                entity.Property(image => image.Caption).HasMaxLength(2000);
+                entity.Property(image => image.SortOrder).IsRequired();
+                entity.Property(image => image.CreatedAt).IsRequired();
+
+                entity.HasOne(image => image.Project)
+                    .WithMany()
+                    .HasForeignKey(image => image.ProjectId)
+                    .OnDelete(DeleteBehavior.Cascade);
+                entity.HasOne(image => image.ProjectCharacter)
+                    .WithMany(character => character.Images)
+                    .HasForeignKey(image => image.ProjectCharacterId)
+                    .OnDelete(DeleteBehavior.Cascade);
+                entity.HasOne(image => image.File)
+                    .WithMany()
+                    .HasForeignKey(image => image.FileId)
+                    .OnDelete(DeleteBehavior.SetNull);
+                entity.HasIndex(image => new { image.ProjectCharacterId, image.FileId }).IsUnique();
+                entity.HasIndex(image => new { image.ProjectCharacterId, image.SortOrder });
+            });
+
+            modelBuilder.Entity<ProjectCharacterModel>(entity =>
+            {
+                entity.ToTable("ProjectCharacterModels", table =>
+                    table.HasCheckConstraint(
+                        "CK_ProjectCharacterModels_SortOrder",
+                        "\"SortOrder\" >= 0"));
+                entity.HasKey(link => link.Id);
+                entity.Property(link => link.ModelId).IsRequired(false);
+                entity.Property(link => link.Label).HasMaxLength(200);
+                entity.Property(link => link.SortOrder).IsRequired();
+                entity.Property(link => link.CreatedAt).IsRequired();
+
+                entity.HasOne(link => link.Project)
+                    .WithMany()
+                    .HasForeignKey(link => link.ProjectId)
+                    .OnDelete(DeleteBehavior.Cascade);
+                entity.HasOne(link => link.ProjectCharacter)
+                    .WithMany(character => character.Models)
+                    .HasForeignKey(link => link.ProjectCharacterId)
+                    .OnDelete(DeleteBehavior.Cascade);
+                entity.HasOne(link => link.Model)
+                    .WithMany()
+                    .HasForeignKey(link => link.ModelId)
+                    .OnDelete(DeleteBehavior.SetNull);
+                entity.HasIndex(link => new { link.ProjectCharacterId, link.ModelId }).IsUnique();
+                entity.HasIndex(link => new { link.ProjectCharacterId, link.SortOrder });
+            });
+
+            modelBuilder.Entity<CharacterAbility>(entity =>
+            {
+                entity.ToTable("CharacterAbilities", table =>
+                    table.HasCheckConstraint(
+                        "CK_CharacterAbilities_SortOrder",
+                        "\"SortOrder\" >= 0"));
+                entity.HasKey(ability => ability.Id);
+                entity.Property(ability => ability.Name).IsRequired().HasMaxLength(200);
+                entity.Property(ability => ability.Description).HasMaxLength(2000);
+                entity.Property(ability => ability.SortOrder).IsRequired();
+                entity.Property(ability => ability.CreatedAt).IsRequired();
+
+                entity.HasOne(ability => ability.Project)
+                    .WithMany()
+                    .HasForeignKey(ability => ability.ProjectId)
+                    .OnDelete(DeleteBehavior.Cascade);
+                entity.HasOne(ability => ability.ProjectCharacter)
+                    .WithMany(character => character.Abilities)
+                    .HasForeignKey(ability => ability.ProjectCharacterId)
+                    .OnDelete(DeleteBehavior.Cascade);
+                entity.HasIndex(ability => new { ability.ProjectCharacterId, ability.SortOrder });
+            });
+
+            modelBuilder.Entity<CharacterVariant>(entity =>
+            {
+                entity.ToTable("CharacterVariants", table =>
+                    table.HasCheckConstraint(
+                        "CK_CharacterVariants_SortOrder",
+                        "\"SortOrder\" >= 0"));
+                entity.HasKey(variant => variant.Id);
+                entity.Property(variant => variant.Name).IsRequired().HasMaxLength(200);
+                entity.Property(variant => variant.Description).HasMaxLength(2000);
+                entity.Property(variant => variant.ProjectLevelId).IsRequired(false);
+                entity.Property(variant => variant.SortOrder).IsRequired();
+                entity.Property(variant => variant.CreatedAt).IsRequired();
+
+                entity.HasOne(variant => variant.Project)
+                    .WithMany()
+                    .HasForeignKey(variant => variant.ProjectId)
+                    .OnDelete(DeleteBehavior.Cascade);
+                entity.HasOne(variant => variant.ProjectCharacter)
+                    .WithMany(character => character.Variants)
+                    .HasForeignKey(variant => variant.ProjectCharacterId)
+                    .OnDelete(DeleteBehavior.Cascade);
+                entity.HasOne(variant => variant.ProjectLevel)
+                    .WithMany(level => level.CharacterVariants)
+                    .HasForeignKey(variant => variant.ProjectLevelId)
+                    .OnDelete(DeleteBehavior.SetNull);
+                entity.HasIndex(variant => new { variant.ProjectCharacterId, variant.SortOrder });
+                entity.HasIndex(variant => variant.ProjectLevelId);
             });
 
             modelBuilder.Entity<ModelCategory>(entity =>
@@ -822,6 +1105,7 @@ namespace Infrastructure.Persistence
             modelBuilder.Entity<ProjectConceptImage>(entity =>
             {
                 entity.HasKey(ci => ci.Id);
+                entity.Property(ci => ci.Title).IsRequired().HasMaxLength(200);
                 entity.Property(ci => ci.SortOrder).IsRequired();
                 entity.Property(ci => ci.CreatedAt).IsRequired();
 
@@ -834,17 +1118,45 @@ namespace Infrastructure.Persistence
                 entity.HasIndex(ci => new { ci.ProjectId, ci.SortOrder });
             });
 
-            // Configure Stage entity
-            modelBuilder.Entity<Stage>(entity =>
+            modelBuilder.Entity<ProjectReferenceLink>(entity =>
             {
-                entity.HasKey(s => s.Id);
-                entity.Property(s => s.Name).IsRequired().HasMaxLength(200);
-                entity.Property(s => s.ConfigurationJson).IsRequired();
-                entity.Property(s => s.CreatedAt).IsRequired();
-                entity.Property(s => s.UpdatedAt).IsRequired();
+                entity.ToTable("ProjectReferenceLinks", table =>
+                    table.HasCheckConstraint(
+                        "CK_ProjectReferenceLinks_OneTarget",
+                        "(CASE WHEN \"ProjectLevelId\" IS NOT NULL THEN 1 ELSE 0 END) + (CASE WHEN \"ProjectCharacterId\" IS NOT NULL THEN 1 ELSE 0 END) = 1"));
 
-                // Create index for efficient querying by name
-                entity.HasIndex(s => s.Name);
+                entity.HasKey(link => link.Id);
+                entity.Property(link => link.ProjectId).IsRequired();
+                entity.Property(link => link.ProjectConceptImageId).IsRequired();
+                entity.Property(link => link.ProjectLevelId).IsRequired(false);
+                entity.Property(link => link.ProjectCharacterId).IsRequired(false);
+                entity.Property(link => link.CreatedAt).IsRequired();
+
+                entity.HasOne(link => link.ReferenceImage)
+                    .WithMany(reference => reference.Links)
+                    .HasForeignKey(link => link.ProjectConceptImageId)
+                    .OnDelete(DeleteBehavior.Cascade);
+
+                entity.HasOne(link => link.ProjectLevel)
+                    .WithMany(level => level.ReferenceLinks)
+                    .HasForeignKey(link => link.ProjectLevelId)
+                    .OnDelete(DeleteBehavior.SetNull);
+
+                entity.HasOne(link => link.ProjectCharacter)
+                    .WithMany(character => character.ReferenceLinks)
+                    .HasForeignKey(link => link.ProjectCharacterId)
+                    .OnDelete(DeleteBehavior.SetNull);
+
+                // Filtered indexes: a level link and a character link are separate
+                // namespaces, and NULLs are distinct in a plain composite index.
+                entity.HasIndex(link => new { link.ProjectConceptImageId, link.ProjectLevelId })
+                    .IsUnique()
+                    .HasFilter("\"ProjectLevelId\" IS NOT NULL");
+                entity.HasIndex(link => new { link.ProjectConceptImageId, link.ProjectCharacterId })
+                    .IsUnique()
+                    .HasFilter("\"ProjectCharacterId\" IS NOT NULL");
+                entity.HasIndex(link => new { link.ProjectId, link.ProjectLevelId });
+                entity.HasIndex(link => new { link.ProjectId, link.ProjectCharacterId });
             });
 
             // Configure Scene entity - an agent-authorable composition of library assets.
@@ -879,7 +1191,22 @@ namespace Infrastructure.Persistence
                     .HasForeignKey(s => s.ProjectId)
                     .OnDelete(DeleteBehavior.SetNull);
 
+                entity.HasOne(s => s.ProjectLevel)
+                    .WithMany(level => level.Scenes)
+                    .HasForeignKey(s => s.ProjectLevelId)
+                    .OnDelete(DeleteBehavior.SetNull);
+
+                entity.ToTable("Scenes", table =>
+                    table.HasCheckConstraint(
+                        "CK_Scenes_PrimaryLevelRequiresLevel",
+                        "\"IsPrimaryLevelScene\" = false OR \"ProjectLevelId\" IS NOT NULL"));
+
                 entity.HasIndex(s => s.ProjectId);
+                entity.HasIndex(s => s.ProjectLevelId);
+                entity.HasIndex(s => s.ProjectLevelId)
+                    .IsUnique()
+                    .HasFilter("\"ProjectLevelId\" IS NOT NULL AND \"IsPrimaryLevelScene\" = true")
+                    .HasDatabaseName("IX_Scenes_PrimaryLevel");
             });
 
             // What each scene's nodes point at, so a project's derived asset list is a join
@@ -979,6 +1306,7 @@ namespace Infrastructure.Persistence
                 entity.Property(tj => tj.SceneId).IsRequired(false);
                 entity.Property(tj => tj.SceneViewpoint).IsRequired(false).HasMaxLength(20);
                 entity.Property(tj => tj.SceneRevision).IsRequired(false);
+                entity.Property(tj => tj.VfxId).IsRequired(false);
                 entity.Property(tj => tj.Status).IsRequired();
                 entity.Property(tj => tj.AttemptCount).IsRequired();
                 entity.Property(tj => tj.MaxAttempts).IsRequired();
@@ -1047,6 +1375,17 @@ namespace Infrastructure.Persistence
                     .IsUnique()
                     .HasFilter("\"EnvironmentMapVariantId\" IS NOT NULL");
 
+                entity.HasOne(tj => tj.Vfx)
+                    .WithMany()
+                    .HasForeignKey(tj => tj.VfxId)
+                    .OnDelete(DeleteBehavior.Cascade)
+                    .IsRequired(false);
+
+                // One job per effect, reused on every re-render (like environment map variants).
+                entity.HasIndex(tj => tj.VfxId)
+                    .IsUnique()
+                    .HasFilter("\"VfxId\" IS NOT NULL");
+
                 entity.HasOne(tj => tj.Scene)
                     .WithMany()
                     .HasForeignKey(tj => tj.SceneId)
@@ -1077,21 +1416,6 @@ namespace Infrastructure.Persistence
                     .WithMany()
                     .HasForeignKey(tje => tje.ThumbnailJobId)
                     .OnDelete(DeleteBehavior.Cascade);
-            });
-
-            // Configure ApplicationSettings entity
-            modelBuilder.Entity<ApplicationSettings>(entity =>
-            {
-                entity.HasKey(s => s.Id);
-                entity.Property(s => s.MaxFileSizeBytes).IsRequired();
-                entity.Property(s => s.MaxThumbnailSizeBytes).IsRequired();
-                entity.Property(s => s.ThumbnailFrameCount).IsRequired();
-                entity.Property(s => s.ThumbnailSize).IsRequired();
-                entity.Property(s => s.CleanRecycledFilesAfterDays).IsRequired();
-                entity.Property(s => s.TextureProxySize).IsRequired()
-                    .HasDefaultValue(512);
-                entity.Property(s => s.CreatedAt).IsRequired();
-                entity.Property(s => s.UpdatedAt).IsRequired();
             });
 
             // Configure Setting entity

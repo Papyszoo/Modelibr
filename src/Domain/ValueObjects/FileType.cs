@@ -306,6 +306,41 @@ public sealed class FileType : IEquatable<FileType>
         return Result.Success(fileType);
     }
     
+    // Image containers whose type depends on the TARGET context rather than the
+    // extension alone. A .webp is a sprite by default (see WebP above) but a
+    // texture the moment it is uploaded INTO a texture set, and a .ktx2 has no
+    // global identity at all - it is only ever a texture. Used by
+    // ValidateForTextureUpload; the global extension map is deliberately left
+    // untouched so WebP sprites keep their type.
+    private static readonly Dictionary<string, FileType> TextureContextMapping = new(StringComparer.OrdinalIgnoreCase)
+    {
+        { ".webp", Texture },
+        { ".ktx2", Texture }
+    };
+
+    /// <summary>
+    /// Validates and resolves a file for upload INTO A TEXTURE SET. The target
+    /// context decides the type: formats the global map files as sprites (WebP)
+    /// or has no entry for (KTX2) are textures here. Everything already in the
+    /// Texture category passes through with its specific type (e.g. Hdr).
+    /// </summary>
+    public static Result<FileType> ValidateForTextureUpload(string fileName)
+    {
+        var fileTypeResult = FromFileName(fileName);
+        if (fileTypeResult.IsFailure)
+            return fileTypeResult;
+
+        var fileType = fileTypeResult.Value;
+        if (fileType.Category == FileTypeCategory.Texture)
+            return Result.Success(fileType);
+
+        if (TextureContextMapping.TryGetValue(Path.GetExtension(fileName), out var textureType))
+            return Result.Success(textureType);
+
+        return Result.Failure<FileType>(
+            new Error("InvalidFileType", $"File type '{fileType.Description}' is not supported for texture upload. Only image files (.png, .jpg, .webp, .ktx2, .exr, etc.) are allowed."));
+    }
+
     public static Result<FileType> ValidateForSpriteUpload(string fileName)
     {
         var fileTypeResult = FromFileName(fileName);

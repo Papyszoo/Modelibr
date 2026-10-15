@@ -95,8 +95,8 @@ public sealed class ComposeScenePrompts
         WHEN THE LIBRARY CANNOT ANSWER
           The library is the default and the fast answer: search_assets first, every time.
           But a brief the library cannot meet is a real outcome, and settling for the
-          closest wrong asset is worse than saying so. If STORE_URL is configured,
-          search_store_assets looks at the companion Asset Store.
+          closest wrong asset is worse than saying so. search_store_assets looks at the
+          companion Asset Store.
           - Reach for it when the library's best hit FAILS the brief - wrong style for the
             project, wrong scale, no UVs, or nothing at all. Not when the local hit is
             merely second-best. An agent that proposes downloads for things the user

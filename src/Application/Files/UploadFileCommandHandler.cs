@@ -34,8 +34,13 @@ namespace Application.Files
 
         public async Task<Result<UploadFileCommandResponse>> Handle(UploadFileCommand command, CancellationToken cancellationToken)
         {
-            // Validate file type for upload using Value Object directly
-            var fileTypeResult = FileType.ValidateForUpload(command.File.FileName);
+            // Validate the file type for upload. An explicit "texture" upload type is
+            // a texture-set context: WebP and KTX2 files resolve to Texture there
+            // instead of their global (sprite / unclassified) identities.
+            var isTextureUpload = string.Equals(command.UploadType, "texture", StringComparison.OrdinalIgnoreCase);
+            var fileTypeResult = isTextureUpload
+                ? FileType.ValidateForTextureUpload(command.File.FileName)
+                : FileType.ValidateForUpload(command.File.FileName);
             if (fileTypeResult.IsFailure)
             {
                 return Result.Failure<UploadFileCommandResponse>(fileTypeResult.Error);

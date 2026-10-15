@@ -1,8 +1,10 @@
 import { http, HttpResponse } from 'msw'
 
+import { STORE_URL } from '@/features/asset-store/lib/storeConfig'
+
 import { BASE_MESHES_COMMIT } from '../db/baseMeshesSeed'
-import { meshHash, missingMeshes } from './importGapFill'
 import type { DemoModel, DemoModelVersion, DemoPack } from '../db/demoDb'
+import { meshHash, missingMeshes } from './importGapFill'
 import {
   getAll,
   nextId,
@@ -22,7 +24,6 @@ import {
  * (SHA-pinned raw URLs, same source the seeded pack uses).
  */
 
-const STORE_URL = import.meta.env.VITE_STORE_URL || ''
 const storeEndpoint = (path: string) => `${STORE_URL}${path}`
 
 const RAW_BASE = `https://raw.githubusercontent.com/Papyszoo/base-meshes/${BASE_MESHES_COMMIT}/models`
@@ -86,6 +87,24 @@ function toLibraryItem(def: StorePackDefinition) {
     totalSize: def.meshes.reduce((sum, m) => sum + m.sizeBytes, 0),
     previewThumbnailUrl: pngUrl(def.meshes[0].name),
     addedAt: '2026-07-01T00:00:00+00:00',
+  }
+}
+
+/** Public-catalog entry (GET /api/assets) - the signed-out browse read. */
+function toCatalogItem(def: StorePackDefinition) {
+  return {
+    id: def.assetId,
+    title: def.title,
+    author: 'The Base Mesh',
+    thumbnailUrl: pngUrl(def.meshes[0].name),
+    itemTypes: ['Model'],
+    isPack: true,
+    itemCount: def.meshes.length,
+    fileSize: def.meshes.reduce((sum, m) => sum + m.sizeBytes, 0),
+    license: 'CC0',
+    // Demo packs are all CC0/free, so the signed-out tab can import them
+    // anonymously - same as the real store's free-asset path.
+    price: 0,
   }
 }
 
@@ -233,8 +252,10 @@ async function materializeImport(
         },
       ],
       materialNames: [],
-      mainVariantName: '',
-      variantNames: [],
+      // Same as the real import: a store model opens on its own embedded
+      // materials, not the viewer's clay "Default".
+      mainVariantName: '__embedded__',
+      variantNames: ['__embedded__'],
       textureMappings: [],
       textureSetIds: [],
     }
@@ -344,6 +365,22 @@ export const assetStoreHandlers = [
     })
   }),
 
+  // Public catalog list - anonymous, what the signed-out Asset Store tab
+  // browses. Serves the same demo packs (all free) in the catalog shape.
+  http.get(storeEndpoint('/api/assets'), async ({ request }) => {
+    const url = new URL(request.url)
+    const page = Number(url.searchParams.get('page') || 1)
+    const pageSize = Number(url.searchParams.get('pageSize') || 12)
+    const items = STORE_PACKS.map(toCatalogItem)
+    return HttpResponse.json({
+      items,
+      page,
+      pageSize,
+      totalCount: items.length,
+      totalPages: 1,
+    })
+  }),
+
   http.get(storeEndpoint('/api/assets/:assetId'), async ({ params }) => {
     const def = STORE_PACKS.find(p => p.assetId === (params.assetId as string))
     if (!def) return new HttpResponse(null, { status: 404 })
@@ -375,7 +412,12 @@ export const assetStoreHandlers = [
       selectedItemIds?: string[]
     }
     const def = STORE_PACKS.find(p => p.assetId === body.assetId)
-    if (!def || body.importToken !== `demo-import-${def.assetId}`) {
+    // The demo packs are free: a missing import token is the anonymous
+    // free-asset import. A PRESENT token must still be the right one.
+    if (
+      !def ||
+      (body.importToken && body.importToken !== `demo-import-${def.assetId}`)
+    ) {
       return HttpResponse.json(
         { error: 'StoreImport.InvalidRequest', message: 'Unknown asset.' },
         { status: 400 }

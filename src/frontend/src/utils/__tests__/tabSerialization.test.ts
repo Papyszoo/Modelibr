@@ -25,7 +25,8 @@ const mockGetTextureSetById = jest.fn()
 const mockGetEnvironmentMapById = jest.fn()
 const mockGetPackById = jest.fn()
 const mockGetProjectById = jest.fn()
-const mockGetStageById = jest.fn()
+const mockGetSceneById = jest.fn()
+const mockGetVfx = jest.fn()
 
 jest.mock('../../services/ApiClient', () => ({
   __esModule: true,
@@ -34,7 +35,6 @@ jest.mock('../../services/ApiClient', () => ({
     getTextureSetById: (...args: unknown[]) => mockGetTextureSetById(...args),
     getPackById: (...args: unknown[]) => mockGetPackById(...args),
     getProjectById: (...args: unknown[]) => mockGetProjectById(...args),
-    getStageById: (...args: unknown[]) => mockGetStageById(...args),
   },
 }))
 
@@ -55,8 +55,11 @@ jest.mock('@/features/pack/api/packApi', () => ({
 jest.mock('@/features/project/api/projectApi', () => ({
   getProjectById: (...args: unknown[]) => mockGetProjectById(...args),
 }))
-jest.mock('@/features/stage-editor/api/stageApi', () => ({
-  getStageById: (...args: unknown[]) => mockGetStageById(...args),
+jest.mock('@/features/scenes/api/scenesApi', () => ({
+  getSceneById: (...args: unknown[]) => mockGetSceneById(...args),
+}))
+jest.mock('@/features/vfx/api/vfxApi', () => ({
+  getVfx: (...args: unknown[]) => mockGetVfx(...args),
 }))
 
 describe('Tab Serialization (Browser Refresh Compatibility)', () => {
@@ -97,9 +100,6 @@ describe('Tab Serialization (Browser Refresh Compatibility)', () => {
           projectName: 'My Project',
         })
       ).toBe('My Project')
-      expect(
-        getTabLabel('stageEditor', { stageId: '222', stageName: 'My Stage' })
-      ).toBe('My Stage')
     })
   })
 
@@ -147,6 +147,41 @@ describe('Tab Serialization (Browser Refresh Compatibility)', () => {
       expect(result).toHaveLength(1)
       expect(result[0].type).toBe('environmentMapViewer')
       expect(result[0].environmentMapId).toBe('42')
+    })
+
+    it('should parse scene editor tabs, one per scene', () => {
+      // Without the `scene-` branch this id is not a tab type, the parse throws,
+      // and the catch returns the DEFAULT layout - a refresh would silently drop
+      // every open tab.
+      const result = parseCompactTabFormat('scenes,scene-12,scene-13')
+
+      expect(result.map(tab => tab.id)).toEqual([
+        'scenes',
+        'scene-12',
+        'scene-13',
+      ])
+      expect(result[1].sceneId).toBe('12')
+      expect(result[2].sceneId).toBe('13')
+    })
+
+    it('drops removed Stages tabs from a saved session, keeping the rest', () => {
+      // Regression guard: the Stages feature was removed; a saved session (or
+      // bookmark) still names its tab ids, and the parse must drop just those
+      // entries instead of failing the whole session.
+      const result = parseCompactTabFormat(
+        'modelList,stageList,stage-42,settings'
+      )
+      expect(result.map(tab => tab.type)).toEqual(['modelList', 'settings'])
+
+      // The legacy JSON format is filtered too.
+      const legacy = parseCompactTabFormat(
+        JSON.stringify([
+          { id: 'modelList', type: 'modelList' },
+          { id: 'stageList', type: 'stageList' },
+          { id: 'stage-42', type: 'stageEditor' },
+        ])
+      )
+      expect(legacy.map(tab => tab.type)).toEqual(['modelList'])
     })
 
     it('should generate deterministic IDs for same input', () => {
@@ -465,15 +500,41 @@ describe('Tab Serialization (Browser Refresh Compatibility)', () => {
       expect(mockGetProjectById).toHaveBeenCalledWith(111)
     })
 
-    it('should fetch stage name from API', async () => {
-      mockGetStageById.mockResolvedValue({ id: 222, name: 'My Stage' })
+    it('drops removed Stages tabs instead of failing the label refresh', async () => {
+      // Regression guard: the Stages feature was removed; a panel restored
+      // from a pre-removal session still names its tab ids, and the async
+      // parse must drop just those entries - throwing would return the
+      // default layout and silently lose every other open tab.
+      const result = await parseCompactTabFormatAsync(
+        'modelList,stageList,stage-42,settings'
+      )
+      expect(result.map(tab => tab.type)).toEqual(['modelList', 'settings'])
+    })
 
-      const result = await parseCompactTabFormatAsync('stage-222')
+    it('should fetch scene name from API, one tab per scene', async () => {
+      mockGetSceneById.mockResolvedValue({
+        scene: { id: 12, name: 'Rooftop chase' },
+      })
+
+      const result = await parseCompactTabFormatAsync('scene-12,scene-13')
+      expect(result.map(tab => tab.id)).toEqual(['scene-12', 'scene-13'])
+      expect(result[0].type).toBe('sceneEditor')
+      expect(result[0].label).toBe('Rooftop chase')
+      expect(result[0].sceneId).toBe('12')
+      expect(mockGetSceneById).toHaveBeenCalledWith(12)
+    })
+
+    // The label refresh rebuilt effect tabs without a name, so every open
+    // effect read "Effect: Effect" in the dock instead of its own name.
+    it('should fetch effect name from API', async () => {
+      mockGetVfx.mockResolvedValue({ id: 10, name: 'Alien spores' })
+
+      const result = await parseCompactTabFormatAsync('vfx-10')
       expect(result).toHaveLength(1)
-      expect(result[0].type).toBe('stageEditor')
-      expect(result[0].label).toBe('My Stage')
-      expect(result[0].stageId).toBe('222')
-      expect(mockGetStageById).toHaveBeenCalledWith(222)
+      expect(result[0].type).toBe('vfxEditor')
+      expect(result[0].label).toBe('Alien spores')
+      expect(result[0].params.vfxId).toBe('10')
+      expect(mockGetVfx).toHaveBeenCalledWith(10)
     })
 
     it('should fall back to ID-based label when API fails', async () => {

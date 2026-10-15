@@ -151,6 +151,9 @@ public static class SceneContractTypeScript
         builder.AppendLine($"  maxIdLength: {Number(SceneDocumentValidator.MaxIdLength)},");
         builder.AppendLine($"  minAbsScale: {Number(SceneDocumentValidator.MinAbsScale)},");
         builder.AppendLine($"  maxCoordinate: {Number(SceneDocumentValidator.MaxCoordinate)},");
+        builder.AppendLine($"  maxShapeKeys: {Number(SceneDocumentValidator.MaxShapeKeys)},");
+        builder.AppendLine($"  minAnimationSpeed: {Number(SceneDocumentValidator.MinAnimationSpeed)},");
+        builder.AppendLine($"  maxAnimationSpeed: {Number(SceneDocumentValidator.MaxAnimationSpeed)},");
         builder.AppendLine("} as const");
     }
 
@@ -224,6 +227,18 @@ public static class SceneContractTypeScript
         return definition == typeof(IReadOnlyList<>) || definition == typeof(IList<>) || definition == typeof(List<>);
     }
 
+    /// <summary>
+    /// A string-keyed map - the shape an arbitrary name-to-number collection has on the wire,
+    /// like a node's shape-key weights. Emitted as a TypeScript <c>Record</c>.
+    /// </summary>
+    private static bool IsDictionaryType(Type type)
+    {
+        var definition = type.GetGenericTypeDefinition();
+        return definition == typeof(IReadOnlyDictionary<,>)
+            || definition == typeof(IDictionary<,>)
+            || definition == typeof(Dictionary<,>);
+    }
+
     private static string TypeScriptType(Type owner, PropertyInfo property, NullabilityInfoContext nullability)
     {
         if (VocabularyProperties.TryGetValue($"{owner.Name}.{property.Name}", out var vocabulary))
@@ -250,6 +265,14 @@ public static class SceneContractTypeScript
             var element = type.GetGenericArguments()[0];
             var elementNullability = nullability?.GenericTypeArguments.FirstOrDefault();
             return Map(element, elementNullability) + "[]";
+        }
+
+        if (type.IsGenericType && IsDictionaryType(type))
+        {
+            // Keys are emitted without a nullability annotation: a JSON object's keys are
+            // always strings, and three's JSON member policy already leaves them as authored.
+            var arguments = type.GetGenericArguments();
+            return $"Record<{Map(arguments[0], null)}, {Map(arguments[1], null)}>";
         }
 
         if (type == typeof(string))

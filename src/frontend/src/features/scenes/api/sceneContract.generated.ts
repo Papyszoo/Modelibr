@@ -56,6 +56,13 @@ export interface SceneAnchor {
   surface?: number | null
 }
 
+export interface SceneAnimation {
+  clip: string
+  loop: boolean
+  speed: number
+  timeOffset: number
+}
+
 export interface SceneAssetRef {
   assetType: SceneAssetType
   assetId: number
@@ -100,6 +107,8 @@ export interface SceneNode {
   faceToward?: Vec3 | null
   anchor?: SceneAnchor | null
   suspended?: boolean | null
+  animation?: SceneAnimation | null
+  shapeKeys?: Record<string, number>
 }
 
 export interface ScenePrimitive {
@@ -156,4 +165,7 @@ export const SCENE_LIMITS = {
   maxIdLength: 128,
   minAbsScale: 0.0001,
   maxCoordinate: 1000000,
+  maxShapeKeys: 64,
+  minAnimationSpeed: 0.1,
+  maxAnimationSpeed: 4,
 } as const

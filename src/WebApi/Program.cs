@@ -1,8 +1,10 @@
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using Application;
+using Application.Settings;
 using Infrastructure;
 using Infrastructure.Extensions;
+using Infrastructure.Startup;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
 using WebApi.Endpoints;
@@ -35,6 +37,20 @@ namespace WebApi
 
             var disableHttpsListener = builder.Configuration.GetValue<bool>("DISABLE_HTTPS_LISTENER");
             var httpPort = builder.Configuration.GetValue<int?>("HTTP_PORT");
+            // Set by the desktop launcher only (see ProcessManager.buildWebApiEnvironment).
+            // Docker leaves it unset, so the container keeps ListenAnyIP.
+            var nativeMode = builder.Configuration.GetValue<bool>("MODELIBR_DESKTOP");
+
+            // The plain-HTTP port is chosen here, not in appsettings: a
+            // "Kestrel:Endpoints" section is merged with the Listen* calls below
+            // rather than replaced by them, so leaving an http://*:8080 endpoint
+            // there kept the container's network-facing listener alive on the
+            // host too, next to the loopback one. The desktop sets HTTP_PORT
+            // (loopback); the container sets neither and keeps 8080 on all
+            // interfaces for nginx.
+            var httpListenPort = httpPort is > 0
+                ? httpPort.Value
+                : (nativeMode ? (int?)null : 8080);
 
             X509Certificate2? selfSignedCert = null;
             if (!disableHttpsListener)
@@ -47,9 +63,21 @@ namespace WebApi
             {
                 options.Limits.MaxRequestBodySize = maxFileSize;
 
-                if (httpPort is > 0)
+                if (httpListenPort is > 0)
                 {
-                    options.ListenAnyIP(httpPort.Value);
+                    // The desktop app launches this process itself and fronts it
+                    // with its edge server, so it must stay on loopback: with
+                    // network access off the private port must not be reachable
+                    // from the LAN. Docker (MODELIBR_DESKTOP unset) keeps
+                    // ListenAnyIP because nginx proxies to it over the network.
+                    if (nativeMode)
+                    {
+                        options.ListenLocalhost(httpListenPort.Value);
+                    }
+                    else
+                    {
+                        options.ListenAnyIP(httpListenPort.Value);
+                    }
                 }
 
                 if (disableHttpsListener)
@@ -116,11 +144,69 @@ namespace WebApi
             builder.Services.AddScoped<IStoreImportProgressNotifier, SignalRStoreImportProgressNotifier>();
             builder.Services.AddHostedService<UploadDirectoryInitializer>();
 
+            // Consumes the marker a restore leaves behind: thumbnails whose files an
+            // archive did not carry are re-queued through the ordinary job queue.
+            builder.Services.AddHostedService<ThumbnailRequeueOnRestoreHostedService>();
+
+            // Permanently deletes recycled items once they are older than the
+            // retention chosen in Settings (absent/0 = never, so nothing is
+            // deleted until the user opts in).
+            builder.Services.AddScoped<RecycledFilePurgeService>();
+            builder.Services.AddHostedService<RecycledFilePurgeHostedService>();
+
             // Local MCP server (prompt 27) - a thin, read-only pass-through over the
             // asset-search / metadata / compute query handlers, hosted in-process over
             // HTTP (SSE) so there's one process and one auth posture. Enabled by default;
             // set MCP_ENABLED=false to turn it off.
-            var mcpEnabled = builder.Configuration["MCP_ENABLED"] != "false";
+            //
+            // The three flags also have stored settings (Settings page). Precedence:
+            // an explicitly set env var wins (Docker deployments keep behaving exactly
+            // as their .env says), otherwise the stored value, then the default. Read
+            // at builder time because tool registration is startup-static - a stored
+            // change applies on the next restart. The stored read is skipped entirely
+            // when every env var is already set.
+            var mcpEnvEnabled = builder.Configuration["MCP_ENABLED"];
+            var mcpEnvWrite = builder.Configuration["MCP_WRITE_ENABLED"];
+            var mcpEnvDestructive = builder.Configuration["MCP_DESTRUCTIVE_ENABLED"];
+
+            var storedMcpKeys = new List<string>();
+            if (!SettingResolution.IsEnvSet(mcpEnvEnabled)) storedMcpKeys.Add(SettingKeys.McpEnabled);
+            if (!SettingResolution.IsEnvSet(mcpEnvWrite)) storedMcpKeys.Add(SettingKeys.McpWriteEnabled);
+            if (!SettingResolution.IsEnvSet(mcpEnvDestructive)) storedMcpKeys.Add(SettingKeys.McpDestructiveEnabled);
+
+            var storedMcp = storedMcpKeys.Count == 0
+                ? new Dictionary<string, string>()
+                : StartupSettingReader.ReadSettings(
+                    builder.Configuration,
+                    LoggerFactory.Create(b => b.AddConsole()).CreateLogger("StartupSettings"),
+                    storedMcpKeys);
+
+            var mcpEnabled = SettingResolution.ResolveBoolEnvThenStored(
+                storedMcp.GetValueOrDefault(SettingKeys.McpEnabled),
+                SettingResolution.IsEnvSet(mcpEnvEnabled)
+                    ? !string.Equals(mcpEnvEnabled, "false", StringComparison.Ordinal)
+                    : null,
+                defaultValue: true);
+            var mcpWriteEnabled = SettingResolution.ResolveBoolEnvThenStored(
+                storedMcp.GetValueOrDefault(SettingKeys.McpWriteEnabled),
+                SettingResolution.IsEnvSet(mcpEnvWrite)
+                    ? string.Equals(mcpEnvWrite, "true", StringComparison.Ordinal)
+                    : null,
+                defaultValue: false);
+            var mcpDestructiveEnabled = SettingResolution.ResolveBoolEnvThenStored(
+                storedMcp.GetValueOrDefault(SettingKeys.McpDestructiveEnabled),
+                SettingResolution.IsEnvSet(mcpEnvDestructive)
+                    ? string.Equals(mcpEnvDestructive, "true", StringComparison.Ordinal)
+                    : null,
+                defaultValue: false);
+
+            // Keep the effective values visible in configuration: the destructive
+            // guard reads the flag per call, and diagnostics should see the same
+            // answer registration used.
+            builder.Configuration["MCP_ENABLED"] = mcpEnabled ? "true" : "false";
+            builder.Configuration["MCP_WRITE_ENABLED"] = mcpWriteEnabled ? "true" : "false";
+            builder.Configuration["MCP_DESTRUCTIVE_ENABLED"] = mcpDestructiveEnabled ? "true" : "false";
+
             if (mcpEnabled)
             {
                 // Access tokens are parsed once, at startup, and a malformed MCP_TOKENS
@@ -129,8 +215,34 @@ namespace WebApi
                 builder.Services.AddSingleton(WebApi.Mcp.McpTokenRegistry.FromConfiguration(builder.Configuration));
                 builder.Services.AddScoped<WebApi.Mcp.McpCallerContext>();
 
+                // Named agents, each seeing only a subset of the tools and asset families.
+                // Loaded and validated once here: a definition that names a tool or family
+                // that does not exist fails startup rather than quietly exposing a surface
+                // nobody intended.
+                var mcpAgents = WebApi.Mcp.McpAgentRegistry.FromFile(
+                    Path.Combine(AppContext.BaseDirectory, "Mcp", "mcp-agents.json"),
+                    WebApi.Mcp.McpAgentRegistry.DiscoverKnownTools(typeof(Program).Assembly));
+                builder.Services.AddSingleton(mcpAgents);
+
                 var mcpServer = builder.Services.AddMcpServer()
-                    .WithHttpTransport()
+                    .WithHttpTransport(options =>
+                    {
+                        // ConfigureSessionOptions is the SDK's per-session options hook: it
+                        // hands us a fresh McpServerOptions and the initiating request's
+                        // HttpContext, so the agent named on the route can be resolved and its
+                        // tool subset applied without touching /mcp.
+                        options.ConfigureSessionOptions = (httpContext, sessionOptions, _) =>
+                        {
+                            var agent = mcpAgents.Find(
+                                httpContext.Request.RouteValues[WebApi.Mcp.McpAgentEndpointFilter.AgentRouteValue] as string);
+                            if (agent is not null)
+                            {
+                                WebApi.Mcp.McpAgentRegistry.RestrictTools(sessionOptions, agent);
+                            }
+
+                            return Task.CompletedTask;
+                        };
+                    })
                     .WithTools<WebApi.Mcp.AssetSearchMcpTools>()
                     // Browsing the companion Asset Store's PUBLIC catalog is a read, and a
                     // credential-free one - these tools acquire nothing. They are here so an
@@ -150,6 +262,8 @@ namespace WebApi
                     .WithTools<WebApi.Mcp.SceneRenderMcpTools>()
                     // Browsing the material library is a read like any other search.
                     .WithTools<WebApi.Mcp.MaterialReadMcpTools>()
+                    // Browsing visual effects is the same read.
+                    .WithTools<WebApi.Mcp.VfxReadMcpTools>()
                     // Asking what a queued job did. A read about work someone else asked
                     // for - and the only way an agent can collect the result of anything
                     // that hands back a job id instead of an answer.
@@ -162,12 +276,15 @@ namespace WebApi
                     // What is being made. Reading a project's brief is what turns "build a
                     // scene" into "build a scene for THIS", and there were no project tools
                     // at all before it.
-                    .WithTools<WebApi.Mcp.ProjectReadMcpTools>();
+                    .WithTools<WebApi.Mcp.ProjectReadMcpTools>()
+                    // The agent definitions, so a harness can create them in its own format.
+                    // A read, and on /mcp only: no agent lists it, so no restricted session
+                    // ever sees it.
+                    .WithTools<WebApi.Mcp.AgentSetupMcpTools>();
 
                 // Write tools (prompt 30) are opt-in: OFF by default keeps a stock server
                 // read-only so enabling agent writes on a LAN-reachable endpoint is a
                 // deliberate operator choice. Every write is idempotency-keyed + audited.
-                var mcpWriteEnabled = builder.Configuration["MCP_WRITE_ENABLED"] == "true";
                 if (mcpWriteEnabled)
                 {
                     mcpServer
@@ -186,6 +303,9 @@ namespace WebApi
                         // Inventing a material mid-scene. A write, and the cheapest one
                         // there is: it creates no files at all.
                         .WithTools<WebApi.Mcp.MaterialWriteMcpTools>()
+                        // Authoring a visual effect. A write like any other, over one
+                        // validated JSON document that references library assets.
+                        .WithTools<WebApi.Mcp.VfxWriteMcpTools>()
                         // Running Blender on an asset. A write: it adds a version to a
                         // model, even though what it hands back is a job id.
                         .WithTools<WebApi.Mcp.BlenderWriteMcpTools>()
@@ -196,9 +316,10 @@ namespace WebApi
                         // Filling in what an asset says about itself - licence, credit,
                         // style, where it came from. A write like any other tagging call.
                         .WithTools<WebApi.Mcp.AssetMetadataWriteMcpTools>()
-                        // Telling a scene which project it belongs to. A scene write, and
-                        // the only project-shaped one an agent gets - the profile itself is
-                        // the user's statement of intent, not something to infer.
+                        // Telling a scene which project it belongs to, and recording the
+                        // user's project profile - engines, platforms, genre, style,
+                        // perspective, budget - when they state it. The profile is their
+                        // statement of intent: an agent records it, it never infers it.
                         .WithTools<WebApi.Mcp.ProjectWriteMcpTools>()
                         .WithPrompts<WebApi.Mcp.ImportLibraryPrompts>()
                         // The playbook for building a scene. Registered with the write
@@ -249,11 +370,13 @@ namespace WebApi
             app.MapThumbnailJobEndpoints();
             app.MapTextureSetEndpoints();
             app.MapMaterialEndpoints();
+            app.MapVfxEndpoints();
             app.MapTextureSetCategoryEndpoints();
             app.MapPackEndpoints();
             app.MapProjectEndpoints();
+            app.MapProjectStudioEndpoints();
+            app.MapProjectCharacterEndpoints();
             app.MapModelCategoryEndpoints();
-            app.MapStageEndpoints();
             app.MapSceneEndpoints();
             app.MapSettingsEndpoints();
             app.MapBatchUploadEndpoints();
@@ -283,6 +406,17 @@ namespace WebApi
                 // overload of AddEndpointFilter is written against.
                 app.MapMcp("/mcp")
                     .AddEndpointFilter<IEndpointConventionBuilder, WebApi.Mcp.McpTokenEndpointFilter>();
+
+                // The per-agent surface. Authentication runs first so an unknown agent is
+                // not disclosed to a caller with no valid token; the agent filter then
+                // rejects an unknown name with 404 and records the agent on the caller
+                // context so family-spanning tools can narrow themselves to it.
+                app.MapMcp("/mcp/agents/{" + WebApi.Mcp.McpAgentEndpointFilter.AgentRouteValue + "}")
+                    .AddEndpointFilter<IEndpointConventionBuilder, WebApi.Mcp.McpTokenEndpointFilter>()
+                    .AddEndpointFilter<IEndpointConventionBuilder, WebApi.Mcp.McpAgentEndpointFilter>();
+
+                // The same definitions over REST, for a read-only Settings view.
+                app.MapMcpAgentEndpoints();
             }
 
             // Map SignalR hubs

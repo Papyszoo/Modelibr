@@ -254,6 +254,9 @@ public sealed class BlenderWriteMcpTools
                  "Targets: glb (glTF Binary - the default choice, and what the viewer and scenes handle best), fbx, stl. " +
                  "gltf and obj are refused on purpose: each keeps part of itself in a sidecar file (.bin, .mtl) and a model version is one file, " +
                  "so the result would import stripped - ask for glb instead. stl carries geometry only, and the job says so. " +
+                 "Set bakeForWeb when the source is a .blend whose rig would otherwise arrive frozen or broken (IK and other constraints, " +
+                 "drivers, shape-key animation, modifiers stacked on shape-keyed meshes): the rig is collapsed into plain keyframes and applied " +
+                 "geometry before export, and the new version is named -web. Bake targets are glb and fbx; stl is refused. " +
                  "Returns a job id: the work is queued, so collect the new version id with get_job_status. " +
                  "Requires Blender to be installed (Settings); you get told so immediately if it is not.")]
     public static Task<object> ConvertModel(
@@ -264,6 +267,7 @@ public sealed class BlenderWriteMcpTools
         [Description("Target format: glb, fbx or stl.")] string format,
         [Description("Unique key so a retried call does not queue the conversion twice.")] string idempotencyKey,
         [Description("Version id to convert. Defaults to the model's active version.")] int? versionId = null,
+        [Description("Bake the rig into keyframes for the web viewer before exporting. For .blend sources; only glb and fbx. Written as a new '-web' version.")] bool bakeForWeb = false,
         [Description("Optional batch id. Writes sharing one can be undone together with reverse_operation.")] string? batchId = null,
         CancellationToken cancellationToken = default)
     {
@@ -275,12 +279,16 @@ public sealed class BlenderWriteMcpTools
             {
                 // Sent verbatim; the validator owns the list of targets and the reasons the
                 // refused ones are refused, so this tool cannot drift from it.
-                var parameters = System.Text.Json.JsonSerializer.Serialize(
-                    new { format = format?.Trim() ?? string.Empty });
+                var parameters = new Dictionary<string, object>
+                {
+                    ["format"] = format?.Trim() ?? string.Empty
+                };
+                if (bakeForWeb) parameters["bake"] = true;
 
                 var result = await handler.Handle(
                     new RequestBlenderOperationCommand(
-                        modelId, BlenderOperations.ConvertFormat, versionId, parameters),
+                        modelId, BlenderOperations.ConvertFormat, versionId,
+                        System.Text.Json.JsonSerializer.Serialize(parameters)),
                     ct);
 
                 if (result.IsFailure)

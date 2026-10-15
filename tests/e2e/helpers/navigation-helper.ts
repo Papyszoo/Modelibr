@@ -1,4 +1,4 @@
-import { Page, expect } from "@playwright/test";
+import { Locator, Page, expect } from "@playwright/test";
 
 /**
  * Navigation Helper for E2E tests
@@ -7,104 +7,112 @@ import { Page, expect } from "@playwright/test";
  * The app uses a Zustand store persisted to localStorage for tab state,
  * so there are no URL query params for tab management.
  *
- * Tab icons in the dock bar:
- *   Models List  → pi-list       | Texture Sets → pi-folder
- *   Sprites      → pi-image      | Sounds       → pi-volume-up
- *   Packs        → pi-inbox      | Projects     → pi-briefcase
- *   Stages       → pi-th-large   | History      → pi-history
- *   Recycled     → pi-trash      | Settings     → pi-cog
- *   ModelViewer  → pi-box        | PackViewer   → pi-folder-open
+ * Dock tabs carry `data-tab-type` (the TabType). Tests select tabs by it rather
+ * than by icon class: an asset tab (model, effect) shows its thumbnail in place
+ * of the icon. The pinned entries at the top of the left dock are `.dock-pin`
+ * buttons, not `.draggable-tab`, so they never count as open tabs.
+ *
+ * The window starts as ONE panel; the right panel only appears once it holds a
+ * tab, which a user gets by dragging a tab onto it (see `openTabViaMenu`).
  */
 
 /**
  * Tile titles in the New Tab page. Used to locate the tile button when
  * opening a tab via UI.
  *
- * Tab types not in this map (`stageList`) have no tile - `stageList` is
- * disabled while the feature is incomplete. Tests that need it inject the
- * tab via localStorage state - see `injectAndActivateTab`. (The legacy
- * `textureSets` type was removed from the app entirely; a persisted-state
- * migration rewrites it to `modelTextures`.)
+ * The legacy `textureSets` type was removed from the app entirely; a
+ * persisted-state migration rewrites it to `modelTextures`.
  */
 const TILE_LABELS: Record<string, string> = {
-    modelList: "Models",
-    globalMaterials: "Global Materials",
-    modelTextures: "Multi-Model Textures",
-    sprites: "Sprites",
-    environmentMaps: "Environment Maps",
-    sounds: "Sounds",
-    scripts: "Scripts",
-    scenes: "Scenes",
-    packs: "Packs",
-    projects: "Projects",
-    assetStore: "Asset Store",
-    history: "History",
-    recycledFiles: "Recycled Files",
-    settings: "Settings",
+  modelList: "Models",
+  globalMaterials: "Global Materials",
+  pbrMaterials: "PBR Materials",
+  modelTextures: "Multi-Model Textures",
+  sprites: "Sprites",
+  environmentMaps: "Environment Maps",
+  sounds: "Sounds",
+  scripts: "Scripts",
+  scenes: "Scenes",
+  vfxList: "VFX",
+  packs: "Packs",
+  projects: "Projects",
+  assetStore: "Asset Store",
+  history: "History",
+  recycledFiles: "Recycled Files",
+  settings: "Settings",
 };
 
-const STATE_INJECTABLE_TYPES = new Set(["stageList"]);
+const KNOWN_TAB_TYPES = new Set([
+  "modelList",
+  "modelViewer",
+  "globalMaterials",
+  "pbrMaterials",
+  "modelTextures",
+  "textureSetViewer",
+  "environmentMaps",
+  "environmentMapViewer",
+  "sprites",
+  "sounds",
+  "scripts",
+  "scriptViewer",
+  "packs",
+  "packViewer",
+  "projects",
+  "projectViewer",
+  "scenes",
+  "sceneEditor",
+  "vfxList",
+  "vfxEditor",
+  "assetStore",
+  "settings",
+  "history",
+  "recycledFiles",
+]);
 
-const TAB_ICONS: Record<string, string> = {
-    modelList: "pi-list",
-    modelViewer: "pi-box",
-    scenes: "pi-box",
-    globalMaterials: "pi-palette",
-    modelTextures: "pi-images",
-    textureSetViewer: "pi-image",
-    environmentMaps: "pi-globe",
-    environmentMapViewer: "pi-globe",
-    sprites: "pi-image",
-    sounds: "pi-volume-up",
-    scripts: "pi-code",
-    packs: "pi-inbox",
-    packViewer: "pi-folder-open",
-    projects: "pi-briefcase",
-    projectViewer: "pi-briefcase",
-    assetStore: "pi-shopping-bag",
-    settings: "pi-cog",
-    history: "pi-history",
-    recycledFiles: "pi-trash",
-    stageList: "pi-th-large",
-    stageEditor: "pi-th-large",
-};
+/** Selector for an open dock tab of the given type. */
+export function tabSelector(tabType: string): string {
+  if (!KNOWN_TAB_TYPES.has(tabType)) {
+    throw new Error(`Unknown tab type "${tabType}"`);
+  }
+  return `.draggable-tab[data-tab-type="${tabType}"]`;
+}
 
 /**
  * Navigate to the app with a clean slate (cleared localStorage/sessionStorage).
  * After loading, the default state is a single "Models List" tab.
  */
 export async function navigateToAppClean(page: Page): Promise<void> {
-    const baseUrl = process.env.FRONTEND_URL || "http://localhost:3002";
+  const baseUrl = process.env.FRONTEND_URL || "http://localhost:3002";
 
-    // First load to inject clear-storage script
-    await page.goto(baseUrl);
-    await page.evaluate(() => {
-        try {
-            localStorage.clear();
-            sessionStorage.clear();
-        } catch (_e) {
-            /* ignore */
-        }
-    });
+  // First load to inject clear-storage script
+  await page.goto(baseUrl);
+  await page.evaluate(() => {
+    try {
+      localStorage.clear();
+      sessionStorage.clear();
+    } catch (_e) {
+      /* ignore */
+    }
+  });
 
-    // Reload so app initialises with fresh default state (modelList tab)
-    await page.goto(baseUrl);
-    await page.waitForSelector(".p-splitter", {
-        state: "visible",
-        timeout: 15000,
-    });
+  // Reload so app initialises with fresh default state (modelList tab)
+  await page.goto(baseUrl);
+  await page.waitForSelector(".p-splitter", {
+    state: "visible",
+    timeout: 15000,
+  });
 }
 
 /**
  * Navigate to the app preserving any existing persisted state.
  */
 export async function navigateToApp(page: Page): Promise<void> {
-    const baseUrl = process.env.FRONTEND_URL || "http://localhost:3002";
-    await page.goto(baseUrl);
-    await page.waitForSelector(".p-splitter", {
-        state: "visible",
-        timeout: 15000,
-    });
+  const baseUrl = process.env.FRONTEND_URL || "http://localhost:3002";
+  await page.goto(baseUrl);
+  await page.waitForSelector(".p-splitter", {
+    state: "visible",
+    timeout: 15000,
+  });
 }
 
 /**
@@ -113,167 +121,90 @@ export async function navigateToApp(page: Page): Promise<void> {
  * Flow: click `+` on the target dock bar → New Tab page renders → click the
  * matching tile → placeholder converts in place to the target type.
  *
- * For tab types that have no tile (`textureSets`, `stageList`), this falls
- * back to a localStorage state injection + reload - same pattern used by
- * `openModelViewer`. Those entries are deliberately not surfaced in the New
- * Tab page (combined texture-sets view is replaced by Global Materials /
- * Model Textures; stages is disabled while incomplete) but the underlying
- * tab types still work, so tests can drive them directly.
- *
  * @param side  Which panel's dock bar to use ('left' | 'right')
  * @param tabType  The tab type key (e.g. 'globalMaterials', 'packs')
  */
 export async function openTabViaMenu(
-    page: Page,
-    tabType: string,
-    side: "left" | "right" = "left",
+  page: Page,
+  tabType: string,
+  side: "left" | "right" = "left",
 ): Promise<void> {
-    if (STATE_INJECTABLE_TYPES.has(tabType)) {
-        await injectAndActivateTab(page, tabType, side);
-        return;
-    }
-
-    const tileLabel = TILE_LABELS[tabType];
-    if (!tileLabel) {
-        throw new Error(
-            `Unknown tab type "${tabType}" - no tile in New Tab page and not state-injectable`,
-        );
-    }
-
-    // Click the "+" button to open the New Tab page in the target panel.
-    const dockBar = page.locator(`.dock-bar-${side}`);
-    const addButton = dockBar.locator(".dock-add-button");
-    await addButton.click();
-
-    // The New Tab page renders inside the panel's content area; find the
-    // tile by its title text. The tile is a <button> with an <h3 class="
-    // newtab-tile-title"> child.
-    const newtabPage = page.locator(".newtab-page").last();
-    await expect(newtabPage).toBeVisible({ timeout: 5000 });
-
-    const tile = newtabPage
-        .locator(".newtab-tile")
-        .filter({
-            has: page.locator(".newtab-tile-title", { hasText: tileLabel }),
-        })
-        .first();
-    await expect(tile).toBeVisible({ timeout: 5000 });
-    await tile.click();
-
-    // The placeholder converts in place; the New Tab page should detach.
-    await expect(newtabPage).toBeHidden({ timeout: 5000 });
-    console.log(
-        `[Nav] Opened "${tileLabel}" tab in ${side} panel via New Tab page ✓`,
+  const tileLabel = TILE_LABELS[tabType];
+  if (!tileLabel) {
+    throw new Error(
+      `Unknown tab type "${tabType}" - no tile in the New Tab page`,
     );
+  }
+
+  // A single-panel window has no visible right dock: open the tab on the left
+  // and drag it onto the right panel, the way a user splits the view.
+  if (side === "right" && !(await page.locator(".dock-bar-right").isVisible())) {
+    await openTabViaMenu(page, tabType, "left");
+    await dragTabToRightPanel(page, tabType);
+    return;
+  }
+
+  // Click the "+" button to open the New Tab page in the target panel.
+  const dockBar = page.locator(`.dock-bar-${side}`);
+  const addButton = dockBar.locator(".dock-add-button");
+  await addButton.click();
+
+  // The New Tab page renders inside the panel's content area; find the
+  // tile by its title text. The tile is a <button> with an <h3 class="
+  // newtab-tile-title"> child.
+  const newtabPage = page.locator(".newtab-page").last();
+  await expect(newtabPage).toBeVisible({ timeout: 5000 });
+
+  const tile = newtabPage
+    .locator(".newtab-tile")
+    .filter({
+      has: page.locator(".newtab-tile-title", { hasText: tileLabel }),
+    })
+    .first();
+  await expect(tile).toBeVisible({ timeout: 5000 });
+  await tile.click();
+
+  // The placeholder converts in place; the New Tab page should detach.
+  await expect(newtabPage).toBeHidden({ timeout: 5000 });
+  console.log(
+    `[Nav] Opened "${tileLabel}" tab in ${side} panel via New Tab page ✓`,
+  );
 }
 
 /**
- * Inject a tab directly into the persisted navigation state and reload.
- *
- * Used for tab types that have no New Tab page tile (e.g. the combined
- * `textureSets` view, kept for the kind-filter e2e tests, and `stageList`,
- * disabled in the UI). The reload guarantees Zustand rehydrates from the
- * mutated localStorage and the app paints the right tab as active.
+ * Drag an open left-panel tab onto the right panel. The right panel is hidden
+ * until a drag starts, so the drop target is looked up only after the pointer
+ * has begun dragging.
  */
-async function injectAndActivateTab(
-    page: Page,
-    tabType: string,
-    side: "left" | "right",
+export async function dragTabToRightPanel(
+  page: Page,
+  tabType: string,
 ): Promise<void> {
-    await page.evaluate(
-        ({ type, side }) => {
-            const storageKey = "modelibr_navigation";
-            const sessionWindowIdKey = "modelibr_windowId";
-            const storedRaw = localStorage.getItem(storageKey);
-            const stored = storedRaw
-                ? JSON.parse(storedRaw)
-                : {
-                      state: {
-                          activeWindows: {},
-                          recentlyClosedTabs: [],
-                          recentlyClosedWindows: [],
-                      },
-                      version: 0,
-                  };
+  const tab = page.locator(`.dock-bar-left ${tabSelector(tabType)}`).first();
+  const box = await tab.boundingBox();
+  if (!box) throw new Error(`No ${tabType} tab in the left dock to drag`);
 
-            let windowId = sessionStorage.getItem(sessionWindowIdKey);
-            if (!windowId) {
-                windowId = crypto.randomUUID();
-                sessionStorage.setItem(sessionWindowIdKey, windowId);
-            }
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width / 2 + 10, box.y + box.height / 2, {
+    steps: 5,
+  });
 
-            const defaultWindowState = {
-                tabs: [
-                    {
-                        id: "modelList",
-                        type: "modelList",
-                        label: "Models",
-                        params: {},
-                        internalUiState: {},
-                    },
-                ],
-                activeTabId: "modelList",
-                activeRightTabId: null,
-                splitterSize: 50,
-                lastActiveAt: new Date().toISOString(),
-            };
+  const dropTarget = page.locator(".dock-bar-right");
+  await expect(dropTarget).toBeVisible({ timeout: 5000 });
+  const target = await dropTarget.boundingBox();
+  if (!target) throw new Error("Right panel did not appear during the drag");
+  await page.mouse.move(
+    target.x + target.width / 2,
+    target.y + target.height / 2,
+    { steps: 10 },
+  );
+  await page.mouse.up();
 
-            const activeWindows = stored.state?.activeWindows || {};
-            const windowState =
-                activeWindows[windowId] || defaultWindowState;
-
-            const labels: Record<string, string> = {
-                stageList: "Stages",
-            };
-
-            const params: Record<string, string> =
-                side === "right" ? { panel: "right" } : {};
-
-            const newTab = {
-                id: type,
-                type,
-                label: labels[type] ?? type,
-                params,
-                internalUiState: {},
-            };
-
-            const existingTabs = (windowState.tabs || []).filter(
-                (tab: { id: string }) => tab.id !== type,
-            );
-            existingTabs.push(newTab);
-
-            const activeUpdate =
-                side === "right"
-                    ? { activeRightTabId: type }
-                    : { activeTabId: type };
-
-            activeWindows[windowId] = {
-                ...windowState,
-                tabs: existingTabs,
-                ...activeUpdate,
-                lastActiveAt: new Date().toISOString(),
-            };
-
-            stored.state = {
-                activeWindows,
-                recentlyClosedTabs: stored.state?.recentlyClosedTabs || [],
-                recentlyClosedWindows:
-                    stored.state?.recentlyClosedWindows || [],
-            };
-
-            localStorage.setItem(storageKey, JSON.stringify(stored));
-        },
-        { type: tabType, side },
-    );
-
-    await page.reload({ waitUntil: "domcontentloaded" });
-    await page.waitForSelector(".p-splitter", {
-        state: "visible",
-        timeout: 15000,
-    });
-    console.log(
-        `[Nav] Injected "${tabType}" tab into ${side} panel via state ✓`,
-    );
+  await expect(
+    page.locator(`.dock-bar-right ${tabSelector(tabType)}`).first(),
+  ).toBeVisible({ timeout: 5000 });
+  console.log(`[Nav] Dragged "${tabType}" tab into the right panel ✓`);
 }
 
 /**
@@ -282,56 +213,44 @@ async function injectAndActivateTab(
  * Uses the tab icon class for identification.
  */
 export async function clickTab(
-    page: Page,
-    tabType: string,
-    side?: "left" | "right",
+  page: Page,
+  tabType: string,
+  side?: "left" | "right",
 ): Promise<void> {
-    const iconClass = TAB_ICONS[tabType];
-    if (!iconClass) {
-        throw new Error(`Unknown tab type "${tabType}"`);
-    }
+  const selector = tabSelector(tabType);
 
-    let tabLocator;
-    if (side) {
-        tabLocator = page
-            .locator(`.dock-bar-${side}`)
-            .locator(`.draggable-tab:has(.${iconClass})`)
-            .first();
-    } else {
-        tabLocator = page.locator(`.draggable-tab:has(.${iconClass})`).first();
-    }
+  let tabLocator;
+  if (side) {
+    tabLocator = page.locator(`.dock-bar-${side}`).locator(selector).first();
+  } else {
+    tabLocator = page.locator(selector).first();
+  }
 
-    await tabLocator.click();
+  await tabLocator.click();
 
-    // Wait for the tab to become active
-    const activeSelector = side
-        ? `.dock-bar-${side} .draggable-tab.active:has(.${iconClass})`
-        : `.draggable-tab.active:has(.${iconClass})`;
-    await expect(page.locator(activeSelector).first()).toBeVisible({
-        timeout: 5000,
-    });
+  // Wait for the tab to become active
+  const activeSelector = side
+    ? `.dock-bar-${side} ${selector}.active`
+    : `${selector}.active`;
+  await expect(page.locator(activeSelector).first()).toBeVisible({
+    timeout: 5000,
+  });
 }
 
 /**
  * Count how many tabs of a given type exist across all dock bars (or in a specific panel).
  */
 export async function countTabsByType(
-    page: Page,
-    tabType: string,
-    side?: "left" | "right",
+  page: Page,
+  tabType: string,
+  side?: "left" | "right",
 ): Promise<number> {
-    const iconClass = TAB_ICONS[tabType];
-    if (!iconClass) {
-        throw new Error(`Unknown tab type "${tabType}"`);
-    }
+  const selector = tabSelector(tabType);
 
-    if (side) {
-        return page
-            .locator(`.dock-bar-${side}`)
-            .locator(`.draggable-tab:has(.${iconClass})`)
-            .count();
-    }
-    return page.locator(`.draggable-tab:has(.${iconClass})`).count();
+  if (side) {
+    return page.locator(`.dock-bar-${side}`).locator(selector).count();
+  }
+  return page.locator(selector).count();
 }
 
 /**
@@ -339,119 +258,135 @@ export async function countTabsByType(
  * Useful for model viewer tabs whose tooltip contains the model name.
  */
 export async function countTabsByTooltip(
-    page: Page,
-    tooltipSubstring: string,
-    side?: "left" | "right",
+  page: Page,
+  tooltipSubstring: string,
+  side?: "left" | "right",
 ): Promise<number> {
-    const selector = `.draggable-tab[data-pr-tooltip*="${tooltipSubstring}"]`;
-    if (side) {
-        return page.locator(`.dock-bar-${side}`).locator(selector).count();
-    }
-    return page.locator(selector).count();
+  const selector = `.draggable-tab[data-pr-tooltip*="${tooltipSubstring}"]`;
+  if (side) {
+    return page.locator(`.dock-bar-${side}`).locator(selector).count();
+  }
+  return page.locator(selector).count();
 }
 
 /**
  * Click a tab identified by its tooltip text (substring match).
  */
 export async function clickTabByTooltip(
-    page: Page,
-    tooltipSubstring: string,
-    side?: "left" | "right",
+  page: Page,
+  tooltipSubstring: string,
+  side?: "left" | "right",
 ): Promise<void> {
-    const selector = `.draggable-tab[data-pr-tooltip*="${tooltipSubstring}"]`;
+  const selector = `.draggable-tab[data-pr-tooltip*="${tooltipSubstring}"]`;
 
-    let tabLocator;
-    if (side) {
-        tabLocator = page
-            .locator(`.dock-bar-${side}`)
-            .locator(selector)
-            .first();
-    } else {
-        tabLocator = page.locator(selector).first();
-    }
+  let tabLocator;
+  if (side) {
+    tabLocator = page.locator(`.dock-bar-${side}`).locator(selector).first();
+  } else {
+    tabLocator = page.locator(selector).first();
+  }
 
-    await tabLocator.click();
+  await tabLocator.click();
 
-    // Wait for the tab to become active
-    const activeSelector = side
-        ? `.dock-bar-${side} .draggable-tab.active[data-pr-tooltip*="${tooltipSubstring}"]`
-        : `.draggable-tab.active[data-pr-tooltip*="${tooltipSubstring}"]`;
-    await expect(page.locator(activeSelector).first()).toBeVisible({
-        timeout: 5000,
-    });
+  // Wait for the tab to become active
+  const activeSelector = side
+    ? `.dock-bar-${side} .draggable-tab.active[data-pr-tooltip*="${tooltipSubstring}"]`
+    : `.draggable-tab.active[data-pr-tooltip*="${tooltipSubstring}"]`;
+  await expect(page.locator(activeSelector).first()).toBeVisible({
+    timeout: 5000,
+  });
+}
+
+/**
+ * Only a pinned page in the main (left) dock has no close button by design
+ * (Models and Projects by default; the set is configurable in Settings,
+ * Appearance). A close attempt on one is a test bug: fail with that, not a
+ * click timeout. Any other main page is an ordinary closable tab.
+ */
+async function expectClosable(tab: Locator, what: string): Promise<void> {
+  if ((await tab.locator(".tab-close-btn").count()) === 0) {
+    throw new Error(
+      `${what} is pinned in the main dock and cannot be closed - unpin it in Settings, drag it to the right panel, or don't close it`,
+    );
+  }
 }
 
 /**
  * Close a tab identified by its tooltip text.
  */
 export async function closeTabByTooltip(
-    page: Page,
-    tooltipSubstring: string,
+  page: Page,
+  tooltipSubstring: string,
+  options: { expectClosed?: boolean } = {},
 ): Promise<void> {
-    const tab = page
-        .locator(`.draggable-tab[data-pr-tooltip*="${tooltipSubstring}"]`)
-        .first();
-    const closeBtn = tab.locator(".tab-close-btn");
-    await closeBtn.click();
+  const tab = page
+    .locator(`.draggable-tab[data-pr-tooltip*="${tooltipSubstring}"]`)
+    .first();
+  // The close button is `display: none` until the tab is hovered, so hovering
+  // is not politeness here - without it the button has no box to click.
+  await tab.hover();
+  await expectClosable(tab, `The "${tooltipSubstring}" tab`);
+  const closeBtn = tab.locator(".tab-close-btn");
+  await closeBtn.click();
 
-    // Wait for the tab to disappear
-    await expect(tab).toBeHidden({ timeout: 5000 });
+  // A tab that installed a close guard may deliberately stay open and ask what
+  // to do with its unsaved work, so "it closed" is the caller's claim to make,
+  // not this helper's assumption.
+  if (options.expectClosed === false) {
+    return;
+  }
+
+  // Wait for the tab to disappear
+  await expect(tab).toBeHidden({ timeout: 5000 });
 }
 
 /**
  * Close a tab identified by its tab type icon.
  */
 export async function closeTabByType(
-    page: Page,
-    tabType: string,
+  page: Page,
+  tabType: string,
 ): Promise<void> {
-    const iconClass = TAB_ICONS[tabType];
-    if (!iconClass) {
-        throw new Error(`Unknown tab type "${tabType}"`);
-    }
+  const tab = page.locator(tabSelector(tabType)).first();
+  // Hidden until hover; see closeTabByTooltip.
+  await tab.hover();
+  await expectClosable(tab, `The ${tabType} tab`);
+  const closeBtn = tab.locator(".tab-close-btn");
+  await closeBtn.click();
 
-    const tab = page.locator(`.draggable-tab:has(.${iconClass})`).first();
-    const closeBtn = tab.locator(".tab-close-btn");
-    await closeBtn.click();
-
-    // Wait for the tab to disappear
-    await expect(tab).toBeHidden({ timeout: 5000 });
+  // Wait for the tab to disappear
+  await expect(tab).toBeHidden({ timeout: 5000 });
 }
 
 /**
  * Check whether a tab of the given type is currently active.
  */
 export async function isTabActive(
-    page: Page,
-    tabType: string,
-    side?: "left" | "right",
+  page: Page,
+  tabType: string,
+  side?: "left" | "right",
 ): Promise<boolean> {
-    const iconClass = TAB_ICONS[tabType];
-    if (!iconClass) {
-        throw new Error(`Unknown tab type "${tabType}"`);
-    }
-
-    const selector = `.draggable-tab.active:has(.${iconClass})`;
-    if (side) {
-        return page
-            .locator(`.dock-bar-${side}`)
-            .locator(selector)
-            .waitFor({ state: "visible", timeout: 2000 })
-            .then(() => true)
-            .catch(() => false);
-    }
+  const selector = `${tabSelector(tabType)}.active`;
+  if (side) {
     return page
-        .locator(selector)
-        .waitFor({ state: "visible", timeout: 2000 })
-        .then(() => true)
-        .catch(() => false);
+      .locator(`.dock-bar-${side}`)
+      .locator(selector)
+      .waitFor({ state: "visible", timeout: 2000 })
+      .then(() => true)
+      .catch(() => false);
+  }
+  return page
+    .locator(selector)
+    .waitFor({ state: "visible", timeout: 2000 })
+    .then(() => true)
+    .catch(() => false);
 }
 
 /**
  * Get the total number of tabs across all dock bars.
  */
 export async function getTotalTabCount(page: Page): Promise<number> {
-    return page.locator(".draggable-tab").count();
+  return page.locator(".draggable-tab").count();
 }
 
 /**
@@ -459,17 +394,17 @@ export async function getTotalTabCount(page: Page): Promise<number> {
  * Convenience wrapper combining navigateToAppClean + openTabViaMenu.
  */
 export async function navigateToTab(
-    page: Page,
-    tabType: string,
+  page: Page,
+  tabType: string,
 ): Promise<void> {
-    await navigateToAppClean(page);
+  await navigateToAppClean(page);
 
-    // Default state already has modelList - skip if that's the target
-    if (tabType === "modelList") {
-        return;
-    }
+  // Default state already has modelList - skip if that's the target
+  if (tabType === "modelList") {
+    return;
+  }
 
-    await openTabViaMenu(page, tabType, "left");
+  await openTabViaMenu(page, tabType, "left");
 }
 
 /**
@@ -484,202 +419,199 @@ export async function navigateToTab(
  * @param modelId    Optional numeric model ID for precise card targeting
  */
 export async function openModelViewer(
-    page: Page,
-    modelName: string,
-    modelId?: number,
+  page: Page,
+  modelName: string,
+  modelId?: number,
 ): Promise<void> {
-    // Ensure we're on the model list
-    const modelListTab = page.locator(
-        ".dock-bar-left .draggable-tab:has(.pi-list)",
-    );
-    if (
-        await modelListTab
-            .waitFor({ state: "visible", timeout: 5000 })
-            .then(() => true)
-            .catch(() => false)
-    ) {
-        await modelListTab.click();
-        // Wait for model list content to load
-        await page.waitForSelector(".model-card, .no-results, .empty-state", {
-            state: "visible",
-            timeout: 15000,
-        });
+  // Ensure we're on the model list
+  const modelListTab = page.locator(
+    `.dock-bar-left ${tabSelector("modelList")}`,
+  );
+  if (
+    await modelListTab
+      .waitFor({ state: "visible", timeout: 5000 })
+      .then(() => true)
+      .catch(() => false)
+  ) {
+    await modelListTab.click();
+    // Wait for model list content to load
+    await page.waitForSelector(".model-card, .no-results, .empty-state", {
+      state: "visible",
+      timeout: 15000,
+    });
+  }
+
+  // Wait for model list to finish loading (cards or empty state)
+  await page.waitForSelector(".model-card, .no-results, .empty-state", {
+    state: "visible",
+    timeout: 10000,
+  });
+
+  const nameCard = page
+    .locator(
+      ".model-card, .model-grid-item, .p-card, [class*='model-card'], [class*='model-list-item']",
+    )
+    .filter({ hasText: modelName })
+    .first();
+  const idCard = modelId
+    ? page.locator(`[data-model-id="${modelId}"]`).first()
+    : null;
+
+  let cardSelectorMode: "id" | "name" | null = null;
+  for (let attempt = 0; attempt < 6; attempt++) {
+    if (idCard && (await idCard.isVisible().catch(() => false))) {
+      cardSelectorMode = "id";
+      break;
     }
 
-    // Wait for model list to finish loading (cards or empty state)
-    await page.waitForSelector(".model-card, .no-results, .empty-state", {
+    if (await nameCard.isVisible().catch(() => false)) {
+      cardSelectorMode = "name";
+      break;
+    }
+
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await page.waitForSelector(
+      ".model-card, .model-grid, .no-results, .empty-state",
+      {
         state: "visible",
-        timeout: 10000,
+        timeout: 15000,
+      },
+    );
+  }
+
+  if (!cardSelectorMode && modelId) {
+    await page.evaluate(
+      ({ id, name }) => {
+        const storageKey = "modelibr_navigation";
+        const sessionWindowIdKey = "modelibr_windowId";
+        const storedRaw = localStorage.getItem(storageKey);
+        const stored = storedRaw
+          ? JSON.parse(storedRaw)
+          : {
+              state: {
+                activeWindows: {},
+                recentlyClosedTabs: [],
+                recentlyClosedWindows: [],
+              },
+              version: 0,
+            };
+
+        let windowId = sessionStorage.getItem(sessionWindowIdKey);
+        if (!windowId) {
+          windowId = crypto.randomUUID();
+          sessionStorage.setItem(sessionWindowIdKey, windowId);
+        }
+
+        const defaultWindowState = {
+          tabs: [
+            {
+              id: "modelList",
+              type: "modelList",
+              label: "Models",
+              params: {},
+            },
+          ],
+          activeTabId: "modelList",
+          activeRightTabId: null,
+          splitterSize: 50,
+          lastActiveAt: new Date().toISOString(),
+        };
+
+        const activeWindows = stored.state?.activeWindows || {};
+        const windowState = activeWindows[windowId] || defaultWindowState;
+        const tabId = `model-${id}`;
+        const existingTabs = (windowState.tabs || []).filter(
+          (tab: any) => tab.id !== tabId,
+        );
+
+        existingTabs.push({
+          id: tabId,
+          type: "modelViewer",
+          label: name,
+          params: { modelId: String(id) },
+          modelId: String(id),
+        });
+
+        activeWindows[windowId] = {
+          ...windowState,
+          tabs: existingTabs,
+          activeTabId: tabId,
+          lastActiveAt: new Date().toISOString(),
+        };
+
+        stored.state = {
+          activeWindows,
+          recentlyClosedTabs: stored.state?.recentlyClosedTabs || [],
+          recentlyClosedWindows: stored.state?.recentlyClosedWindows || [],
+        };
+
+        localStorage.setItem(storageKey, JSON.stringify(stored));
+      },
+      { id: modelId, name: modelName },
+    );
+
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await page.waitForSelector(".version-dropdown-trigger", {
+      state: "visible",
+      timeout: 30000,
+    });
+  } else {
+    expect(cardSelectorMode).not.toBeNull();
+
+    await expect(async () => {
+      const clickTarget =
+        cardSelectorMode === "id" && idCard ? idCard : nameCard;
+
+      if (modelId && clickTarget === nameCard) {
+        console.warn(
+          `[Nav] data-model-id="${modelId}" not found, falling back to name match`,
+        );
+      }
+
+      await expect(clickTarget).toBeVisible({ timeout: 5000 });
+
+      try {
+        await clickTarget.click({ timeout: 10000 });
+      } catch {
+        await clickTarget.click({ force: true, timeout: 10000 });
+      }
+
+      // Wait for the model viewer to load WITH version data.
+      // The .version-dropdown-trigger only renders when versions.length > 0,
+      // so this guarantees the API responded with version info.
+      await page.waitForSelector(".version-dropdown-trigger", {
+        state: "visible",
+        timeout: 15000,
+      });
+    }).toPass({ timeout: 60000, intervals: [1000, 2000, 5000] });
+  }
+
+  if (modelId) {
+    const openedModelId = await page.evaluate(() => {
+      try {
+        const stored = localStorage.getItem("modelibr_navigation");
+        if (!stored) return null;
+        const data = JSON.parse(stored);
+        const windows = data?.state?.activeWindows || {};
+        for (const win of Object.values(windows) as any[]) {
+          const activeTab = win?.tabs?.find(
+            (tab: any) =>
+              tab.id === win.activeTabId && tab.type === "modelViewer",
+          );
+          if (activeTab?.modelId) {
+            return Number(activeTab.modelId);
+          }
+        }
+        return null;
+      } catch {
+        return null;
+      }
     });
 
-    const nameCard = page
-        .locator(
-            ".model-card, .model-grid-item, .p-card, [class*='model-card'], [class*='model-list-item']",
-        )
-        .filter({ hasText: modelName })
-        .first();
-    const idCard = modelId
-        ? page.locator(`[data-model-id="${modelId}"]`).first()
-        : null;
+    expect(openedModelId).toBe(modelId);
+  }
 
-    let cardSelectorMode: "id" | "name" | null = null;
-    for (let attempt = 0; attempt < 6; attempt++) {
-        if (idCard && (await idCard.isVisible().catch(() => false))) {
-            cardSelectorMode = "id";
-            break;
-        }
-
-        if (await nameCard.isVisible().catch(() => false)) {
-            cardSelectorMode = "name";
-            break;
-        }
-
-        await page.reload({ waitUntil: "domcontentloaded" });
-        await page.waitForSelector(
-            ".model-card, .model-grid, .no-results, .empty-state",
-            {
-                state: "visible",
-                timeout: 15000,
-            },
-        );
-    }
-
-    if (!cardSelectorMode && modelId) {
-        await page.evaluate(
-            ({ id, name }) => {
-                const storageKey = "modelibr_navigation";
-                const sessionWindowIdKey = "modelibr_windowId";
-                const storedRaw = localStorage.getItem(storageKey);
-                const stored = storedRaw
-                    ? JSON.parse(storedRaw)
-                    : {
-                          state: {
-                              activeWindows: {},
-                              recentlyClosedTabs: [],
-                              recentlyClosedWindows: [],
-                          },
-                          version: 0,
-                      };
-
-                let windowId = sessionStorage.getItem(sessionWindowIdKey);
-                if (!windowId) {
-                    windowId = crypto.randomUUID();
-                    sessionStorage.setItem(sessionWindowIdKey, windowId);
-                }
-
-                const defaultWindowState = {
-                    tabs: [
-                        {
-                            id: "modelList",
-                            type: "modelList",
-                            label: "Models",
-                            params: {},
-                        },
-                    ],
-                    activeTabId: "modelList",
-                    activeRightTabId: null,
-                    splitterSize: 50,
-                    lastActiveAt: new Date().toISOString(),
-                };
-
-                const activeWindows = stored.state?.activeWindows || {};
-                const windowState =
-                    activeWindows[windowId] || defaultWindowState;
-                const tabId = `model-${id}`;
-                const existingTabs = (windowState.tabs || []).filter(
-                    (tab: any) => tab.id !== tabId,
-                );
-
-                existingTabs.push({
-                    id: tabId,
-                    type: "modelViewer",
-                    label: name,
-                    params: { modelId: String(id) },
-                    modelId: String(id),
-                });
-
-                activeWindows[windowId] = {
-                    ...windowState,
-                    tabs: existingTabs,
-                    activeTabId: tabId,
-                    lastActiveAt: new Date().toISOString(),
-                };
-
-                stored.state = {
-                    activeWindows,
-                    recentlyClosedTabs: stored.state?.recentlyClosedTabs || [],
-                    recentlyClosedWindows:
-                        stored.state?.recentlyClosedWindows || [],
-                };
-
-                localStorage.setItem(storageKey, JSON.stringify(stored));
-            },
-            { id: modelId, name: modelName },
-        );
-
-        await page.reload({ waitUntil: "domcontentloaded" });
-        await page.waitForSelector(".version-dropdown-trigger", {
-            state: "visible",
-            timeout: 30000,
-        });
-    } else {
-        expect(cardSelectorMode).not.toBeNull();
-
-        await expect(async () => {
-            const clickTarget =
-                cardSelectorMode === "id" && idCard ? idCard : nameCard;
-
-            if (modelId && clickTarget === nameCard) {
-                console.warn(
-                    `[Nav] data-model-id="${modelId}" not found, falling back to name match`,
-                );
-            }
-
-            await expect(clickTarget).toBeVisible({ timeout: 5000 });
-
-            try {
-                await clickTarget.click({ timeout: 10000 });
-            } catch {
-                await clickTarget.click({ force: true, timeout: 10000 });
-            }
-
-            // Wait for the model viewer to load WITH version data.
-            // The .version-dropdown-trigger only renders when versions.length > 0,
-            // so this guarantees the API responded with version info.
-            await page.waitForSelector(".version-dropdown-trigger", {
-                state: "visible",
-                timeout: 15000,
-            });
-        }).toPass({ timeout: 60000, intervals: [1000, 2000, 5000] });
-    }
-
-    if (modelId) {
-        const openedModelId = await page.evaluate(() => {
-            try {
-                const stored = localStorage.getItem("modelibr_navigation");
-                if (!stored) return null;
-                const data = JSON.parse(stored);
-                const windows = data?.state?.activeWindows || {};
-                for (const win of Object.values(windows) as any[]) {
-                    const activeTab = win?.tabs?.find(
-                        (tab: any) =>
-                            tab.id === win.activeTabId &&
-                            tab.type === "modelViewer",
-                    );
-                    if (activeTab?.modelId) {
-                        return Number(activeTab.modelId);
-                    }
-                }
-                return null;
-            } catch {
-                return null;
-            }
-        });
-
-        expect(openedModelId).toBe(modelId);
-    }
-
-    console.log(
-        `[Nav] Opened model viewer for "${modelName}"${modelId ? ` (id=${modelId})` : ""} ✓`,
-    );
+  console.log(
+    `[Nav] Opened model viewer for "${modelName}"${modelId ? ` (id=${modelId})` : ""} ✓`,
+  );
 }

@@ -8,7 +8,11 @@ import type { StartStoreImportResponse, StoreImportJobDto } from '../types'
 export async function startStoreImport(request: {
   storeUrl: string
   assetId: string
-  importToken: string
+  /**
+   * The minted import token, or omitted for a free pack imported without a
+   * store account - the store answers those anonymously.
+   */
+  importToken?: string
   /** When set, only these manifest item ids are imported (partial pack import). */
   selectedItemIds?: string[]
 }): Promise<StartStoreImportResponse> {

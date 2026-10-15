@@ -1,6 +1,7 @@
 import { type AxiosResponse } from 'axios'
 
 import { client } from '@/lib/apiBase'
+import { type MaterialEffectsDocument } from '@/shared/three/materialEffects'
 
 /** glTF's alphaMode, which is what the viewport and every exporter speak. */
 export type AlphaMode = 'Opaque' | 'Mask' | 'Blend'
@@ -40,6 +41,8 @@ export interface MaterialDto {
   tags: string[]
   createdAt: string
   updatedAt: string
+  /** Null, absent or invalid means the material renders with its params only. */
+  effects?: MaterialEffectsDocument | null
 }
 
 /** Which table a library entry came from. Ids are unique per kind, not across both. */
@@ -78,6 +81,7 @@ export interface MaterialLibraryEntryDto {
   tags: string[]
   createdAt: string
   updatedAt: string
+  effects?: MaterialEffectsDocument | null
 }
 
 export interface MaterialLibraryResponse {
@@ -97,6 +101,8 @@ export interface CreateMaterialRequest {
   categoryId?: number | null
   previewGeometryType?: string | null
   tags?: string[]
+  /** The full effects document to store, or null for a material with none. */
+  effects?: MaterialEffectsDocument | null
 }
 
 export async function getMaterialById(
@@ -168,7 +174,14 @@ export async function createMaterial(
 
 export async function updateMaterial(
   materialId: number,
-  request: Partial<CreateMaterialRequest> & { clearCategory?: boolean }
+  request: Partial<CreateMaterialRequest> & {
+    clearCategory?: boolean
+    /**
+     * Removes the stored effects document. Omit both this and `effects` to
+     * leave whatever is stored untouched.
+     */
+    clearEffects?: boolean
+  }
 ): Promise<MaterialDto> {
   const response: AxiosResponse<MaterialDto> = await client.put(
     `/materials/${materialId}`,

@@ -13,7 +13,7 @@ function parseRequestedSlugs() {
         .filter(Boolean);
 }
 
-function runFfmpeg(args) {
+export function runFfmpeg(args) {
     if (!ffmpegPath) {
         throw new Error("ffmpeg-static binary is unavailable");
     }
@@ -49,26 +49,31 @@ function parseBlackSegments(text) {
     }));
 }
 
-function parseFreezeSegments(text) {
+// freezedetect logs each event as its own metadata line
+// (`lavfi.freezedetect.freeze_start: 5.16`, `...freeze_duration: 1.6`,
+// `...freeze_end: 6.76`), so a segment is a start line followed by an end line.
+// A freeze still running at the end of the clip has no end line.
+export function parseFreezeSegments(text, duration = null) {
     const segments = [];
-    let current = null;
+    let start = null;
 
     for (const line of text.split("\n")) {
         const startMatch = line.match(/freeze_start:\s*(\d+(?:\.\d+)?)/);
         if (startMatch) {
-            current = { start: Number(startMatch[1]) };
+            start = Number(startMatch[1]);
             continue;
         }
 
-        const endMatch = line.match(/freeze_end:\s*(\d+(?:\.\d+)?)\s*\|\s*freeze_duration:\s*(\d+(?:\.\d+)?)/);
-        if (endMatch && current) {
-            segments.push({
-                start: current.start,
-                end: Number(endMatch[1]),
-                duration: Number(endMatch[2]),
-            });
-            current = null;
+        const endMatch = line.match(/freeze_end:\s*(\d+(?:\.\d+)?)/);
+        if (endMatch && start !== null) {
+            const end = Number(endMatch[1]);
+            segments.push({ start, end, duration: Number((end - start).toFixed(3)) });
+            start = null;
         }
+    }
+
+    if (start !== null && duration !== null && duration > start) {
+        segments.push({ start, end: duration, duration: Number((duration - start).toFixed(3)) });
     }
 
     return segments;
@@ -127,6 +132,7 @@ export async function analyzeVideoDirectory(rootDir) {
                 "null",
                 "-",
             ]),
+            duration,
         );
 
         const longestBlack = blackSegments.reduce(

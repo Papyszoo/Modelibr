@@ -20,7 +20,6 @@ import * as recycledApi from '@/features/recycled-files/api/recycledApi'
 import * as settingsApi from '@/features/settings/api/settingsApi'
 import * as soundApi from '@/features/sounds/api/soundApi'
 import * as spriteApi from '@/features/sprite/api/spriteApi'
-import * as stageApi from '@/features/stage-editor/api/stageApi'
 import * as textureSetApi from '@/features/texture-set/api/textureSetApi'
 import { baseURL } from '@/lib/apiBase'
 import * as thumbnailApi from '@/shared/thumbnail/api/thumbnailApi'
@@ -159,19 +158,12 @@ class ApiClient {
   getDeletePreview = recycledApi.getDeletePreview
   permanentlyDeleteEntity = recycledApi.permanentlyDeleteEntity
 
-  // Stage methods
-  createStage = stageApi.createStage
-  getAllStages = stageApi.getAllStages
-  getStageById = stageApi.getStageById
-  updateStage = stageApi.updateStage
-
   // History methods
   getBatchUploadHistory = historyApi.getBatchUploadHistory
 
   // Settings methods
   getSettings = settingsApi.getSettings
   updateSettings = settingsApi.updateSettings
-  refreshCache = settingsApi.refreshCache
 }
 
 export const apiClient = new ApiClient()

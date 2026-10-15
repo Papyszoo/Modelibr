@@ -171,9 +171,15 @@ export const SoundCard = memo(function SoundCard({
         preload="metadata"
       />
 
-      <div className="sound-select-checkbox" onClick={onSelect}>
+      <button
+        type="button"
+        className="sound-select-checkbox"
+        onClick={onSelect}
+        aria-label={`${isSelected ? 'Deselect' : 'Select'} ${sound.name}`}
+        aria-pressed={isSelected}
+      >
         <i className={`pi ${isSelected ? 'pi-check-square' : 'pi-stop'}`} />
-      </div>
+      </button>
 
       <div ref={waveformContainerRef} className="sound-waveform-container">
         {waveformUrl ? (

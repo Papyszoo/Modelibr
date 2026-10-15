@@ -209,10 +209,19 @@ export class PacksPage {
     const packCard = packId
       ? this.page.locator(`.pack-grid-card[data-pack-id="${packId}"]`)
       : this.page.locator(`.pack-grid-card:has-text("${packName}")`);
-    const deleteButton = packCard.locator(
-      'button[aria-label="Delete Pack"], button.p-button-danger',
-    );
-    await deleteButton.click();
+    // The card's actions button opens the shared context menu; Delete is a menu
+    // item that then opens the confirmation.
+    await packCard
+      .getByRole("button", { name: `Pack actions for ${packName}` })
+      .click();
+    await this.page
+      .locator(".p-contextmenu")
+      .getByText("Delete", { exact: true })
+      .click();
+    await this.page
+      .locator(".p-confirm-dialog")
+      .getByRole("button", { name: "Delete Pack" })
+      .click();
     await packCard.waitFor({ state: "hidden", timeout: 10000 });
     console.log(`[Action] Deleted pack: ${packName}`);
   }

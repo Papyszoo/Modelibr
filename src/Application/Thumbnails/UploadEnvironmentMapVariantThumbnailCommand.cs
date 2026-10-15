@@ -14,20 +14,17 @@ internal sealed class UploadEnvironmentMapVariantThumbnailCommandHandler
 {
     private readonly IEnvironmentMapRepository _environmentMapRepository;
     private readonly IFileStorage _fileStorage;
-    private readonly IUploadPathProvider _pathProvider;
     private readonly IDateTimeProvider _dateTimeProvider;
     private readonly IUnitOfWork _unitOfWork;
 
     public UploadEnvironmentMapVariantThumbnailCommandHandler(
         IEnvironmentMapRepository environmentMapRepository,
         IFileStorage fileStorage,
-        IUploadPathProvider pathProvider,
         IDateTimeProvider dateTimeProvider,
         IUnitOfWork unitOfWork)
     {
         _environmentMapRepository = environmentMapRepository;
         _fileStorage = fileStorage;
-        _pathProvider = pathProvider;
         _dateTimeProvider = dateTimeProvider;
         _unitOfWork = unitOfWork;
     }
@@ -59,10 +56,11 @@ internal sealed class UploadEnvironmentMapVariantThumbnailCommandHandler
         try
         {
             var storedFileResult = await _fileStorage.SaveAsync(command.ThumbnailFile, FileType.Texture, cancellationToken);
-            var fullPath = Path.Combine(_pathProvider.UploadRootPath, storedFileResult.RelativePath);
+            // Uploads-relative, like every other stored file; the preview endpoint rebases it.
+            var relativePath = storedFileResult.RelativePath;
             var now = _dateTimeProvider.UtcNow;
 
-            variant.SetThumbnailPath(fullPath, now);
+            variant.SetThumbnailPath(relativePath, now);
             environmentMap.Touch(now);
 
             await _environmentMapRepository.UpdateAsync(environmentMap, cancellationToken);
@@ -71,7 +69,7 @@ internal sealed class UploadEnvironmentMapVariantThumbnailCommandHandler
             return Result.Success(new UploadEnvironmentMapVariantThumbnailCommandResponse(
                 command.EnvironmentMapId,
                 command.VariantId,
-                fullPath,
+                relativePath,
                 storedFileResult.SizeBytes));
         }
         catch (Exception ex)

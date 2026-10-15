@@ -125,6 +125,14 @@ export class ModelDataService {
    */
   async downloadTextureFile(fileId, originalFileName) {
     try {
+      // ensureTempDirectory() runs once in the constructor, but the periodic
+      // temp sweep (ModelFileService.cleanupOldFiles) treats every entry under
+      // /tmp/modelibr-worker as disposable and removes this textures/ directory
+      // once it is an hour stale. Recreate it at the write site so the next
+      // download after a sweep does not fail with ENOENT - which silently
+      // dropped the bound texture set and rendered the model neutral grey.
+      this.ensureTempDirectory()
+
       logger.debug('Downloading texture file', { fileId, originalFileName })
 
       const response = await this.apiClient.get(`/files/${fileId}`, {
@@ -342,6 +350,8 @@ export class ModelDataService {
    * @param {number|null} metadata.vertexCount - Total vertex count
    * @param {number|null} metadata.meshCount - Total mesh count
    * @param {number|null} metadata.materialCount - Total distinct material count
+   * @param {Array<{name: string, durationSeconds: number, kinds: string[]}>} [metadata.animations] - Per-clip name/duration/kinds
+   * @param {Array<{meshName: string, shapeKeys: string[]}>} [metadata.shapeKeys] - Shape-key names per morph-capable mesh
    * @returns {Promise<boolean>} True if saved successfully
    */
   async saveTechnicalMetadata(modelVersionId, metadata) {
@@ -369,6 +379,8 @@ export class ModelDataService {
           animationCount: metadata.animationCount ?? null,
           animationNames: metadata.animationNames ?? [],
           boneCount: metadata.boneCount ?? null,
+          animations: metadata.animations ?? [],
+          shapeKeys: metadata.shapeKeys ?? [],
         },
         {
           headers: {
@@ -430,6 +442,12 @@ export class ModelDataService {
             : null,
           animationCount: sceneGraph.rollups.animationCount ?? null,
           animationNames: sceneGraph.rollups.animationNames ?? [],
+          // Per-clip {name, durationSeconds, kinds} from the shared scene-graph
+          // walk, so the stored raw payload can answer what each clip moves.
+          animations: sceneGraph.rollups.animations ?? [],
+          // Present only for a .blend source whose rig a plain web conversion
+          // cannot carry (web_bake.inspect()'s counts); null for everything else.
+          unbakedRig: sceneGraph.rollups.unbakedRig ?? null,
         },
         parts: sceneGraph.parts.map(p => ({
           partPath: p.partPath,

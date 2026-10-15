@@ -7,10 +7,12 @@ import {
   addSoundToProject,
   addSpriteToProject,
   addTextureSetToProject,
+  addVfxToProject,
   getModelsByProject,
   getScriptsByProject,
   removeModelFromProject,
   removeScriptFromProject,
+  removeVfxFromProject,
 } from '../projectApi'
 
 const mockGet = client.get as jest.Mock
@@ -42,6 +44,9 @@ describe('project membership endpoints', () => {
 
     await addEnvironmentMapToProject(5, 75)
     expect(mockPost).toHaveBeenCalledWith('/projects/5/environment-maps/75')
+
+    await addVfxToProject(5, 76)
+    expect(mockPost).toHaveBeenCalledWith('/projects/5/vfx/76')
   })
 
   it('removes members via DELETE on the same sub-resource', async () => {
@@ -50,6 +55,9 @@ describe('project membership endpoints', () => {
 
     await removeScriptFromProject(5, 74)
     expect(mockDelete).toHaveBeenCalledWith('/projects/5/scripts/74')
+
+    await removeVfxFromProject(5, 76)
+    expect(mockDelete).toHaveBeenCalledWith('/projects/5/vfx/76')
   })
 })
 

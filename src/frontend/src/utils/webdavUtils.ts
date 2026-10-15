@@ -3,6 +3,9 @@
  * Provides platform detection and generates native file system paths for WebDAV resources.
  */
 
+import { isDemoMode } from '@/lib/env'
+import { copyTextToClipboard } from '@/shared/utils/clipboard'
+
 export type OperatingSystem = 'windows' | 'macos' | 'linux' | 'unknown'
 
 /**
@@ -140,6 +143,16 @@ export async function openInFileExplorer(
   const { buildWebDavPath } = await import('@/stores/webDavStore')
   const pathInfo = buildWebDavPath(virtualPath)
 
+  // The demo is a plain browser with no WebDAV drive mounted behind it, so a
+  // native file explorer can never be opened there. Say that plainly instead of
+  // the generic copy-the-path note, matching the demo banner's limitations list.
+  if (isDemoMode()) {
+    return {
+      success: false,
+      message: `Show in Folder needs the local server. WebDAV drive access is not available in the browser-only demo. Copy the path to open it yourself: ${pathInfo.nativePath}`,
+    }
+  }
+
   return {
     success: false,
     message: `Cannot open file explorer automatically. Please copy the path: ${pathInfo.nativePath}`,
@@ -203,12 +216,10 @@ export async function copyPathToClipboard(
   const { buildWebDavPath } = await import('@/stores/webDavStore')
   const pathInfo = buildWebDavPath(virtualPath)
 
-  try {
-    await navigator.clipboard.writeText(pathInfo.nativePath)
-    return { success: true, path: pathInfo.nativePath }
-  } catch {
-    return { success: false, path: pathInfo.nativePath }
-  }
+  // Guarded by the shared helper: navigator.clipboard is undefined over plain
+  // http (a LAN client), so this reports failure instead of throwing.
+  const success = await copyTextToClipboard(pathInfo.nativePath)
+  return { success, path: pathInfo.nativePath }
 }
 
 /**

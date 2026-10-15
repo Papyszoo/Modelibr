@@ -240,3 +240,18 @@
 .list-filters-search-input::placeholder {
   color: var(--text-color-secondary);
 }
+
+.list-filters-search-clear {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.5rem 0.75rem;
+  color: var(--text-color-secondary);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+}
+
+.list-filters-search-clear:hover {
+  color: var(--text-color);
+}

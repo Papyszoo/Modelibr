@@ -47,6 +47,21 @@
   color: var(--text-color-secondary);
 }
 
+.search-palette-clear {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.25rem;
+  color: var(--text-color-secondary);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+}
+
+.search-palette-clear:hover {
+  color: var(--text-color);
+}
+
 .search-palette-results {
   overflow-y: auto;
   padding: 0.35rem 0;

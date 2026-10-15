@@ -75,7 +75,7 @@ public class LogThumbnailJobEventCommandHandler : ICommandHandler<LogThumbnailJo
             await _unitOfWork.SaveChangesAsync(cancellationToken);
 
             _logger.LogInformation("Logged event {EventType} for thumbnail job {JobId}", 
-                command.EventType, command.JobId);
+                LogSanitizer.Sanitize(command.EventType), command.JobId);
 
             return Result.Success(new LogThumbnailJobEventResponse(savedEvent.Id));
         }

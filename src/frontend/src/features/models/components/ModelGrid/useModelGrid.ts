@@ -14,6 +14,8 @@ interface UseModelGridOptions {
   textureSetId?: number
   persistedViewState?: ModelListViewState | null
   onPersistedViewStateChange?: (patch: Partial<ModelListViewState>) => void
+  /** Opens the asset a deduped upload resolved to. */
+  onOpenModel?: (modelId: number) => void
 }
 
 export function useModelGrid({
@@ -22,6 +24,7 @@ export function useModelGrid({
   textureSetId,
   persistedViewState,
   onPersistedViewStateChange,
+  onOpenModel,
 }: UseModelGridOptions) {
   const toast = useRef<Toast>(null)
 
@@ -54,6 +57,7 @@ export function useModelGrid({
     projectId,
     toast,
     onUploadComplete: () => data.fetchModels(),
+    onOpenModel,
   })
 
   // Client-side name search only; category scoping is server-side.

@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Application.Abstractions.Messaging;
 using Application.Materials;
 using Microsoft.AspNetCore.Mvc;
@@ -25,14 +26,26 @@ public static class MaterialEndpoints
             .WithSummary("Gets a specific material by ID")
             .WithOpenApi();
 
+        app.MapGet("/materials/{id}/export/godot", ExportMaterialGodot)
+            .WithName("Export Material To Godot")
+            .WithSummary("Downloads a material as a Godot 4 ShaderMaterial with its effects shader, zipped")
+            .WithOpenApi();
+
         app.MapPost("/materials", CreateMaterial)
             .WithName("Create Material")
             .WithSummary("Creates a material from parameters - no files involved")
             .WithOpenApi();
 
+        // PUT and PATCH are the same patch semantics: every omitted field is left alone.
+        // PATCH is the honest verb for that, so both are mapped to the one handler.
         app.MapPut("/materials/{id}", UpdateMaterial)
             .WithName("Update Material")
             .WithSummary("Updates a material; omitted fields are left alone")
+            .WithOpenApi();
+
+        app.MapPatch("/materials/{id}", UpdateMaterial)
+            .WithName("Patch Material")
+            .WithSummary("Patches a material; omitted fields are left alone")
             .WithOpenApi();
 
         app.MapPut("/materials/{id}/tags", UpdateMaterialTags)
@@ -103,6 +116,18 @@ public static class MaterialEndpoints
             : Results.Ok(result.Value);
     }
 
+    private static async Task<IResult> ExportMaterialGodot(
+        int id,
+        IQueryHandler<ExportMaterialGodotQuery, MaterialGodotExport> queryHandler,
+        CancellationToken cancellationToken)
+    {
+        var result = await queryHandler.Handle(new ExportMaterialGodotQuery(id), cancellationToken);
+
+        return result.IsFailure
+            ? Results.NotFound(new { error = result.Error.Code, message = result.Error.Message })
+            : Results.File(result.Value.Content, "application/zip", result.Value.FileName);
+    }
+
     private static async Task<IResult> CreateMaterial(
         [FromBody] CreateMaterialRequest request,
         ICommandHandler<CreateMaterialCommand, CreateMaterialResponse> commandHandler,
@@ -115,7 +140,8 @@ public static class MaterialEndpoints
                 request.Description,
                 request.CategoryId,
                 request.PreviewGeometryType,
-                request.Tags),
+                request.Tags,
+                request.Effects),
             cancellationToken);
 
         return result.IsFailure
@@ -137,7 +163,9 @@ public static class MaterialEndpoints
                 request.Parameters,
                 request.CategoryId,
                 request.ClearCategory ?? false,
-                request.PreviewGeometryType),
+                request.PreviewGeometryType,
+                request.Effects,
+                request.ClearEffects ?? false),
             cancellationToken);
 
         if (result.IsFailure)
@@ -201,7 +229,8 @@ public record CreateMaterialRequest(
     string? Description = null,
     int? CategoryId = null,
     string? PreviewGeometryType = null,
-    IReadOnlyCollection<string>? Tags = null);
+    IReadOnlyCollection<string>? Tags = null,
+    JsonElement? Effects = null);
 
 public record UpdateMaterialRequest(
     string? Name = null,
@@ -209,6 +238,8 @@ public record UpdateMaterialRequest(
     MaterialParametersRequest? Parameters = null,
     int? CategoryId = null,
     bool? ClearCategory = null,
-    string? PreviewGeometryType = null);
+    string? PreviewGeometryType = null,
+    JsonElement? Effects = null,
+    bool? ClearEffects = null);
 
 public record UpdateMaterialTagsRequest(IReadOnlyCollection<string>? Tags);

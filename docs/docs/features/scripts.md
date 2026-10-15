@@ -1,5 +1,6 @@
 ---
-sidebar_position: 7
+description: Store shaders and source code as first-class assets, with syntax highlighting, live shader previews, and the same tags and packs as every other asset type.
+sidebar_position: 10
 ---
 
 # Scripts

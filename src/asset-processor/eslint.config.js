@@ -5,7 +5,7 @@ import prettierConfig from 'eslint-config-prettier'
 
 export default [
   {
-    ignores: ['node_modules/', 'tests/'],
+    ignores: ['node_modules/', 'tests/', '.cache/'],
   },
   {
     files: ['**/*.js'],

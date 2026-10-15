@@ -35,7 +35,7 @@ export function CreatePackDialog({ visible, onHide }: CreatePackDialogProps) {
   const queryClient = useQueryClient()
   const toast = useRef<Toast>(null)
 
-  const { register, control, handleSubmit, reset } = useForm<
+  const { register, control, handleSubmit, reset, formState } = useForm<
     PackCreateFormInput,
     unknown,
     PackCreateFormOutput
@@ -49,6 +49,7 @@ export function CreatePackDialog({ visible, onHide }: CreatePackDialogProps) {
       url: '',
     },
   })
+  const nameError = formState.errors.name?.message
 
   const createPackMutation = useMutation({
     mutationFn: (payload: {
@@ -129,9 +130,20 @@ export function CreatePackDialog({ visible, onHide }: CreatePackDialogProps) {
             <label htmlFor="pack-name">Name *</label>
             <InputText
               id="pack-name"
+              className={nameError ? 'p-invalid' : undefined}
+              aria-invalid={!!nameError}
               {...register('name')}
               placeholder="Enter pack name"
             />
+            {nameError ? (
+              <small
+                className="p-error"
+                role="alert"
+                data-testid="pack-name-error"
+              >
+                {nameError}
+              </small>
+            ) : null}
           </div>
           <div className="field">
             <label htmlFor="pack-description">Description</label>

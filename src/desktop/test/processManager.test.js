@@ -4,7 +4,7 @@ import fs from 'fs/promises'
 import os from 'os'
 import path from 'path'
 
-import { ProcessManager } from '../src/processManager.js'
+import { ProcessManager, findLanIPv4Address, buildLanUrl } from '../src/processManager.js'
 import { sanitizeRuntimeConfig } from '../src/runtimeConfig.js'
 import { readMigrationMarker } from '../src/dataMigration.js'
 
@@ -197,52 +197,62 @@ test('clearStalePostgresLock is a no-op when there is no lock file', async () =>
   }
 })
 
-test('web api environment uses bundled PostgreSQL tools and keeps pre-migration backup enabled', () => {
+test('web api environment needs no PostgreSQL client tools and keeps backups on', () => {
+  // The regression this replaced: PG_DUMP_PATH/PSQL_PATH were advertised, and the
+  // packaged runtime has no such files. Backups are now written through the same
+  // driver the app already uses, so there is no tool path to point at and nothing
+  // to skip.
   const pm = makePM({ postgresPort: 35432 })
   pm.markRunning()
-
-  const env = pm.buildWebApiEnvironment()
-  const postgresBinDir = path.join(pm.runtimeDir, 'postgres', 'bin')
-  const executable = name =>
-    path.join(
-      postgresBinDir,
-      process.platform === 'win32' ? `${name}.exe` : name
-    )
-
-  assert.equal(env.PG_DUMP_PATH, executable('pg_dump'))
-  assert.equal(env.PSQL_PATH, executable('psql'))
-  assert.equal(path.isAbsolute(env.PG_DUMP_PATH), true)
-  assert.equal(path.isAbsolute(env.PSQL_PATH), true)
-  assert.equal(env.POSTGRES_HOST, '127.0.0.1')
-  assert.equal(env.POSTGRES_PORT, '35432')
-  assert.equal(env.POSTGRES_DB, 'Modelibr')
-  assert.equal(env.POSTGRES_USER, 'modelibr')
-  assert.equal(env.POSTGRES_PASSWORD, 'modelibr')
-  assert.equal(env.MODELIBR_SKIP_PREMIGRATION_BACKUP, 'false')
-})
-
-test('web api environment omits client-tool paths the runtime does not ship', () => {
-  // The packaged runtime is a trimmed embedded PostgreSQL: bin/ holds only
-  // initdb, pg_ctl and postgres. Advertising PG_DUMP_PATH for a file that does
-  // not exist turns "this build has no client tools" into a bogus backup
-  // failure, so the vars must be absent instead.
-  const pm = makePM({ postgresPort: 35432 })
-  pm.markRunning()
-  pm.postgresToolsAvailable = false
 
   const env = pm.buildWebApiEnvironment()
 
   assert.equal('PG_DUMP_PATH' in env, false)
   assert.equal('PSQL_PATH' in env, false)
-  // Everything else the WebApi needs is unaffected.
   assert.equal(env.POSTGRES_HOST, '127.0.0.1')
-  assert.equal(env.MODELIBR_SKIP_PREMIGRATION_BACKUP, 'false')
+  assert.equal(env.POSTGRES_PORT, '35432')
+  assert.equal(env.POSTGRES_DB, 'Modelibr')
+  assert.equal(env.POSTGRES_USER, 'modelibr')
+  assert.equal(env.POSTGRES_PASSWORD, 'modelibr')
+  // Deliberately NOT set: the child environment is this exact object (nothing
+  // leaks in from the developer's shell), and leaving the variable unset lets
+  // the Settings page's stored "back up before updates" choice decide. The
+  // WebApi default keeps backups on.
+  assert.equal('MODELIBR_SKIP_PREMIGRATION_BACKUP' in env, false)
 })
 
-test('a runtime without the client tools still passes the asset check', async () => {
+test('worker environment points scene render-back at the active UI port', () => {
+  // Regression: the native host started workers without FRONTEND_URL, so
+  // ?render=scene and ?render=vfx could never load the app and every scene
+  // render and animated thumbnail failed - while docker-compose passed it. It
+  // must follow the bound UI port (active), like API_BASE_URL follows the bound
+  // API port.
+  const pm = makePM({ appPort: 3010, internalApiPort: 38080 })
+  pm.markRunning()
+
+  const env = pm.buildWorkerEnvironment(0)
+
+  assert.equal(env.FRONTEND_URL, 'http://127.0.0.1:3010')
+  assert.equal(env.API_BASE_URL, 'http://127.0.0.1:38080')
+  // Health port hangs off the bound API port (index 0 -> +100).
+  assert.equal(env.WORKER_PORT, '38180')
+})
+
+test('worker FRONTEND_URL follows a UI port resolved away from a taken one', () => {
+  const pm = makePM({ appPort: 3010 })
+  pm.markRunning({ appPort: 50515 }) // 3010 was busy, bound 50515 instead
+
+  assert.equal(
+    pm.buildWorkerEnvironment(0).FRONTEND_URL,
+    'http://127.0.0.1:50515'
+  )
+})
+
+test('a runtime with only the server binaries passes the asset check', async () => {
   // Regression guard for the 0.6.1 desktop break: pg_dump/psql were listed as
   // required assets, so every packaged build threw "Missing runtime asset" and
-  // the app refused to start.
+  // the app refused to start. The server binaries are the whole requirement now,
+  // so a runtime carrying exactly those three is a complete one.
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'mlbr-runtime-'))
   const runtimeDir = path.join(root, 'runtime')
   const exe = name => (process.platform === 'win32' ? `${name}.exe` : name)
@@ -269,8 +279,80 @@ test('a runtime without the client tools still passes the asset check', async ()
 
     await pm.ensureRuntimeAssets()
 
-    assert.equal(pm.postgresToolsAvailable, false)
+    const env = pm.buildWebApiEnvironment()
+    // Boot did not throw, and no skip switch is forced: with no stored setting
+    // the WebApi default keeps pre-migration backups on.
+    assert.equal('MODELIBR_SKIP_PREMIGRATION_BACKUP' in env, false)
   } finally {
     await fs.rm(root, { recursive: true, force: true })
   }
+})
+
+test('the desktop marks the WebApi as native so it binds loopback only', () => {
+  // Regression: the desktop launched the WebApi with ListenAnyIP, so its private
+  // (unauthenticated) port was reachable from the LAN even with network access
+  // off. The marker is what makes the WebApi bind localhost; Docker never sets it.
+  const pm = makePM()
+  pm.markRunning()
+
+  assert.equal(pm.buildWebApiEnvironment().MODELIBR_DESKTOP, 'true')
+})
+
+test('the desktop marks workers as native so their health servers bind loopback only', () => {
+  // Same regression, worker side: the asset-processor health server (health,
+  // status, metrics) was listening on every interface, so the desktop's private
+  // ports were reachable from the LAN with network access off. The marker makes
+  // it bind 127.0.0.1; Docker never sets it.
+  const pm = makePM()
+  pm.markRunning()
+
+  assert.equal(pm.buildWorkerEnvironment(0).MODELIBR_DESKTOP, 'true')
+})
+
+test('findLanIPv4Address returns the first non-internal IPv4 interface', () => {
+  const interfaces = {
+    lo0: [{ family: 'IPv4', address: '127.0.0.1', internal: true }],
+    en0: [{ family: 'IPv6', address: 'fe80::1', internal: false }],
+    en1: [
+      { family: 'IPv4', address: '192.168.1.63', internal: false },
+      { family: 'IPv4', address: '10.0.0.5', internal: false },
+    ],
+  }
+
+  assert.equal(findLanIPv4Address(interfaces), '192.168.1.63')
+  // Loopback-only (offline / IPv6-only) yields nothing rather than a dead URL.
+  assert.equal(
+    findLanIPv4Address({
+      lo0: [{ family: 'IPv4', address: '127.0.0.1', internal: true }],
+    }),
+    null
+  )
+})
+
+test('buildLanUrl builds the address a LAN device uses, or null when there is none', () => {
+  assert.equal(
+    buildLanUrl(3010, {
+      en0: [{ family: 'IPv4', address: '192.168.1.63', internal: false }],
+    }),
+    'https://192.168.1.63:3010'
+  )
+  assert.equal(
+    buildLanUrl(3010, {
+      lo0: [{ family: 'IPv4', address: '127.0.0.1', internal: true }],
+    }),
+    null
+  )
+})
+
+test('probeStatus advertises the LAN URL only when network access is on', async () => {
+  // Regression: the status window never told the user what to type on another
+  // device. It must appear only while the opt-in is on, and must match the host
+  // helper so the window and the tray agree.
+  const off = makePM({ appPort: 3010, allowNetworkAccess: false })
+  off.markRunning()
+  assert.equal((await off.probeStatus()).lanFrontendUrl, null)
+
+  const on = makePM({ appPort: 3010, allowNetworkAccess: true })
+  on.markRunning()
+  assert.equal((await on.probeStatus()).lanFrontendUrl, buildLanUrl(3010))
 })

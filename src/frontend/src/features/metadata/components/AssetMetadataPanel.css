@@ -58,6 +58,12 @@
   color: var(--mod-color-text-muted);
 }
 
+/* A failed save must be impossible to miss: `showToast` is optional and no
+   caller passes one, so the panel reports the failure itself. */
+.asset-metadata-error {
+  color: var(--mod-color-danger);
+}
+
 /* Says where a value came from. A read-only field is still shown - an imported
    licence is how an asset states its rights, and hiding it would make a store
    import look like an asset nobody knows anything about. */
@@ -72,6 +78,18 @@
 }
 
 .asset-metadata-select {
+  padding: 6px 8px;
+  border: 1px solid var(--mod-color-border);
+  border-radius: var(--mod-radius-sm);
+  background: var(--mod-color-surface);
+  color: inherit;
+  font-size: var(--mod-text-sm);
+}
+
+/* The shared NumberInput renders a bare input, so the panel styles it here -
+   same chrome as the select beside it. */
+.asset-metadata-number {
+  width: 100%;
   padding: 6px 8px;
   border: 1px solid var(--mod-color-border);
   border-radius: var(--mod-radius-sm);

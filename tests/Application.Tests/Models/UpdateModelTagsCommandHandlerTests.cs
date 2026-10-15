@@ -9,10 +9,10 @@ using Xunit;
 namespace Application.Tests.Models;
 
 /// <summary>
-/// The write behind <c>set_tags</c> and the tag editor. What is worth pinning here is not
-/// that tags are stored - it is that search learns about them in the same transaction.
-/// Search reads projection state only, so a tag the projection never heard about is a tag
-/// nobody can find the model by.
+/// The write behind <c>set_asset_metadata</c>'s tags field and the tag editor. What is
+/// worth pinning here is not that tags are stored - it is that search learns about them in
+/// the same transaction. Search reads projection state only, so a tag the projection never
+/// heard about is a tag nobody can find the model by.
 /// </summary>
 public class UpdateModelTagsCommandHandlerTests
 {

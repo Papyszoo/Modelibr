@@ -1,8 +1,15 @@
 import './MaterialSwatch.css'
 
-import { type JSX } from 'react'
+import { type JSX, useMemo } from 'react'
+
+import {
+  hasMaterialEffects,
+  parseMaterialEffects,
+} from '@/shared/three/materialEffects'
+import { type ParameterMaterialSource } from '@/shared/three/parameterMaterial'
 
 import { type MaterialParametersDto } from '../api/materialApi'
+import { MaterialEffectPreview } from './MaterialEffectPreview'
 
 /**
  * The five fields the swatch actually reads.
@@ -21,6 +28,12 @@ interface MaterialSwatchProps {
   parameters: MaterialSwatchParameters
   /** Rendered small (tile) or large (editor preview). */
   size?: 'tile' | 'editor'
+  /**
+   * The full material, used for a real three.js preview when it carries
+   * runtime effects. The material editor passes its live draft parameters so
+   * edits show immediately; scene callers omit it and keep the CSS swatch.
+   */
+  material?: ParameterMaterialSource | null
 }
 
 /**
@@ -32,11 +45,40 @@ interface MaterialSwatchProps {
  * tightens as roughness drops, and a darkened base as metallic rises (a metal
  * has no diffuse response). It is honest about being a swatch - the sphere
  * render lands with the thumbnail work.
+ *
+ * The one exception is a material with runtime effects (rim, emission pulse,
+ * jelly wobble): a CSS swatch cannot show a shader, so that material renders
+ * its real three.js material instead. Effect-free materials render exactly as
+ * before.
  */
 export function MaterialSwatch({
   parameters,
   size = 'tile',
+  material = null,
 }: MaterialSwatchProps): JSX.Element {
+  // Parsed once per document: re-parsing every render would hand the preview a
+  // new effects object each time and rebuild its material needlessly.
+  const effectsDocument = material?.effects
+  const parsedEffects = useMemo(
+    () => parseMaterialEffects(effectsDocument),
+    [effectsDocument]
+  )
+
+  if (material && hasMaterialEffects(parsedEffects)) {
+    return (
+      <div
+        className={`material-swatch material-swatch--${size}`}
+        data-testid="material-swatch"
+      >
+        <MaterialEffectPreview
+          material={material}
+          effects={parsedEffects}
+          animated={size === 'editor'}
+        />
+      </div>
+    )
+  }
+
   const { baseColorHex, roughness, metallic, baseColorA, alphaMode } =
     parameters
 

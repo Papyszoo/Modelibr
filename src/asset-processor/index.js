@@ -6,6 +6,7 @@ import { JobProcessor } from './jobProcessor.js'
 import { ExtractionJobProcessor } from './extractionJobProcessor.js'
 import { BlenderOperationProcessor } from './blenderOperationProcessor.js'
 import { HealthServer } from './healthServer.js'
+import { browserManager } from './browserManager.js'
 
 // Load environment variables
 dotenv.config()
@@ -104,6 +105,10 @@ class AssetProcessorApp {
       if (this.blenderOperationProcessor) {
         await this.blenderOperationProcessor.shutdown()
       }
+
+      // Close the worker's single Chromium now that no processor needs it.
+      // (Each processor's cleanup closed its job pages, not the shared browser.)
+      await browserManager.dispose()
 
       // Stop health server
       if (this.healthServer) {

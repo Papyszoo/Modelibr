@@ -1,10 +1,12 @@
 import './SceneList.css'
 
 import { Button } from 'primereact/button'
+import { ContextMenu } from 'primereact/contextmenu'
 import { Dropdown } from 'primereact/dropdown'
 import { InputText } from 'primereact/inputtext'
 import { InputTextarea } from 'primereact/inputtextarea'
-import { type JSX, useRef, useState } from 'react'
+import { type MenuItem } from 'primereact/menuitem'
+import { type JSX, useMemo, useRef, useState } from 'react'
 
 import { useProjectsQuery } from '@/features/project/api/queries'
 import { ApiClientError } from '@/lib/apiBase'
@@ -27,7 +29,11 @@ import {
 import type { SceneSummary } from '../types'
 
 interface SceneListProps {
-  onOpenScene: (sceneId: number) => void
+  /**
+   * Opens a scene somewhere else - a tab of its own. The name comes along so the
+   * tab can be labelled with it: a dock full of "Scene 7" is not navigation.
+   */
+  onOpenScene: (sceneId: number, name?: string) => void
 }
 
 export function SceneList({ onOpenScene }: SceneListProps): JSX.Element {
@@ -39,10 +45,14 @@ export function SceneList({ onOpenScene }: SceneListProps): JSX.Element {
 
   const [isCreating, setIsCreating] = useState(false)
   const [name, setName] = useState('')
+  const [nameTouched, setNameTouched] = useState(false)
   const [description, setDescription] = useState('')
   const [projectId, setProjectId] = useState<number | null>(null)
   const [pendingDelete, setPendingDelete] = useState<SceneSummary | null>(null)
+  const [contextScene, setContextScene] = useState<SceneSummary | null>(null)
   const [createError, setCreateError] = useState<string | null>(null)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
+  const contextMenu = useRef<ContextMenu>(null)
 
   /**
    * The scene that exists, and the project it still wants, after a link failed.
@@ -154,7 +164,7 @@ export function SceneList({ onOpenScene }: SceneListProps): JSX.Element {
       // Past this point the scene EXISTS. The form must never return to a state
       // where submitting it would create another one - see `linkFailure`.
       if (projectId === null) {
-        finish(created.scene.id)
+        finish(created.scene.id, trimmed)
         return
       }
 
@@ -189,17 +199,18 @@ export function SceneList({ onOpenScene }: SceneListProps): JSX.Element {
     }
 
     setLinkFailure(null)
-    finish(sceneId)
+    finish(sceneId, name.trim() || undefined)
   }
 
-  const finish = (sceneId: number) => {
+  const finish = (sceneId: number, sceneName?: string) => {
     setIsCreating(false)
     setName('')
     setDescription('')
     setProjectId(null)
+    setNameTouched(false)
     setCreateError(null)
     setLinkFailure(null)
-    onOpenScene(sceneId)
+    onOpenScene(sceneId, sceneName)
   }
 
   /**
@@ -216,18 +227,65 @@ export function SceneList({ onOpenScene }: SceneListProps): JSX.Element {
    */
   const openCreatedScene = () => {
     if (linkFailure) {
-      finish(linkFailure.sceneId)
+      finish(linkFailure.sceneId, name.trim() || undefined)
     }
   }
 
   const closeCreate = () => {
     // Dismissing after a link failure still leaves a real scene behind, so the
     // form is reset rather than kept - reopening it must not offer to retry a
-    // link for a scene the user has walked away from.
+    // link for a scene the user has walked away from, and must not show the
+    // previous draft's name.
     setIsCreating(false)
+    setName('')
+    setDescription('')
+    setProjectId(null)
+    setNameTouched(false)
     setCreateError(null)
     setLinkFailure(null)
   }
+
+  // Inline error only after the name field is left empty, so a freshly opened
+  // dialog does not show an error before the user has typed.
+  const nameError = nameTouched && name.trim().length === 0
+
+  const openSceneMenu = (
+    event: React.MouseEvent,
+    scene: SceneSummary
+  ): void => {
+    event.preventDefault()
+    setContextScene(scene)
+    contextMenu.current?.show(event)
+  }
+
+  // Same shape as model/material cards: card actions live behind one right-click
+  // context menu, and right-click never goes straight into a destructive
+  // confirm. A scene is a hard delete (no recycle bin), so Delete still opens
+  // the existing confirm dialog.
+  const contextMenuItems = useMemo<MenuItem[]>(
+    () => [
+      {
+        label: 'Open',
+        icon: 'pi pi-external-link',
+        command: () => {
+          if (contextScene) {
+            onOpenScene(contextScene.id, contextScene.name)
+          }
+        },
+      },
+      { separator: true },
+      {
+        label: 'Delete',
+        icon: 'pi pi-trash',
+        command: () => {
+          if (!contextScene) return
+          setDeleteError(null)
+          setPendingDelete(contextScene)
+        },
+      },
+    ],
+    [contextScene, onOpenScene]
+  )
 
   if (isLoading) {
     return <LoadingState message="Loading scenes…" />
@@ -290,11 +348,8 @@ export function SceneList({ onOpenScene }: SceneListProps): JSX.Element {
                 'data-testid': 'scene-tile',
                 'data-scene-id': scene.id,
               }}
-              onClick={() => onOpenScene(scene.id)}
-              onContextMenu={event => {
-                event.preventDefault()
-                setPendingDelete(scene)
-              }}
+              onClick={() => onOpenScene(scene.id, scene.name)}
+              onContextMenu={event => openSceneMenu(event, scene)}
               media={
                 // Scenes have no preview render yet, so the tile shows the
                 // scene glyph rather than an empty frame. When the render-back
@@ -314,6 +369,11 @@ export function SceneList({ onOpenScene }: SceneListProps): JSX.Element {
         onClose={closeCreate}
         header="New scene"
         size="sm"
+        // PrimeReact focuses the dialog's close button when it shows, which
+        // blurred the auto-focused name field and marked it touched - the
+        // dialog opened already saying "Name is required." With the steal off,
+        // focus stays on the name field and validation waits for a real blur.
+        focusOnShow={false}
         footer={
           <>
             {linkFailure ? (
@@ -370,9 +430,12 @@ export function SceneList({ onOpenScene }: SceneListProps): JSX.Element {
             value={name}
             autoFocus
             placeholder="Rundown city street"
+            className={nameError ? 'p-invalid' : undefined}
+            aria-invalid={nameError}
             // The scene already exists once a link has failed; renaming it is a
             // different operation and not one this dialog offers.
             disabled={linkFailure !== null}
+            onBlur={() => setNameTouched(true)}
             onChange={event => setName(event.target.value)}
             onKeyDown={event => {
               // Enter goes through the SAME guarded handler as the button, and
@@ -388,6 +451,15 @@ export function SceneList({ onOpenScene }: SceneListProps): JSX.Element {
               void handleCreate()
             }}
           />
+          {nameError ? (
+            <small
+              className="scene-list-form-error"
+              role="alert"
+              data-testid="scene-name-error"
+            >
+              Name is required.
+            </small>
+          ) : null}
 
           {/*
             Optional, and worth setting: a scene's project is what biases the
@@ -426,7 +498,10 @@ export function SceneList({ onOpenScene }: SceneListProps): JSX.Element {
 
       <Dialog
         open={pendingDelete !== null}
-        onClose={() => setPendingDelete(null)}
+        onClose={() => {
+          setDeleteError(null)
+          setPendingDelete(null)
+        }}
         header="Delete scene"
         size="sm"
         footer={
@@ -435,7 +510,10 @@ export function SceneList({ onOpenScene }: SceneListProps): JSX.Element {
               label="Cancel"
               text
               size="small"
-              onClick={() => setPendingDelete(null)}
+              onClick={() => {
+                setDeleteError(null)
+                setPendingDelete(null)
+              }}
             />
             <Button
               label="Delete"
@@ -444,10 +522,28 @@ export function SceneList({ onOpenScene }: SceneListProps): JSX.Element {
               size="small"
               loading={deleteScene.isPending}
               onClick={async () => {
-                if (pendingDelete) {
+                if (!pendingDelete) return
+                setDeleteError(null)
+                try {
                   await deleteScene.mutateAsync(pendingDelete.id)
+                  setPendingDelete(null)
+                } catch (caught) {
+                  // A scene already gone is not a failure: the dialog's job is
+                  // done, so close. Anything else stays on screen with the
+                  // reason, rather than vanishing with no message.
+                  if (
+                    caught instanceof ApiClientError &&
+                    caught.status === 404
+                  ) {
+                    setPendingDelete(null)
+                    return
+                  }
+                  setDeleteError(
+                    caught instanceof ApiClientError
+                      ? caught.message
+                      : 'The scene could not be deleted.'
+                  )
                 }
-                setPendingDelete(null)
               }}
             />
           </>
@@ -457,7 +553,22 @@ export function SceneList({ onOpenScene }: SceneListProps): JSX.Element {
           Delete <strong>{pendingDelete?.name}</strong>? The assets it
           references are not affected - only the composition is removed.
         </p>
+        {deleteError ? (
+          <p
+            className="scene-list-error"
+            role="alert"
+            data-testid="scene-delete-error"
+          >
+            {deleteError}
+          </p>
+        ) : null}
       </Dialog>
+
+      <ContextMenu
+        ref={contextMenu}
+        model={contextMenuItems}
+        onHide={() => setContextScene(null)}
+      />
     </div>
   )
 }

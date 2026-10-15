@@ -6,24 +6,21 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { type z } from 'zod'
 
+import { uploadFile } from '@/features/models/api/modelApi'
 import {
-  getFilePreviewUrl,
-  getFileUrl,
-  uploadFile,
-} from '@/features/models/api/modelApi'
-import {
-  addProjectConceptImage,
-  removeProjectConceptImage,
   setProjectCustomThumbnail,
   updateProject,
 } from '@/features/project/api/projectApi'
 import { useTabUiState } from '@/hooks/useTabUiState'
 import { resolveApiAssetUrl } from '@/lib/apiBase'
-import { ImageLightboxDialog } from '@/shared/components/ImageLightboxDialog'
 import { projectDetailsFormSchema } from '@/shared/validation/formSchemas'
 import { type ProjectDetailDto } from '@/types'
 
 import { ProjectProfileSection } from './ProjectProfileSection'
+import {
+  type ProjectAssetNames,
+  ProjectStudioSection,
+} from './ProjectStudioSection'
 
 type ProjectDetailsInput = z.input<typeof projectDetailsFormSchema>
 type ProjectDetailsOutput = z.output<typeof projectDetailsFormSchema>
@@ -58,10 +55,6 @@ export function ProjectDetailsPanel({
 }: ProjectDetailsPanelProps) {
   const queryClient = useQueryClient()
   const thumbnailInputRef = useRef<HTMLInputElement | null>(null)
-  const conceptInputRef = useRef<HTMLInputElement | null>(null)
-  const [activeConceptImageIndex, setActiveConceptImageIndex] = useState<
-    number | null
-  >(null)
   const tabStateKey = tabId ?? `project-${project.id}`
   const [storedOverviewState, setStoredOverviewState] =
     useTabUiState<StoredOverviewState | null>(
@@ -220,46 +213,31 @@ export function ProjectDetailsPanel({
     },
   })
 
-  const conceptMutation = useMutation({
-    mutationFn: async (files: File[]) => {
-      for (const file of files) {
-        const upload = await uploadFile(file, { uploadType: 'file' })
-        await addProjectConceptImage(project.id, upload.fileId)
-      }
-    },
-    onSuccess: async () => {
-      await invalidate()
-      showToast({
-        severity: 'success',
-        summary: 'Uploaded',
-        detail: 'Project concept images updated.',
-        life: 2500,
-      })
-    },
-  })
-
-  const removeConceptMutation = useMutation({
-    mutationFn: (fileId: number) =>
-      removeProjectConceptImage(project.id, fileId),
-    onSuccess: async () => {
-      await invalidate()
-    },
-  })
-
   const onSave = handleSubmit(values => updateMutation.mutate(values))
   const thumbnailUrl = resolveApiAssetUrl(project.customThumbnailUrl)
-  const lightboxImages = project.conceptImages.map(image => ({
-    id: image.fileId,
-    name: image.fileName,
-    previewUrl:
-      resolveApiAssetUrl(image.previewUrl) ||
-      getFilePreviewUrl(String(image.fileId)),
-    fullUrl:
-      resolveApiAssetUrl(image.fileUrl) || getFileUrl(String(image.fileId)),
-  }))
+
+  // The project's asset lists, for naming what a comment points at. `sounds` is
+  // read defensively: the API DTO declares only a sound COUNT, while the demo
+  // and seed projects carry the actual list - only a real array is a name source.
+  const assetNames: ProjectAssetNames = {
+    models: project.models,
+    textureSets: project.textureSets,
+    sprites: project.sprites,
+    environmentMaps: project.environmentMaps,
+    vfx: project.vfx,
+    sounds: Array.isArray((project as { sounds?: unknown }).sounds)
+      ? (project as { sounds: { id: number; name: string }[] }).sounds
+      : undefined,
+  }
 
   return (
     <div className="container-rich-details">
+      <ProjectStudioSection
+        projectId={project.id}
+        tabId={tabStateKey}
+        onChanged={refetchContainer}
+        assets={assetNames}
+      />
       <div className="container-rich-layout">
         <div className="container-rich-main">
           <div className="container-rich-block">
@@ -298,95 +276,17 @@ export function ProjectDetailsPanel({
             </div>
           </div>
 
-          <div className="container-rich-block">
-            <ProjectProfileSection
-              projectId={project.id}
-              tabId={tabStateKey}
-              onDirtyChange={setProfileDirty}
-              showToast={showToast}
-            />
-          </div>
-
-          <div className="container-rich-block">
-            <div className="container-rich-header-row">
-              <div>
-                <span className="container-rich-kicker">Concept Art</span>
-                <h3>Reference Board</h3>
-              </div>
-              <Button
-                label="Add Images"
-                icon="pi pi-images"
-                className="p-button-outlined"
-                onClick={() => conceptInputRef.current?.click()}
-                disabled={conceptMutation.isPending}
+          <details className="project-profile-disclosure">
+            <summary>Project setup</summary>
+            <div className="container-rich-block">
+              <ProjectProfileSection
+                projectId={project.id}
+                tabId={tabStateKey}
+                onDirtyChange={setProfileDirty}
+                showToast={showToast}
               />
             </div>
-
-            <input
-              ref={conceptInputRef}
-              type="file"
-              accept="image/*"
-              multiple
-              hidden
-              onChange={async event => {
-                const files = Array.from(event.target.files ?? [])
-                if (files.length > 0) {
-                  conceptMutation.mutate(files)
-                }
-                event.target.value = ''
-              }}
-            />
-
-            <ImageLightboxDialog
-              visible={activeConceptImageIndex !== null}
-              title="Project concept image"
-              images={lightboxImages}
-              activeIndex={activeConceptImageIndex ?? 0}
-              onIndexChange={setActiveConceptImageIndex}
-              onHide={() => setActiveConceptImageIndex(null)}
-            />
-
-            {project.conceptImages.length === 0 ? (
-              <div className="container-empty-media">
-                <i className="pi pi-images" />
-                <p>No concept images yet.</p>
-              </div>
-            ) : (
-              <div className="container-media-grid">
-                {project.conceptImages.map((image, index) => (
-                  <div key={image.fileId} className="container-media-card">
-                    <button
-                      type="button"
-                      className="container-media-preview"
-                      aria-label={`Open concept image ${image.fileName}`}
-                      onClick={() => setActiveConceptImageIndex(index)}
-                    >
-                      <img
-                        src={
-                          resolveApiAssetUrl(image.previewUrl) ||
-                          getFilePreviewUrl(String(image.fileId))
-                        }
-                        alt={image.fileName}
-                      />
-                    </button>
-                    <div className="container-media-card-footer">
-                      <span title={image.fileName}>{image.fileName}</span>
-                      <Button
-                        icon="pi pi-times"
-                        text
-                        rounded
-                        severity="danger"
-                        onClick={event => {
-                          event.stopPropagation()
-                          removeConceptMutation.mutate(image.fileId)
-                        }}
-                      />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+          </details>
         </div>
 
         <aside className="container-rich-side">
@@ -439,18 +339,6 @@ export function ProjectDetailsPanel({
                 onClick={() => thumbnailMutation.mutate(null)}
                 disabled={!thumbnailUrl || thumbnailMutation.isPending}
               />
-            </div>
-          </div>
-
-          <div className="container-rich-block">
-            <span className="container-rich-kicker">Snapshot</span>
-            <div className="container-detail-assets">
-              <span>{project.modelCount} models</span>
-              <span>{project.globalMaterialCount} global materials</span>
-              <span>{project.multiModelTextureCount} multi-model textures</span>
-              <span>{project.spriteCount} sprites</span>
-              <span>{project.soundCount} sounds</span>
-              <span>{project.environmentMapCount ?? 0} environment maps</span>
             </div>
           </div>
         </aside>

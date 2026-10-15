@@ -27,6 +27,8 @@ namespace Application.Scenes;
 /// right for a table and wrong for a sofa, a shelf or a sink.
 /// </param>
 /// <param name="Suspended">Declare that this node is meant to hang with nothing under it - a pendant lamp, a sign. Contradicts <paramref name="GroundSnap"/> and <paramref name="AnchorTo"/>.</param>
+/// <param name="Animation">A clip this placement plays, named as the referenced model's own clips are.</param>
+/// <param name="ShapeKeys">Shape-key weights for this placement, by the model's own key names.</param>
 public sealed record PlaceSceneAssetCommand(
     int SceneId,
     string AssetType,
@@ -46,7 +48,9 @@ public sealed record PlaceSceneAssetCommand(
     string? AnchorTo = null,
     string? AnchorAlign = null,
     bool Suspended = false,
-    int? OnSurface = null) : ICommand<ScenePlacementResponse>;
+    int? OnSurface = null,
+    SceneAnimation? Animation = null,
+    IReadOnlyDictionary<string, double>? ShapeKeys = null) : ICommand<ScenePlacementResponse>;
 
 /// <summary>
 /// The placed node plus what is now wrong with the scene because of it.
@@ -154,7 +158,9 @@ internal sealed class PlaceSceneAssetCommandHandler : ICommandHandler<PlaceScene
                         GroundSnap: command.GroundSnap,
                         SnapToGrid: command.SnapToGrid,
                         FaceToward: command.FaceToward,
-                        Suspended: command.Suspended),
+                        Suspended: command.Suspended,
+                        Animation: command.Animation,
+                        ShapeKeys: command.ShapeKeys),
                     nodeId,
                     frontAxis.Value,
                     anchor.Value,

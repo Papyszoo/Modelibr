@@ -15,7 +15,12 @@ public class Project : AggregateRoot
     private readonly List<Sound> _sounds = new();
     private readonly List<Script> _scripts = new();
     private readonly List<EnvironmentMap> _environmentMaps = new();
+    private readonly List<Vfx> _vfx = new();
     private readonly List<ProjectConceptImage> _conceptImages = new();
+    private readonly List<ProjectLevel> _levels = new();
+    private readonly List<ProjectCharacter> _characters = new();
+    private readonly List<ProjectCharacterTag> _characterTags = new();
+    private readonly List<ProjectComment> _comments = new();
     private readonly List<ProjectProfileValue> _profileValues = new();
     private readonly List<Scene> _scenes = new();
 
@@ -168,6 +173,17 @@ public class Project : AggregateRoot
         }
     }
 
+    public ICollection<Vfx> Vfx
+    {
+        get => _vfx;
+        set
+        {
+            _vfx.Clear();
+            if (value != null)
+                _vfx.AddRange(value);
+        }
+    }
+
     public ICollection<ProjectConceptImage> ConceptImages
     {
         get => _conceptImages;
@@ -176,6 +192,50 @@ public class Project : AggregateRoot
             _conceptImages.Clear();
             if (value != null)
                 _conceptImages.AddRange(value);
+        }
+    }
+
+    public ICollection<ProjectLevel> Levels
+    {
+        get => _levels;
+        set
+        {
+            _levels.Clear();
+            if (value != null)
+                _levels.AddRange(value);
+        }
+    }
+
+    public ICollection<ProjectCharacter> Characters
+    {
+        get => _characters;
+        set
+        {
+            _characters.Clear();
+            if (value != null)
+                _characters.AddRange(value);
+        }
+    }
+
+    public ICollection<ProjectCharacterTag> CharacterTags
+    {
+        get => _characterTags;
+        set
+        {
+            _characterTags.Clear();
+            if (value != null)
+                _characterTags.AddRange(value);
+        }
+    }
+
+    public ICollection<ProjectComment> Comments
+    {
+        get => _comments;
+        set
+        {
+            _comments.Clear();
+            if (value != null)
+                _comments.AddRange(value);
         }
     }
 
@@ -692,6 +752,30 @@ public class Project : AggregateRoot
         return _environmentMaps.AsReadOnly();
     }
 
+    public void AddVfx(Vfx vfx, DateTime updatedAt)
+    {
+        ArgumentNullException.ThrowIfNull(vfx);
+
+        if (_vfx.Any(v => v.Id == vfx.Id))
+            return;
+
+        _vfx.Add(vfx);
+        UpdatedAt = updatedAt;
+    }
+
+    public void RemoveVfx(Vfx vfx, DateTime updatedAt)
+    {
+        ArgumentNullException.ThrowIfNull(vfx);
+
+        if (_vfx.Remove(vfx))
+            UpdatedAt = updatedAt;
+    }
+
+    public bool HasVfx(int vfxId)
+    {
+        return _vfx.Any(v => v.Id == vfxId);
+    }
+
     /// <summary>
     /// Gets the count of models in this project.
     /// </summary>
@@ -724,10 +808,12 @@ public class Project : AggregateRoot
 
     public int EnvironmentMapCount => _environmentMaps.Count;
 
+    public int VfxCount => _vfx.Count;
+
     /// <summary>
     /// Checks if the project is empty (contains no models, texture sets, sprites, or sounds).
     /// </summary>
-    public bool IsEmpty => _models.Count == 0 && _textureSets.Count == 0 && _sprites.Count == 0 && _sounds.Count == 0 && _environmentMaps.Count == 0;
+    public bool IsEmpty => _models.Count == 0 && _textureSets.Count == 0 && _sprites.Count == 0 && _sounds.Count == 0 && _environmentMaps.Count == 0 && _vfx.Count == 0;
 
     /// <summary>
     /// Gets a human-readable description of the project.

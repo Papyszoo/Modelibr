@@ -28,6 +28,9 @@ describe('createTab', () => {
     expect(createTab('projectViewer', '5').id).toBe('project-5')
     expect(createTab('scriptViewer', '7').id).toBe('script-7')
     expect(createTab('scriptViewer', '7').params.scriptId).toBe('7')
+    // One tab per scene, so two scenes can be open at once.
+    expect(createTab('sceneEditor', '12').id).toBe('scene-12')
+    expect(createTab('sceneEditor', '12').params.sceneId).toBe('12')
   })
 
   it('uses the entity name as the label, falling back to a type label', () => {
@@ -37,6 +40,10 @@ describe('createTab', () => {
     )
     // No name given → getTabLabel fallback with the id.
     expect(createTab('scriptViewer', '7').label).toBe('Script 7')
+    expect(createTab('sceneEditor', '12', 'Rooftop chase').label).toBe(
+      'Rooftop chase'
+    )
+    expect(createTab('sceneEditor', '12').label).toBe('Scene 12')
   })
 
   it('gives list tabs an id equal to their type (single-instance tabs)', () => {
@@ -52,6 +59,22 @@ describe('openTab', () => {
     store().openTab('w1', 'left', createTab('scripts'))
     expect(win().tabs.map(t => t.id)).toEqual(['modelList', 'scripts'])
     expect(win().activeTabId).toBe('scripts')
+  })
+
+  it('relabels a tab without recreating it', () => {
+    // A scene renamed in its editor keeps the tab the user is looking at. If the
+    // rename recreated the tab, the id and the internal UI state would go with it -
+    // and a scene editor tab's internal state is how the app knows which scene's
+    // unsaved draft it is showing.
+    store().initWindow('w1')
+    store().setTabUiState('w1', 'modelList', 'sceneId', '12')
+
+    store().setTabLabel('w1', 'modelList', 'Rooftop chase')
+
+    const tab = store().activeWindows['w1'].tabs.find(t => t.id === 'modelList')
+    expect(tab?.label).toBe('Rooftop chase')
+    expect(tab?.id).toBe('modelList')
+    expect(tab?.internalUiState.sceneId).toBe('12')
   })
 
   it('does not duplicate an already-open tab - it just re-activates it', () => {
@@ -71,6 +94,102 @@ describe('openTab', () => {
     expect(history?.params?.panel).toBe('right')
     expect(win().activeRightTabId).toBe('history')
     expect(win().activeTabId).toBe('scripts')
+  })
+})
+
+describe('focusOrOpenTab (pinned dock entries)', () => {
+  beforeEach(() => store().initWindow('w1'))
+
+  const rightTab = (type: Tab['type']): Tab => {
+    const tab = createTab(type)
+    return { ...tab, params: { ...tab.params, panel: 'right' } }
+  }
+
+  it('opens a closed pinned page in the left panel and activates it', () => {
+    store().focusOrOpenTab('w1', createTab('vfxList'))
+    expect(win().tabs.map(t => t.id)).toEqual(['modelList', 'vfxList'])
+    expect(win().tabs[1].params.panel).toBeUndefined()
+    expect(win().activeTabId).toBe('vfxList')
+  })
+
+  // openTab('left') on a tab that lives on the right set the LEFT active id to
+  // it, so the left panel fell back to its first tab and the right one never
+  // changed: the click did nothing visible.
+  it('focuses a page open in the right panel there, not on the left', () => {
+    store().setTabs('w1', [createTab('modelList'), rightTab('scenes')])
+    store().setActiveRightTab('w1', 'other')
+
+    store().focusOrOpenTab('w1', createTab('scenes'))
+
+    expect(win().activeRightTabId).toBe('scenes')
+    expect(win().activeTabId).toBe('modelList')
+    expect(win().tabs).toHaveLength(2)
+  })
+})
+
+// The left panel's active tab was picked from the whole tab list, so closing
+// (or moving away) the active left tab could hand the left active id to a
+// right-panel tab, and the left panel fell back to its first tab.
+describe('closing the active left tab with right-panel tabs open', () => {
+  beforeEach(() => store().initWindow('w1'))
+
+  const layout = () => {
+    const sprites = createTab('sprites')
+    store().setTabs('w1', [
+      createTab('modelList'),
+      { ...sprites, params: { panel: 'right' } },
+      createTab('sounds'),
+    ])
+    store().setActiveTab('w1', 'sounds')
+  }
+
+  it('closeTab activates the neighbouring left tab', () => {
+    layout()
+    store().closeTab('w1', 'sounds')
+    expect(win().activeTabId).toBe('modelList')
+  })
+
+  it('removeTabFromWindow activates the neighbouring left tab', () => {
+    layout()
+    store().removeTabFromWindow('w1', 'sounds')
+    expect(win().activeTabId).toBe('modelList')
+  })
+})
+
+describe('collapseEmptyLeftPanel', () => {
+  beforeEach(() => store().initWindow('w1'))
+
+  // Closing the last left tab used to leave an empty half-screen pane next to
+  // the right one; the remaining tabs must become the single left panel.
+  it('moves right-panel tabs left when the left panel is empty', () => {
+    const scenes = createTab('scenes')
+    const sounds = createTab('sounds')
+    store().setTabs('w1', [
+      { ...scenes, params: { panel: 'right' } },
+      { ...sounds, params: { panel: 'right' } },
+    ])
+    store().setActiveRightTab('w1', 'sounds')
+
+    store().collapseEmptyLeftPanel('w1')
+
+    expect(win().tabs.map(t => [t.id, t.params.panel])).toEqual([
+      ['scenes', undefined],
+      ['sounds', undefined],
+    ])
+    expect(win().activeTabId).toBe('sounds')
+    expect(win().activeRightTabId).toBeNull()
+  })
+
+  it('leaves a real split alone', () => {
+    const before = [
+      createTab('modelList'),
+      { ...createTab('sounds'), params: { panel: 'right' } },
+    ]
+    store().setTabs('w1', before)
+
+    store().collapseEmptyLeftPanel('w1')
+
+    expect(win().tabs).toEqual(before)
   })
 })
 

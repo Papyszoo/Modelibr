@@ -13,6 +13,13 @@ services:
             - AllowedOrigins__0=http://localhost:3002
             - AllowedOrigins__1=http://localhost:3010
             - BLENDER_INSTALL_PATH=/var/lib/modelibr/blender
+            # The store address is a build constant now, so the e2e stack points the
+            # backend at its local fixture through the test-only override (never
+            # documented user config). The fixture shares this container's network
+            # namespace (see store-fixture-e2e), so loopback reaches it; http: is
+            # allowed because the host is localhost. The browser side is mapped to
+            # the same fixture's TLS listener by the Playwright host-resolver rule.
+            - MODELIBR_STORE_BASE_URL_OVERRIDE=http://localhost:9280
             # This stack recreates its DB fresh every run, so first boot always has
             # every migration pending. It has no backup configuration (no POSTGRES_*
             # env / BACKUP_STORAGE_PATH), so the pre-migration backup cannot run here
@@ -20,11 +27,20 @@ services:
             # covered by backup-restore-e2e spec 06 + the DatabaseExtensions
             # integration tests.
             - MODELIBR_SKIP_PREMIGRATION_BACKUP=true
+            # The agent write tools (add_to_project, add_project_comment, ...) are
+            # opt-in and off in a stock server. The project features that exist
+            # only for agents are covered through them, so this stack turns them
+            # on. No tokens are configured, so the endpoint stays unauthenticated
+            # like the rest of this throwaway stack.
+            - MCP_WRITE_ENABLED=true
         ports:
             - "8090:8080"
             # Published for store-fixture-e2e, which shares this container's
-            # network namespace (see that service for why).
+            # network namespace (see that service for why). 9280 is the backend's
+            # plain-http fixture; 9443 is the same fixture over TLS, which the
+            # browser reaches as the store's https origin.
             - "9280:9280"
+            - "9443:9443"
         healthcheck:
             test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
             interval: 5s
@@ -39,17 +55,25 @@ services:
         networks:
             - modelibr-e2e
     # Stand-in for the companion Asset Store (fixtures/store-fixture). It
-    # shares webapi-e2e's network namespace so the ONE configured store URL,
-    # http://localhost:9280, resolves to it from both the browser (via the
-    # host port published on webapi-e2e) and the backend importer (loopback -
-    # the importer allows http only for localhost, and manifest download URLs
-    # must be same-ORIGIN - scheme included - to carry the import token).
+    # shares webapi-e2e's network namespace so it is reachable both as
+    # http://localhost:9280 (the backend importer, via the
+    # MODELIBR_STORE_BASE_URL_OVERRIDE test seam) and, over TLS on 9443, as
+    # https://store.modelibr.com (the browser, via the Playwright host-resolver
+    # rule). Manifest download URLs must be same-ORIGIN - scheme included - to
+    # carry the import token.
     store-fixture-e2e:
         build:
             context: .
             dockerfile: fixtures/store-fixture/Dockerfile
         container_name: store-fixture-e2e
         network_mode: "service:webapi-e2e"
+        environment:
+            # Serve TLS alongside the plain-http fixture so the browser can talk
+            # to the store's real https origin (mapped here by the Playwright
+            # config's host-resolver rule). Cert is generated at image build.
+            - TLS_PORT=9443
+            - TLS_CERT=/app/server.crt
+            - TLS_KEY=/app/server.key
         depends_on:
             webapi-e2e:
                 condition: service_started
@@ -64,7 +88,6 @@ services:
                 asset-processor: ../../src/asset-processor
             args:
                 VITE_API_BASE_URL: http://localhost:8090
-                VITE_STORE_URL: http://localhost:9280
         container_name: frontend-e2e
         ports:
             - "3002:80"

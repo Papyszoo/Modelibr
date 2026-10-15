@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Application.Abstractions;
 using Application.Abstractions.Repositories;
 using Application.Materials;
@@ -12,6 +13,16 @@ namespace Application.Tests.Materials;
 public class MaterialCommandHandlerTests
 {
     private static readonly DateTime Now = new(2026, 8, 17, 12, 0, 0, DateTimeKind.Utc);
+
+    private static JsonElement Effects() => JsonSerializer.SerializeToElement(new
+    {
+        version = 1,
+        effects = new object[]
+        {
+            new { type = "jelly_wobble", amplitude = 0.03, frequency = 1.5, waveScale = 4.0, seed = 0 },
+            new { type = "rim", color = "#7CFF2A", power = 3.0, intensity = 1.0 },
+        },
+    });
 
     private readonly Mock<IMaterialRepository> _materials = new();
     private readonly Mock<ITextureSetCategoryRepository> _categories = new();
@@ -212,5 +223,149 @@ public class MaterialCommandHandlerTests
 
         Assert.True(result.IsFailure);
         Assert.Equal("MaterialNotFound", result.Error.Code);
+    }
+
+    // ── Effects ────────────────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task Create_WithValidEffects_StoresTheCanonicalDocument()
+    {
+        Material? saved = null;
+        _materials
+            .Setup(r => r.AddAsync(It.IsAny<Material>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Material material, CancellationToken _) => saved = material);
+
+        var result = await CreateHandler().Handle(
+            new CreateMaterialCommand("Glow Jelly", Effects: Effects()), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(saved!.EffectsJson);
+        Assert.Contains("\"jelly_wobble\"", saved.EffectsJson);
+        Assert.Contains("\"rim\"", saved.EffectsJson);
+    }
+
+    [Fact]
+    public async Task Create_WithoutEffects_LeavesTheDocumentNull()
+    {
+        Material? saved = null;
+        _materials
+            .Setup(r => r.AddAsync(It.IsAny<Material>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((Material material, CancellationToken _) => saved = material);
+
+        var result = await CreateHandler().Handle(new CreateMaterialCommand("Plain"), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Null(saved!.EffectsJson);
+    }
+
+    [Fact]
+    public async Task Create_WithInvalidEffects_FailsWithoutSaving()
+    {
+        var bad = JsonSerializer.SerializeToElement(new
+        {
+            version = 1,
+            effects = new object[] { new { type = "rim", color = "orange", power = 3.0, intensity = 1.0 } },
+        });
+
+        var result = await CreateHandler().Handle(
+            new CreateMaterialCommand("Bad", Effects: bad), CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("InvalidMaterialEffects", result.Error.Code);
+        Assert.Contains("effects[0].color", result.Error.Message);
+        _materials.Verify(r => r.AddAsync(It.IsAny<Material>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task GetMaterialById_CarriesTheStoredEffects()
+    {
+        var material = Material.Create("Glow Jelly", MaterialParameters.Default, Now);
+        material.SetEffects(
+            """{"version":1,"effects":[{"type":"rim","color":"#7CFF2A","power":3,"intensity":1}]}""", Now);
+        _materials
+            .Setup(r => r.GetByIdAsync(1, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(material);
+
+        var result = await new GetMaterialByIdQueryHandler(_materials.Object)
+            .Handle(new GetMaterialByIdQuery(1), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.NotNull(result.Value.Effects);
+        Assert.Equal(JsonValueKind.Object, result.Value.Effects!.Value.ValueKind);
+        Assert.Equal("#7CFF2A", result.Value.Effects.Value.GetProperty("effects")[0].GetProperty("color").GetString());
+    }
+
+    [Fact]
+    public async Task Update_WithEffects_ReplacesTheDocument()
+    {
+        var material = Material.Create("Oak", MaterialParameters.Default, Now);
+        material.SetEffects("""{"version":1,"effects":[]}""", Now);
+        _materials
+            .Setup(r => r.GetByIdAsync(1, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(material);
+
+        var result = await UpdateHandler().Handle(
+            new UpdateMaterialCommand(1, Effects: Effects()), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Contains("\"jelly_wobble\"", material.EffectsJson);
+        Assert.NotNull(result.Value.Effects);
+    }
+
+    [Fact]
+    public async Task Update_WithClearEffects_RemovesTheDocument()
+    {
+        var material = Material.Create("Oak", MaterialParameters.Default, Now);
+        material.SetEffects("""{"version":1,"effects":[]}""", Now);
+        _materials
+            .Setup(r => r.GetByIdAsync(1, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(material);
+
+        var result = await UpdateHandler().Handle(
+            new UpdateMaterialCommand(1, ClearEffects: true), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Null(material.EffectsJson);
+        Assert.Null(result.Value.Effects);
+    }
+
+    [Fact]
+    public async Task Update_WithNoEffectsMentioned_LeavesTheDocumentAlone()
+    {
+        // A null Effects cannot be told apart from "not mentioned", which is why
+        // clearing needs its own flag.
+        var material = Material.Create("Oak", MaterialParameters.Default, Now);
+        material.SetEffects("""{"version":1,"effects":[]}""", Now);
+        _materials
+            .Setup(r => r.GetByIdAsync(1, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(material);
+
+        var result = await UpdateHandler().Handle(
+            new UpdateMaterialCommand(1, Name: "Oak Dark"), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal("""{"version":1,"effects":[]}""", material.EffectsJson);
+    }
+
+    [Fact]
+    public async Task Update_WithInvalidEffects_FailsWithoutSaving()
+    {
+        var material = Material.Create("Oak", MaterialParameters.Default, Now);
+        _materials
+            .Setup(r => r.GetByIdAsync(1, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(material);
+
+        var bad = JsonSerializer.SerializeToElement(new
+        {
+            version = 2,
+            effects = Array.Empty<object>(),
+        });
+
+        var result = await UpdateHandler().Handle(
+            new UpdateMaterialCommand(1, Effects: bad), CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("InvalidMaterialEffects", result.Error.Code);
+        _materials.Verify(r => r.UpdateAsync(It.IsAny<Material>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 }

@@ -84,6 +84,20 @@ describe('ModelsFilters - technical-metadata filters', () => {
       screen.getByRole('button', { name: /clear all filters/i })
     ).toBeInTheDocument()
   })
+
+  // Regression: an inverted range (Min > Max) was sent as an impossible query
+  // with no explanation. It must be flagged inline instead.
+  it('flags an inverted triangle range with an inline error', () => {
+    renderFilters({ minTriangleCount: 5000, maxTriangleCount: 1000 })
+    expect(screen.getByTestId('triangle-range-error')).toHaveTextContent(
+      'Min must be ≤ Max'
+    )
+  })
+
+  it('shows no inline error for a valid range', () => {
+    renderFilters({ minTriangleCount: 1000, maxTriangleCount: 5000 })
+    expect(screen.queryByTestId('triangle-range-error')).not.toBeInTheDocument()
+  })
 })
 
 describe('ModelsFilters - UV layout filter', () => {

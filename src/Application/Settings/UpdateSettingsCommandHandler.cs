@@ -9,18 +9,15 @@ namespace Application.Settings;
 
 internal class UpdateSettingsCommandHandler : ICommandHandler<UpdateSettingsCommand, UpdateSettingsResponse>
 {
-    private readonly IApplicationSettingsRepository _settingsRepository;
     private readonly ISettingRepository _settingRepository;
     private readonly IDateTimeProvider _dateTimeProvider;
     private readonly IUnitOfWork _unitOfWork;
 
     public UpdateSettingsCommandHandler(
-        IApplicationSettingsRepository settingsRepository,
         ISettingRepository settingRepository,
         IDateTimeProvider dateTimeProvider,
         IUnitOfWork unitOfWork)
     {
-        _settingsRepository = settingsRepository;
         _settingRepository = settingRepository;
         _dateTimeProvider = dateTimeProvider;
         _unitOfWork = unitOfWork;
@@ -28,64 +25,47 @@ internal class UpdateSettingsCommandHandler : ICommandHandler<UpdateSettingsComm
 
     public async Task<Result<UpdateSettingsResponse>> Handle(UpdateSettingsCommand command, CancellationToken cancellationToken)
     {
-        try
+        var updates = new (string Key, string Value)[]
         {
-            var settings = await _settingsRepository.GetAsync(cancellationToken);
-            
-            // If no settings exist, create default settings first
-            if (settings == null)
+            (SettingKeys.MaxFileSizeBytes, command.MaxFileSizeBytes.ToString()),
+            (SettingKeys.MaxThumbnailSizeBytes, command.MaxThumbnailSizeBytes.ToString()),
+            (SettingKeys.ThumbnailFrameCount, command.ThumbnailFrameCount.ToString()),
+            (SettingKeys.ThumbnailSize, command.ThumbnailSize.ToString()),
+            (SettingKeys.GenerateThumbnailOnUpload, command.GenerateThumbnailOnUpload.ToString().ToLower()),
+            (SettingKeys.GenerateAnimatedThumbnail, command.GenerateAnimatedThumbnail.ToString().ToLower()),
+            (SettingKeys.TextureProxySize, command.TextureProxySize.ToString()),
+        };
+
+        // Same validation the per-key endpoint applies, before anything is
+        // written, so a rejected save cannot half-apply.
+        foreach (var (key, value) in updates)
+        {
+            var validation = SettingValidator.ValidateSetting(key, value);
+            if (validation.IsFailure)
             {
-                settings = Domain.Models.ApplicationSettings.CreateDefault(_dateTimeProvider.UtcNow);
+                return Result.Failure<UpdateSettingsResponse>(
+                    new Error("InvalidSettings", validation.Error.Message));
             }
-
-            var now = _dateTimeProvider.UtcNow;
-
-            // Update file size limits
-            settings.UpdateFileSizeLimits(
-                command.MaxFileSizeBytes,
-                command.MaxThumbnailSizeBytes,
-                now);
-
-            // Update thumbnail settings
-            settings.UpdateThumbnailSettings(
-                command.ThumbnailFrameCount,
-                command.ThumbnailSize,
-                command.GenerateThumbnailOnUpload,
-                command.GenerateAnimatedThumbnail,
-                now);
-
-            // Update texture proxy size
-            settings.UpdateTextureProxySize(command.TextureProxySize, now);
-
-            var updatedSettings = await _settingsRepository.SaveAsync(settings, cancellationToken);
-
-            // Also update the new Settings table for forward compatibility
-            await UpdateOrCreateSettingAsync(SettingKeys.MaxFileSizeBytes, command.MaxFileSizeBytes.ToString(), now, cancellationToken);
-            await UpdateOrCreateSettingAsync(SettingKeys.MaxThumbnailSizeBytes, command.MaxThumbnailSizeBytes.ToString(), now, cancellationToken);
-            await UpdateOrCreateSettingAsync(SettingKeys.ThumbnailFrameCount, command.ThumbnailFrameCount.ToString(), now, cancellationToken);
-            await UpdateOrCreateSettingAsync(SettingKeys.ThumbnailSize, command.ThumbnailSize.ToString(), now, cancellationToken);
-            await UpdateOrCreateSettingAsync(SettingKeys.GenerateThumbnailOnUpload, command.GenerateThumbnailOnUpload.ToString().ToLower(), now, cancellationToken);
-            await UpdateOrCreateSettingAsync(SettingKeys.GenerateAnimatedThumbnail, command.GenerateAnimatedThumbnail.ToString().ToLower(), now, cancellationToken);
-            await UpdateOrCreateSettingAsync(SettingKeys.TextureProxySize, command.TextureProxySize.ToString(), now, cancellationToken);
-
-            await _unitOfWork.SaveChangesAsync(cancellationToken);
-
-            return Result.Success(new UpdateSettingsResponse(
-                updatedSettings.MaxFileSizeBytes,
-                updatedSettings.MaxThumbnailSizeBytes,
-                updatedSettings.ThumbnailFrameCount,
-                updatedSettings.ThumbnailSize,
-                updatedSettings.GenerateThumbnailOnUpload,
-                updatedSettings.GenerateAnimatedThumbnail,
-                updatedSettings.TextureProxySize,
-                updatedSettings.UpdatedAt
-            ));
         }
-        catch (ArgumentException ex)
+
+        var now = _dateTimeProvider.UtcNow;
+
+        foreach (var (key, value) in updates)
         {
-            return Result.Failure<UpdateSettingsResponse>(
-                new Error("InvalidSettings", ex.Message));
+            await UpdateOrCreateSettingAsync(key, value, now, cancellationToken);
         }
+
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+        return Result.Success(new UpdateSettingsResponse(
+            command.MaxFileSizeBytes,
+            command.MaxThumbnailSizeBytes,
+            command.ThumbnailFrameCount,
+            command.ThumbnailSize,
+            command.GenerateThumbnailOnUpload,
+            command.GenerateAnimatedThumbnail,
+            command.TextureProxySize,
+            now));
     }
 
     private async Task UpdateOrCreateSettingAsync(string key, string value, DateTime updatedAt, CancellationToken cancellationToken)

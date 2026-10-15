@@ -165,10 +165,6 @@ export async function updateScriptContent(
   return response.data
 }
 
-export async function deleteScript(id: number): Promise<void> {
-  await client.delete(`/scripts/${id}`)
-}
-
 export async function softDeleteScript(id: number): Promise<void> {
   await client.delete(`/scripts/${id}/soft`)
 }

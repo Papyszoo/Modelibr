@@ -4,7 +4,9 @@ import { useState } from 'react'
 
 import * as modelApi from '@/features/models/api/modelApi'
 import * as projectApi from '@/features/project/api/projectApi'
+import * as projectStudioQueries from '@/features/project/api/projectStudioQueries'
 import { ProjectDetailsPanel } from '@/features/project/components/ProjectDetailsPanel'
+import * as sceneQueries from '@/features/scenes/api/queries'
 import {
   createTab,
   getWindowId,
@@ -15,9 +17,28 @@ import { type ProjectBriefDto, type ProjectDetailDto } from '@/types'
 
 jest.mock('@/features/models/api/modelApi')
 jest.mock('@/features/project/api/projectApi')
+jest.mock('@/features/project/api/projectStudioQueries')
+// Only the scene LIST is stubbed: the level asset view reads documents through
+// the editor's own query options, which stay real.
+jest.mock('@/features/scenes/api/queries', () => ({
+  ...jest.requireActual('@/features/scenes/api/queries'),
+  useScenesQuery: jest.fn(),
+}))
 
 const projectApiMock = projectApi as jest.Mocked<typeof projectApi>
 const modelApiMock = modelApi as jest.Mocked<typeof modelApi>
+const studioQueriesMock = projectStudioQueries as jest.Mocked<
+  typeof projectStudioQueries
+>
+const sceneQueriesMock = sceneQueries as jest.Mocked<typeof sceneQueries>
+
+const emptyQuery = <T,>(data: T) => ({
+  data,
+  error: null,
+  isLoading: false,
+  isFetching: false,
+  refetch: jest.fn(),
+})
 
 function project(): ProjectDetailDto {
   return {
@@ -126,6 +147,26 @@ describe('ProjectDetailsPanel draft ownership', () => {
     projectApiMock.addProjectConceptImage.mockResolvedValue()
     projectApiMock.setProjectProfile.mockResolvedValue(brief())
     modelApiMock.uploadFile.mockResolvedValue({ fileId: 42 } as never)
+    // The Project studio (levels, characters, references) renders inside this
+    // panel; it is exercised by its own suites, so stub the queries here.
+    studioQueriesMock.useProjectLevelsQuery.mockReturnValue(
+      emptyQuery([]) as never
+    )
+    studioQueriesMock.useProjectCharactersQuery.mockReturnValue(
+      emptyQuery([]) as never
+    )
+    studioQueriesMock.useProjectReferencesQuery.mockReturnValue(
+      emptyQuery([]) as never
+    )
+    studioQueriesMock.useProjectCommentsQuery.mockReturnValue(
+      emptyQuery([]) as never
+    )
+    // The studio's level asset view reads the project's explicit members and
+    // the scene list; neither is what this file is about.
+    studioQueriesMock.useProjectMemberModelsQuery.mockReturnValue(
+      emptyQuery([]) as never
+    )
+    sceneQueriesMock.useScenesQuery.mockReturnValue(emptyQuery([]) as never)
   })
 
   afterEach(() => {
@@ -188,6 +229,8 @@ describe('ProjectDetailsPanel draft ownership', () => {
   })
 
   it('keeps Overview and Profile edits through a reference refetch and tab unmount', async () => {
+    let refetches = 0
+
     function ProjectTab() {
       const [currentProject, setCurrentProject] = useState(project())
 
@@ -196,11 +239,13 @@ describe('ProjectDetailsPanel draft ownership', () => {
           project={currentProject}
           tabId={tabId}
           refetchContainer={async () => {
+            refetches += 1
             setCurrentProject(value => ({
               ...value,
               conceptImageCount: 1,
               conceptImages: [
                 {
+                  id: 42,
                   fileId: 42,
                   fileName: 'reference.png',
                   previewUrl: '/files/42/preview',
@@ -236,15 +281,28 @@ describe('ProjectDetailsPanel draft ownership', () => {
     await userEvent.clear(triangles)
     await userEvent.type(triangles, '3210')
 
-    const referenceInput = document.querySelector(
-      'input[type="file"][multiple]'
+    // The reference board lives on the workspace's References view, so it has to
+    // be switched to before its upload input is in the document. This test is
+    // about draft ownership, not about which view is showing - the switch is
+    // setup, not the thing under test.
+    await userEvent.click(
+      await screen.findByTestId('project-workspace-tab-references')
+    )
+
+    const referenceInput = screen.getByLabelText(
+      'Reference images to upload'
     ) as HTMLInputElement
     await userEvent.upload(
       referenceInput,
       new File(['reference'], 'reference.png', { type: 'image/png' })
     )
 
-    expect(await screen.findByText('reference.png')).toBeVisible()
+    // The reference upload refetches the containing project; the drafts must
+    // survive that round trip.
+    await waitFor(() => {
+      expect(refetches).toBeGreaterThan(0)
+    })
+    expect(projectApiMock.addProjectConceptImage).toHaveBeenCalledWith(9, 42)
     expect(screen.getByLabelText('Description')).toHaveValue(
       'Unsaved description'
     )
@@ -266,8 +324,11 @@ describe('ProjectDetailsPanel draft ownership', () => {
     expect(await screen.findByLabelText('Description')).toHaveValue(
       'Unsaved description'
     )
+    // The shared NumberInput is locale-proof and renders the canonical
+    // ungrouped digits (a comma group would read as a decimal point in
+    // comma-decimal locales).
     expect(await screen.findByLabelText('Triangles per asset')).toHaveValue(
-      '3,210'
+      '3210'
     )
   })
 })

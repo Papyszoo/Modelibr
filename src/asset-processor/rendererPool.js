@@ -1,34 +1,35 @@
-import puppeteer from 'puppeteer'
 import { PuppeteerRenderer } from './puppeteerRenderer.js'
+import { browserManager } from './browserManager.js'
 import { config } from './config.js'
 import logger from './logger.js'
 
 /**
- * Pool of PuppeteerRenderer instances sharing a single browser.
+ * Hands out renderer slots that all share the worker's single browser, and
+ * caps how many jobs may render at once (see browserManager).
  *
- * Each renderer has its own page (and therefore its own WebGL context),
- * so concurrent jobs never interfere with each other's scenes.
+ * A page belongs to a job: it is opened on the renderer when the job first uses
+ * it and closed in `release()`, so a job's WebGL scene is not held between jobs.
+ * `acquire()` blocks while all slots are busy.
  *
  * Usage:
  *   const pool = new RendererPool()
  *   await pool.initialize()
  *
- *   const renderer = await pool.acquire()   // blocks if all slots busy
+ *   const renderer = await pool.acquire()
  *   try {
  *     await renderer.loadModel(...)
  *     const frames = await renderer.renderOrbitFrames(...)
  *   } finally {
- *     pool.release(renderer)
+ *     await pool.release(renderer)
  *   }
  */
 export class RendererPool {
   /**
-   * @param {number} [poolSize] - Number of renderer instances.
+   * @param {number} [poolSize] - Number of renderer slots.
    *   Defaults to config.maxConcurrentJobs (typically 3).
    */
   constructor(poolSize) {
     this.poolSize = poolSize || config.maxConcurrentJobs || 3
-    this.browser = null
     /** @type {PuppeteerRenderer[]} */
     this.available = []
     /** @type {PuppeteerRenderer[]} */
@@ -39,18 +40,18 @@ export class RendererPool {
   }
 
   /**
-   * Launch the shared browser and create the renderer pool.
+   * Create the renderer slots on the shared browser. No page is opened here -
+   * a page belongs to the job that renders with it.
    */
   async initialize() {
     if (this._initialized) return
 
     logger.info('Initializing renderer pool', { poolSize: this.poolSize })
 
-    this.browser = await puppeteer.launch(PuppeteerRenderer.getLaunchOptions())
+    const browser = await browserManager.getBrowser()
 
     for (let i = 0; i < this.poolSize; i++) {
-      const renderer = new PuppeteerRenderer(this.browser)
-      await renderer.initialize()
+      const renderer = new PuppeteerRenderer(browser)
       this.available.push(renderer)
       this.allRenderers.push(renderer)
       logger.debug('Renderer pool slot initialized', {
@@ -64,8 +65,8 @@ export class RendererPool {
   }
 
   /**
-   * Acquire an exclusive renderer from the pool.
-   * If all renderers are in use, the call blocks until one is released.
+   * Acquire an exclusive renderer from the pool and one render slot. If all
+   * renderers are in use, the call blocks until one is released.
    * @returns {Promise<PuppeteerRenderer>}
    */
   async acquire() {
@@ -73,21 +74,32 @@ export class RendererPool {
       await this.initialize()
     }
 
+    let renderer
     if (this.available.length > 0) {
-      return this.available.shift()
+      renderer = this.available.shift()
+    } else {
+      // All renderers busy - wait for one to be released
+      renderer = await new Promise(resolve => {
+        this._waiting.push(resolve)
+      })
     }
 
-    // All renderers busy - wait for one to be released
-    return new Promise(resolve => {
-      this._waiting.push(resolve)
-    })
+    // The shared browser may have been relaunched after a crash while this
+    // renderer sat idle; hand it the current one so its page recovery works.
+    renderer.browser = await browserManager.getBrowser()
+    await browserManager.acquireSlot()
+    return renderer
   }
 
   /**
-   * Return a renderer to the pool after use.
+   * Return a renderer after use: close the job's page and give the slot back.
    * @param {PuppeteerRenderer} renderer
    */
-  release(renderer) {
+  async release(renderer) {
+    if (renderer) {
+      await renderer.closePage()
+    }
+
     const waiter = this._waiting.shift()
     if (waiter) {
       // Hand directly to the next waiting caller
@@ -95,6 +107,8 @@ export class RendererPool {
     } else {
       this.available.push(renderer)
     }
+
+    browserManager.releaseSlot()
   }
 
   /**
@@ -116,17 +130,15 @@ export class RendererPool {
   }
 
   /**
-   * Shut down all renderers and the shared browser.
+   * Close every slot's page. The shared browser itself is worker-wide and is
+   * closed by browserManager on shutdown, not here.
    */
   async dispose() {
     logger.info('Disposing renderer pool')
 
     for (const renderer of this.allRenderers) {
       try {
-        if (renderer.page) {
-          await renderer.page.close()
-          renderer.page = null
-        }
+        await renderer.closePage()
       } catch (e) {
         logger.debug('Error closing pool page', { error: e.message })
       }
@@ -135,16 +147,6 @@ export class RendererPool {
     this.available = []
     this.allRenderers = []
     this._waiting = []
-
-    if (this.browser) {
-      try {
-        await this.browser.close()
-      } catch (e) {
-        logger.debug('Error closing pool browser', { error: e.message })
-      }
-      this.browser = null
-    }
-
     this._initialized = false
     logger.info('Renderer pool disposed')
   }

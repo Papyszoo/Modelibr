@@ -240,4 +240,86 @@ public class FileTypeValueObjectTests
         Assert.Equal("text/plain", FileType.Lua.GetMimeType());
         Assert.Equal("text/plain", FileType.CSharp.GetMimeType());
     }
+
+    // ------------------------------------------------------------------
+    // Texture-set context: a file's type is decided by the target context.
+    // The regression these pin: store texture packs ship .webp and .ktx2
+    // maps, and both were rejected by Texture.Create ("File type 'WebP
+    // Image'/'Other file type' is not a texture") because the global
+    // extension map calls WebP a sprite and has no entry for KTX2 at all.
+    // ------------------------------------------------------------------
+
+    [Theory]
+    [InlineData("brick_albedo.png")]
+    [InlineData("brick_albedo.jpg")]
+    [InlineData("brick_normal.ktx2")]
+    [InlineData("brick_roughness.webp")]
+    public void ValidateForTextureUpload_WithImages_ReturnsTextureCategory(string fileName)
+    {
+        var result = FileType.ValidateForTextureUpload(fileName);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(FileTypeCategory.Texture, result.Value.Category);
+    }
+
+    [Theory]
+    [InlineData("brick_normal.ktx2")]
+    [InlineData("brick_roughness.webp")]
+    public void ValidateForTextureUpload_WithSpriteOrUnclassifiedImages_CoercesToTexture(string fileName)
+    {
+        // WebP is a sprite globally and KTX2 is unclassified globally, but inside a
+        // texture set both are textures - so the persisted type must be Texture.
+        var result = FileType.ValidateForTextureUpload(fileName);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(FileType.Texture, result.Value);
+        Assert.Equal("texture", result.Value.Value);
+    }
+
+    [Fact]
+    public void ValidateForTextureUpload_WithASpecificTextureType_KeepsItsType()
+    {
+        // .hdr maps to the Hdr type; in a texture context it stays Hdr rather
+        // than being flattened to the generic Texture.
+        var result = FileType.ValidateForTextureUpload("sky.hdr");
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(FileType.Hdr, result.Value);
+    }
+
+    [Theory]
+    [InlineData("chair.glb")]
+    [InlineData("click.wav")]
+    [InlineData("player.lua")]
+    public void ValidateForTextureUpload_WithNonImages_ReturnsFailure(string fileName)
+    {
+        var result = FileType.ValidateForTextureUpload(fileName);
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("InvalidFileType", result.Error.Code);
+    }
+
+    [Theory]
+    [InlineData("sprite.webp")]
+    [InlineData("TEXTURE.KTX2")]
+    public void FromFileName_WithWebpOrKtx2_StillUsesTheGlobalExtensionMap(string fileName)
+    {
+        // The context resolution must not reclassify the GLOBAL mapping - WebP
+        // sprites keep their sprite type and KTX2 stays unclassified outside a
+        // texture context.
+        var result = FileType.FromFileName(fileName);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(fileName.Contains("KTX2", StringComparison.OrdinalIgnoreCase) ? "other" : "webp", result.Value.Value);
+    }
+
+    [Fact]
+    public void ValidateForSpriteUpload_WithWebp_StillSucceedsAsTheWebpSpriteType()
+    {
+        var result = FileType.ValidateForSpriteUpload("hero.webp");
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(FileType.WebP, result.Value);
+        Assert.Equal(FileTypeCategory.Sprite, result.Value.Category);
+    }
 }

@@ -25,6 +25,18 @@ that is deliberate.
 `version/*` branches are protected so CodeQL actually scans version-branch PRs
 (CodeQL default setup only scans PRs targeting the default or a protected branch).
 
+## Jest cannot see a deleted surface
+
+Removing a UI block can silently break E2E steps that located it, and nothing
+in the unit suites notices. The project's "Snapshot" asset-count strip was
+deleted as clutter in `1aa7f998`; `05-project-sprites.feature` read its sprite
+count from `.container-detail-assets` and only surfaced as a failure on the
+first e2e run afterwards. The fix was to re-point the steps at the sprites-tab
+badge plus the API, not to restore the clutter.
+
+When deleting a block, grep the e2e steps for its class or test id first
+(`grep -rn "<class>" tests/e2e/steps`).
+
 ## Local environment
 
 Docker runs on **colima**. VM sizing, corruption recovery and routine disk

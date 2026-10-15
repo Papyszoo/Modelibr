@@ -177,12 +177,13 @@ export const seedFileAssets: Record<number, string> = {
   209: 'pink_color.png',
   210: 'yellow_color.png',
   301: 'global texture/diffuse.jpg',
-  302: 'global texture/normal.exr',
-  303: 'global texture/roughness.exr',
+  302: 'store-texture-brick_normal.webp',
+  303: 'store-texture-brick_roughness.png',
   304: 'global texture/displacement.png',
   401: 'texture.png',
   402: 'texture_albedo.png',
   501: 'test-tone.wav',
+  502: 'test-tone.wav',
   601: 'hdri/potsdamer_platz_1k.hdr',
   602: 'hdri/potsdamer_platz_1k.hdr',
 }
@@ -711,6 +712,7 @@ export async function enrichModel(model: DemoModel, stringId = false) {
       animationCount: latestVersion?.animationCount ?? null,
       animationNames: latestVersion?.animationNames ?? [],
       boneCount: latestVersion?.boneCount ?? null,
+      unbakedRig: latestVersion?.unbakedRig ?? null,
       uvStatus: latestVersion?.uvStatus ?? null,
       updatedAt: latestVersion?.technicalDetailsUpdatedAt ?? null,
     },
@@ -732,6 +734,9 @@ export function buildConceptImage(
   mimeType?: string
 ) {
   return {
+    id: fileId,
+    projectLevelId: null,
+    title: '',
     fileId,
     fileName,
     previewUrl: `/files/${fileId}/preview?channel=rgb`,
@@ -888,6 +893,8 @@ export function toProjectDto(project: DemoProject) {
     multiModelTextureCount: project.multiModelTextureCount ?? 0,
     environmentMapCount: project.environmentMapCount ?? 0,
     environmentMaps: project.environmentMaps ?? [],
+    vfx: project.vfx ?? [],
+    vfxCount: project.vfx?.length ?? 0,
     customThumbnailFileId: project.customThumbnailFileId ?? null,
     customThumbnailUrl: project.customThumbnailUrl ?? null,
     conceptImages,
@@ -1031,6 +1038,83 @@ export async function ensureDemoDataShape(): Promise<void> {
       project.conceptImages = []
       changed = true
     }
+    if (!Array.isArray(project.levels)) {
+      project.levels = []
+      changed = true
+    }
+    if (!Array.isArray(project.characters)) {
+      project.characters = []
+      changed = true
+    }
+    for (const character of project.characters) {
+      for (const key of [
+        'images',
+        'models',
+        'abilities',
+        'variants',
+      ] as const) {
+        if (!Array.isArray(character[key])) {
+          character[key] = []
+          changed = true
+        }
+      }
+      character.imageCount = character.images.length
+      character.modelCount = character.models.length
+      character.abilityCount = character.abilities.length
+      character.variantCount = character.variants.length
+    }
+    if (!Array.isArray(project.productionNotes)) {
+      project.productionNotes = []
+      changed = true
+    }
+    for (const note of project.productionNotes) {
+      if (typeof note.characterId === 'undefined') {
+        note.characterId = null
+        changed = true
+      }
+    }
+    if (!Array.isArray(project.referenceLinks)) {
+      project.referenceLinks = []
+      changed = true
+    }
+    for (const image of project.conceptImages) {
+      if (typeof image.id !== 'number') {
+        image.id = image.fileId
+        changed = true
+      }
+      if (typeof image.title !== 'string') {
+        image.title = ''
+        changed = true
+      }
+      // Same backfill the real migration performs: the old single scope column
+      // becomes one link row, and the column stops being meaningful.
+      if (image.projectLevelId != null) {
+        project.referenceLinks.push({
+          id: await nextId('projectReferenceLinks'),
+          projectId: project.id,
+          referenceImageId: image.id,
+          projectLevelId: image.projectLevelId,
+          projectCharacterId: null,
+          createdAt: now(),
+        })
+        image.projectLevelId = null
+        changed = true
+      }
+    }
+    project.referenceLinks = project.referenceLinks.filter(link => {
+      const image = project.conceptImages.find(
+        candidate => candidate.id === link.referenceImageId
+      )
+      const levelExists =
+        link.projectLevelId == null ||
+        (project.levels ?? []).some(level => level.id === link.projectLevelId)
+      const characterExists =
+        link.projectCharacterId == null ||
+        (project.characters ?? []).some(
+          character => character.id === link.projectCharacterId
+        )
+      return Boolean(image) && levelExists && characterExists
+    })
     if (!Array.isArray(project.models)) {
       project.models = []
       changed = true

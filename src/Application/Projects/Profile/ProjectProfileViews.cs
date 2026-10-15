@@ -67,6 +67,8 @@ public sealed record ProjectConceptImageBriefDto(int FileId, string FileName, st
 
 public sealed record ProjectEnvironmentMapBriefDto(int Id, string Name);
 
+public sealed record ProjectVfxBriefDto(int Id, string Name);
+
 public sealed record ProjectSceneBriefDto(int Id, string Name, int Revision, DateTime UpdatedAt);
 
 /// <summary>
@@ -99,6 +101,7 @@ public sealed record ProjectBriefDto(
     IReadOnlyList<string> PaletteHex,
     IReadOnlyList<ProjectConceptImageBriefDto> ConceptImages,
     IReadOnlyList<ProjectEnvironmentMapBriefDto> EnvironmentMaps,
+    IReadOnlyList<ProjectVfxBriefDto> Vfx,
     IReadOnlyList<ProjectSceneBriefDto> Scenes,
     ProjectAssetCountsDto AssetCounts,
     IReadOnlyList<string> Guidance);
@@ -110,6 +113,7 @@ public sealed record ProjectAssetCountsDto(
     int Sounds,
     int Scripts,
     int EnvironmentMaps,
+    int Vfx,
     int Scenes);
 
 /// <summary>One line per project, for a list.</summary>

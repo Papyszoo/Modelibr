@@ -58,7 +58,7 @@ could each silently swap the asset's searchable version.
 | soft delete / restore | recycled assets stayed fully searchable (now `IsActive`) |
 | permanent delete | no FK from the projection, so nothing cascaded - documents orphaned |
 | active-version change | current-version marker never moved |
-| `set_category` | category is stamped at extraction time, so an agent could not confirm its own write with a category-filtered search |
+| `set_asset_metadata` | category is stamped at extraction time, so an agent could not confirm its own write with a category-filtered search |
 
 ## Search: structural filters describe the asset, part rows describe a part
 

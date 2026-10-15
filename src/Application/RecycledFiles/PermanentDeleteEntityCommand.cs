@@ -46,6 +46,7 @@ internal sealed class GetDeletePreviewQueryHandler : IQueryHandler<GetDeletePrev
     private readonly ISoundRepository _soundRepository;
     private readonly IScriptRepository _scriptRepository;
     private readonly IEnvironmentMapRepository _environmentMapRepository;
+    private readonly IMaterialRepository _materialRepository;
 
     public GetDeletePreviewQueryHandler(
         IModelRepository modelRepository,
@@ -55,7 +56,8 @@ internal sealed class GetDeletePreviewQueryHandler : IQueryHandler<GetDeletePrev
         ISpriteRepository spriteRepository,
         ISoundRepository soundRepository,
         IScriptRepository scriptRepository,
-        IEnvironmentMapRepository environmentMapRepository)
+        IEnvironmentMapRepository environmentMapRepository,
+        IMaterialRepository materialRepository)
     {
         _modelRepository = modelRepository;
         _modelVersionRepository = modelVersionRepository;
@@ -65,6 +67,7 @@ internal sealed class GetDeletePreviewQueryHandler : IQueryHandler<GetDeletePrev
         _soundRepository = soundRepository;
         _scriptRepository = scriptRepository;
         _environmentMapRepository = environmentMapRepository;
+        _materialRepository = materialRepository;
     }
 
     public async Task<Result<GetDeletePreviewResponse>> Handle(GetDeletePreviewQuery request, CancellationToken cancellationToken)
@@ -169,6 +172,22 @@ internal sealed class GetDeletePreviewQueryHandler : IQueryHandler<GetDeletePrev
                 filesToDelete.AddRange(EnvironmentMapDeletionHelpers.GetVariantFiles(variant).Select(file => new DeletedFileInfo(file.FilePath, file.OriginalFileName, file.SizeBytes)));
                 break;
 
+            case "material":
+                var material = await _materialRepository.GetDeletedByIdAsync(request.EntityId, cancellationToken);
+                if (material == null)
+                    return Result.Failure<GetDeletePreviewResponse>(new Error("MaterialNotFound", "Recycled material not found"));
+
+                entityName = material.Name;
+                // A parameter material has no source files - only the thumbnail the renderer
+                // wrote for it, which is still worth naming before it is gone.
+                foreach (var thumbnail in new[] { material.ThumbnailPath, material.PngThumbnailPath })
+                {
+                    if (!string.IsNullOrWhiteSpace(thumbnail))
+                        filesToDelete.Add(new DeletedFileInfo(thumbnail, Path.GetFileName(thumbnail), 0));
+                }
+
+                break;
+
             default:
                 return Result.Failure<GetDeletePreviewResponse>(new Error("InvalidEntityType", $"Unknown entity type: {request.EntityType}"));
         }
@@ -188,6 +207,7 @@ internal sealed class PermanentDeleteEntityCommandHandler : ICommandHandler<Perm
     private readonly ISoundRepository _soundRepository;
     private readonly IScriptRepository _scriptRepository;
     private readonly IEnvironmentMapRepository _environmentMapRepository;
+    private readonly IMaterialRepository _materialRepository;
     private readonly IFileStorage _fileStorage;
     private readonly IThumbnailQueue _thumbnailQueue;
     private readonly IAssetSearchDocumentRepository _searchDocumentRepository;
@@ -203,6 +223,7 @@ internal sealed class PermanentDeleteEntityCommandHandler : ICommandHandler<Perm
         ISoundRepository soundRepository,
         IScriptRepository scriptRepository,
         IEnvironmentMapRepository environmentMapRepository,
+        IMaterialRepository materialRepository,
         IFileStorage fileStorage,
         IThumbnailQueue thumbnailQueue,
         IAssetSearchDocumentRepository searchDocumentRepository,
@@ -217,6 +238,7 @@ internal sealed class PermanentDeleteEntityCommandHandler : ICommandHandler<Perm
         _soundRepository = soundRepository;
         _scriptRepository = scriptRepository;
         _environmentMapRepository = environmentMapRepository;
+        _materialRepository = materialRepository;
         _fileStorage = fileStorage;
         _thumbnailQueue = thumbnailQueue;
         _searchDocumentRepository = searchDocumentRepository;
@@ -473,6 +495,26 @@ internal sealed class PermanentDeleteEntityCommandHandler : ICommandHandler<Perm
 
                 await _unitOfWork.SaveChangesAsync(cancellationToken);
                 return Result.Success(new PermanentDeleteEntityResponse(true, "Environment map variant permanently deleted", deletedFiles));
+
+            case "material":
+                var material = await _materialRepository.GetDeletedByIdAsync(request.EntityId, cancellationToken);
+                if (material == null)
+                    return Result.Failure<PermanentDeleteEntityResponse>(new Error("MaterialNotFound", "Material not found"));
+
+                // A parameter material carries no source files; only its rendered thumbnails
+                // live on disk, and a permanent delete is the one place they should go.
+                foreach (var thumbnail in new[] { material.ThumbnailPath, material.PngThumbnailPath })
+                {
+                    if (string.IsNullOrWhiteSpace(thumbnail))
+                        continue;
+
+                    await _fileStorage.DeleteFileAsync(thumbnail, cancellationToken);
+                    deletedFiles.Add(new DeletedFileInfo(thumbnail, Path.GetFileName(thumbnail), 0));
+                }
+
+                await _materialRepository.DeleteAsync(request.EntityId, cancellationToken);
+                await _unitOfWork.SaveChangesAsync(cancellationToken);
+                return Result.Success(new PermanentDeleteEntityResponse(true, "Material permanently deleted", deletedFiles));
 
             default:
                 return Result.Failure<PermanentDeleteEntityResponse>(new Error("InvalidEntityType", $"Unknown entity type: {request.EntityType}"));

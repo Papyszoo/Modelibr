@@ -22,7 +22,9 @@ import {
 // v2: parts now carry a world-space `worldBoundingBox` (local `boundingBox` is
 // kept for geometry context) so derived dimensions reflect the node transform
 // (scale/rotation), not raw object-space geometry.
-export const SCENE_GRAPH_EXTRACTOR_VERSION = 2
+// v3: clip rollups carry `{name, durationSeconds, kinds}` - the kinds are derived
+// from the track target paths so the metadata layer can say what each clip moves.
+export const SCENE_GRAPH_EXTRACTOR_VERSION = 3
 
 function round(value, decimals = 6) {
   if (typeof value !== 'number' || !Number.isFinite(value)) return null
@@ -52,6 +54,39 @@ function materialNamesOf(obj) {
   if (!obj.material) return []
   const materials = Array.isArray(obj.material) ? obj.material : [obj.material]
   return materials.map(m => (m && m.name ? m.name : '')).filter(Boolean)
+}
+
+// Animation kinds, in the order they are reported. `material` is the fallback
+// bucket: a clip that moves neither a bone nor a morph target is animating
+// material properties (colour, opacity, texture transform, ...).
+const ANIMATION_KIND_ORDER = ['skeletal', 'morph', 'material']
+const SKELETAL_TRACK_SUFFIXES = ['.position', '.quaternion', '.scale']
+const MORPH_TRACK_SUFFIX = '.morphTargetInfluences'
+
+/**
+ * What a clip animates, read off its track target paths:
+ * transform tracks on bones are skeletal, morphTargetInfluences is morph,
+ * everything else (material properties) is material. Canonically ordered and
+ * deduplicated so the payload stays reproducible.
+ *
+ * @param {{ tracks?: Array<{ name?: string }> }} clip
+ * @returns {string[]} Any of skeletal / morph / material.
+ */
+export function animationKindsOf(clip) {
+  const kinds = new Set()
+  const tracks = Array.isArray(clip?.tracks) ? clip.tracks : []
+  for (const track of tracks) {
+    const name = String(track?.name || '')
+    if (!name) continue
+    if (name.endsWith(MORPH_TRACK_SUFFIX)) {
+      kinds.add('morph')
+    } else if (SKELETAL_TRACK_SUFFIXES.some(suffix => name.endsWith(suffix))) {
+      kinds.add('skeletal')
+    } else {
+      kinds.add('material')
+    }
+  }
+  return ANIMATION_KIND_ORDER.filter(kind => kinds.has(kind))
 }
 
 function geometryArrays(geometry) {
@@ -285,8 +320,8 @@ export function extractSceneGraph(root, THREE, options = {}) {
   const animationClips = Array.isArray(root.animations) ? root.animations : []
   const animations = animationClips.map((clip, index) => ({
     name: clip.name || `Animation ${index + 1}`,
-    duration: round(clip.duration ?? 0, 4),
-    trackCount: Array.isArray(clip.tracks) ? clip.tracks.length : 0,
+    durationSeconds: round(clip.duration ?? 0, 4),
+    kinds: animationKindsOf(clip),
   }))
 
   const referencedImages = collectReferencedImages(meshes, warnings)

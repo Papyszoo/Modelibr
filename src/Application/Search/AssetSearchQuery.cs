@@ -183,6 +183,12 @@ public record AssetSearchProfileView(
 /// they do not occupy a caller's slots twice. Empty when the asset is unique, or when it
 /// carries no geometry fingerprint to compare.
 /// </param>
+/// <param name="Variants">
+/// Other asset ids that are numbered takes on this same idea - the base name is identical and
+/// only a trailing number differs, like <c>SM_Env_Stalagmite_01</c> and <c>_02</c> - collapsed
+/// out of the results so one idea does not fill several of a caller's slots. Empty when the
+/// name ends in no number, or when this is the only numbered copy.
+/// </param>
 public record AssetSearchHit(
     string AssetType,
     int AssetId,
@@ -195,7 +201,8 @@ public record AssetSearchHit(
     AssetSearchFacts? Facts = null,
     MatchedPartView? MatchedPart = null,
     IReadOnlyList<int>? AlsoAt = null,
-    Application.Media.AssetThumbnail? Media = null);
+    Application.Media.AssetThumbnail? Media = null,
+    IReadOnlyList<int>? Variants = null);
 
 /// <summary>
 /// The mesh inside an asset that a query matched. Distinct from the hit itself so the two

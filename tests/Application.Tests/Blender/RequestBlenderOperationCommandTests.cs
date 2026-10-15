@@ -505,12 +505,16 @@ public class RequestBlenderOperationCommandTests
     [InlineData("{\"format\":true}")]
     [InlineData("{\"format\":null}")]
     [InlineData("{\"format\":[\"glb\"]}")]
+    [InlineData("{\"format\":\"glb\",\"bake\":\"yes\"}")]
+    [InlineData("{\"format\":\"glb\",\"bake\":5}")]
     [InlineData("not json at all")]
     public void An_Unreadable_Stored_Target_Reads_As_Nothing_Rather_Than_Throwing(string stored)
     {
         // Reading a stored blob must not be able to leave the handler. GetValue<string> on
         // a JSON number throws InvalidOperationException, which the JsonException catch
-        // around it never covered.
+        // around it never covered. A bake flag that is not a boolean reads as unreadable
+        // rather than being guessed at - guessing could hand a caller a plain job for a
+        // baked request.
         Assert.Null(BlenderOperationSpecs.ConvertTarget(stored));
     }
 
@@ -537,11 +541,137 @@ public class RequestBlenderOperationCommandTests
         jobs.Verify(r => r.AddAsync(It.IsAny<ExtractionJob>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
+    // ---- convert-format with bake ----------------------------------------------
+
+    [Fact]
+    public async Task Queues_A_Conversion_That_Bakes_The_Rig_For_The_Web()
+    {
+        var jobs = Jobs();
+        var handler = Handler(jobs: jobs);
+
+        var result = await handler.Handle(
+            new RequestBlenderOperationCommand(
+                42, BlenderOperations.ConvertFormat,
+                ParametersJson: "{\"format\": \"glb\", \"bake\": true}"),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        jobs.Verify(r => r.AddAsync(
+            It.Is<ExtractionJob>(j =>
+                j.ParametersJson!.Contains("\"format\":\"glb\"") &&
+                j.ParametersJson.Contains("\"bake\":true")),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task A_Conversion_Without_Bake_Records_That_It_Does_Not_Bake()
+    {
+        // The normalized blob is what the dedup comparison reads, so the flag has to be
+        // present even when it is false - an absent key would read as "unknown", not as
+        // "a plain conversion".
+        var jobs = Jobs();
+        var handler = Handler(jobs: jobs);
+
+        await handler.Handle(
+            new RequestBlenderOperationCommand(
+                42, BlenderOperations.ConvertFormat, ParametersJson: "{\"format\": \"glb\"}"),
+            CancellationToken.None);
+
+        jobs.Verify(r => r.AddAsync(
+            It.Is<ExtractionJob>(j => j.ParametersJson!.Contains("\"bake\":false")),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task Refuses_To_Bake_Into_A_Geometry_Only_Format()
+    {
+        // A bake writes constraints, drivers and shape keys as keyframes. STL holds
+        // triangles, so every one of them would be dropped on the way out - the request
+        // is refused up front rather than burning a job to produce a hollow file.
+        var jobs = Jobs();
+        var handler = Handler(jobs: jobs);
+
+        var result = await handler.Handle(
+            new RequestBlenderOperationCommand(
+                42, BlenderOperations.ConvertFormat,
+                ParametersJson: "{\"format\": \"stl\", \"bake\": true}"),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("Blender.InvalidParameters", result.Error.Code);
+        Assert.Contains("geometry only", result.Error.Message);
+        jobs.Verify(r => r.AddAsync(It.IsAny<ExtractionJob>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task A_Baked_Conversion_Is_Not_Deduped_Against_A_Plain_One()
+    {
+        // Same format, different result: the plain job would be handed back for a bake
+        // request and the caller would collect a version whose rig is still unbaked.
+        var live = ExtractionJob.CreateOperation(
+            "Model", 42, ExtractorFamilies.Blender, BlenderOperations.ConvertFormat, Now,
+            parametersJson: "{\"format\":\"glb\",\"bake\":false}", versionId: 7);
+        var jobs = Jobs();
+        jobs.Setup(r => r.GetLiveJobAsync(
+                "Model", 42, 7, ExtractorFamilies.Blender, BlenderOperations.ConvertFormat,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(live);
+        var handler = Handler(jobs: jobs);
+
+        var result = await handler.Handle(
+            new RequestBlenderOperationCommand(
+                42, BlenderOperations.ConvertFormat,
+                ParametersJson: "{\"format\": \"glb\", \"bake\": true}"),
+            CancellationToken.None);
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("Blender.ConversionInFlight", result.Error.Code);
+        Assert.Contains("baked for web", result.Error.Message);
+        jobs.Verify(r => r.AddAsync(It.IsAny<ExtractionJob>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task Asking_For_The_SAME_Baked_Conversion_Twice_Still_Costs_One_Run()
+    {
+        var live = ExtractionJob.CreateOperation(
+            "Model", 42, ExtractorFamilies.Blender, BlenderOperations.ConvertFormat, Now,
+            parametersJson: "{\"format\":\"glb\",\"bake\":true}", versionId: 7);
+        var jobs = Jobs();
+        jobs.Setup(r => r.GetLiveJobAsync(
+                "Model", 42, 7, ExtractorFamilies.Blender, BlenderOperations.ConvertFormat,
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(live);
+        var handler = Handler(jobs: jobs);
+
+        var result = await handler.Handle(
+            new RequestBlenderOperationCommand(
+                42, BlenderOperations.ConvertFormat,
+                ParametersJson: "{\"format\": \"glb\", \"bake\": true}"),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.True(result.Value.AlreadyQueued);
+        jobs.Verify(r => r.AddAsync(It.IsAny<ExtractionJob>(), It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public void A_Stored_Target_Reads_Its_Bake_State()
+    {
+        Assert.Equal("glb baked for web",
+            BlenderOperationSpecs.ConvertTarget("{\"format\":\"glb\",\"bake\":true}"));
+        Assert.Equal("glb",
+            BlenderOperationSpecs.ConvertTarget("{\"format\":\"glb\",\"bake\":false}"));
+        // Rows written before the flag existed mean "not baked".
+        Assert.Equal("glb", BlenderOperationSpecs.ConvertTarget("{\"format\":\"glb\"}"));
+    }
+
     [Theory]
     [InlineData(BlenderOperations.ConvertFormat, "{\"format\": 5}")]
     [InlineData(BlenderOperations.ConvertFormat, "{\"format\": true}")]
     [InlineData(BlenderOperations.ConvertFormat, "{\"format\": {}}")]
     [InlineData(BlenderOperations.ConvertFormat, "{\"format\": []}")]
+    [InlineData(BlenderOperations.ConvertFormat, "{\"format\": \"glb\", \"bake\": \"yes\"}")]
+    [InlineData(BlenderOperations.ConvertFormat, "{\"format\": \"glb\", \"bake\": 1}")]
     [InlineData(BlenderOperations.UvUnwrap, "{\"method\": 123}")]
     [InlineData(BlenderOperations.UvUnwrap, "{\"method\": true}")]
     [InlineData(BlenderOperations.UvUnwrap, "{\"lightmap\": \"true\"}")]

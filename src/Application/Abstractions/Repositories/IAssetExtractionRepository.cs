@@ -21,6 +21,20 @@ public interface IAssetExtractionRepository
         CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// The newest extraction row for an asset (and version, when the family is
+    /// versioned), whatever file hash it was keyed on. The read side of the
+    /// metadata surfaces uses this instead of the exact-key lookup: a caller
+    /// asking what an asset knows should not have to reproduce the worker's
+    /// invalidation key first. A null <paramref name="versionId"/> means any
+    /// version, newest first.
+    /// </summary>
+    Task<AssetExtraction?> GetLatestForAssetAsync(
+        string assetType,
+        int assetId,
+        int? versionId = null,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Invalidation as set difference: extraction rows for a type whose
     /// <see cref="AssetExtraction.ExtractorVersion"/> is below <paramref name="currentExtractorVersion"/>
     /// (i.e. produced by an older extractor and due for re-extraction).

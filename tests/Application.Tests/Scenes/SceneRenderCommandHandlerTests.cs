@@ -21,7 +21,6 @@ public class SceneRenderCommandHandlerTests
     private readonly Mock<ISceneRenderRepository> _renders = new();
     private readonly Mock<ISceneRepository> _scenes = new();
     private readonly Mock<IFileStorage> _files = new();
-    private readonly Mock<IUploadPathProvider> _paths = new();
     private readonly Mock<IDateTimeProvider> _clock = new();
     private readonly Mock<IUnitOfWork> _unitOfWork = new();
     private readonly UploadSceneRenderCommandHandler _uploadHandler;
@@ -30,7 +29,6 @@ public class SceneRenderCommandHandlerTests
     public SceneRenderCommandHandlerTests()
     {
         _clock.SetupGet(c => c.UtcNow).Returns(Now);
-        _paths.SetupGet(p => p.UploadRootPath).Returns("/uploads");
         _unitOfWork
             .Setup(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
@@ -43,7 +41,6 @@ public class SceneRenderCommandHandlerTests
             _renders.Object,
             _scenes.Object,
             _files.Object,
-            _paths.Object,
             _clock.Object,
             _unitOfWork.Object);
     }
@@ -122,7 +119,7 @@ public class SceneRenderCommandHandlerTests
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
-        Assert.Equal(Path.Combine("/uploads", "renders/scene.png"), result.Value.FilePath);
+        Assert.Equal("renders/scene.png", result.Value.FilePath);
         Assert.NotNull(storedRender);
         Assert.False(storedRender.TimedOut);
         Assert.Equal(job.SceneId, storedRender.SceneId);

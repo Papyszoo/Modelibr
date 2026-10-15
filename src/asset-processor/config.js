@@ -13,6 +13,25 @@ export const config = {
 
   // Job processing settings
   maxConcurrentJobs: parseInt(process.env.MAX_CONCURRENT_JOBS || '3', 10),
+  // How many render jobs one worker may run at once. Every render (model,
+  // texture-set, environment-map, extraction, scene, vfx) shares one Chromium
+  // and closes its page when the job ends, so this caps how many live WebGL
+  // contexts the worker holds. Default 1: a worker drives Chromium with one
+  // context no matter how many jobs the queue has in flight, which is what
+  // keeps a large re-queue from ballooning memory. Raise it deliberately.
+  maxConcurrentRenderJobs: Math.max(
+    1,
+    parseInt(process.env.MAX_CONCURRENT_RENDER_JOBS, 10) || 1
+  ),
+  // How long the shared Chromium may sit with no render job before the worker
+  // closes it, freeing the ~3.7 GB an idle native app holds. The next job
+  // relaunches it lazily. Default 60000; 0 disables the idle close entirely.
+  browserIdleTimeoutMs: (() => {
+    const raw = process.env.BROWSER_IDLE_TIMEOUT_MS
+    if (raw === undefined || raw === '') return 60000
+    const parsed = parseInt(raw, 10)
+    return Number.isFinite(parsed) && parsed >= 0 ? parsed : 60000
+  })(),
   jobTimeout: parseInt(process.env.JOB_TIMEOUT_MS) || 300000, // 5 minutes default
   // Poll interval for the decoupled extraction queue (prompt 20 executor).
   extractionPollIntervalMs:
@@ -71,6 +90,25 @@ export const config = {
     enabled: process.env.ORBIT_ENABLED !== 'false', // enable orbit rendering
   },
 
+  // Animated model thumbnails. When the loaded model carries clips, the FIRST
+  // clip is played at explicit instants instead of orbiting (see
+  // puppeteerRenderer.renderAnimationFrames). Same density rule as the vfx loop:
+  // sampled across the whole clip at up to targetFps, capped so a long clip
+  // stays a small file, each frame held for duration / frames so the loop plays
+  // in real time. boundingSamples sets how many instants the union of the
+  // model's bounds is taken over, so the fixed camera frames every pose.
+  animationClip: {
+    targetFps: 15,
+    maxFrames: 90,
+    minFrames: 2,
+    boundingSamples: 12,
+    // Fraction of the frame's vertical FOV the animated union box should fill.
+    // Kept inside the 70-80% band (and just under its middle) so the whole clip
+    // stays inside the frame, instead of the diagonal-plus-pad estimate that
+    // left the model a small dot.
+    framingCoverage: 0.72,
+  },
+
   // Scene render-back (03-D / 11-M). Unlike every other render here, this one
   // photographs the running frontend rather than assembling geometry itself -
   // see sceneRenderer.js for why - so it needs the app's address, not just the
@@ -84,6 +122,20 @@ export const config = {
     // but crossing this deadline is a failed render rather than permission to
     // photograph and publish a page that is still loading.
     timeoutMs: parseInt(process.env.SCENE_RENDER_TIMEOUT_MS, 10) || 60000,
+  },
+
+  // Animated VFX thumbnails. Like scene renders this photographs the running
+  // frontend (the app's own VFX runtime draws the effect - see vfxRenderer.js),
+  // so it reuses FRONTEND_URL and the scene render's readiness timeout.
+  vfxRender: {
+    // Same fixed size as model thumbnails.
+    width: 256,
+    height: 256,
+    // One loop covers the WHOLE effect. Frames are spread evenly across it at
+    // up to targetFps; the count is capped so a long effect stays a small file,
+    // and the cap lowers the rate (each frame is held for window / frames).
+    targetFps: 15,
+    maxFrames: 90,
   },
 
   // Environment map rendering settings
@@ -157,6 +209,23 @@ export const config = {
     path: 'blender',
     enabled: false,
   },
+}
+
+/**
+ * Host the health server should bind.
+ *
+ * The desktop app launches each worker itself and fronts it with its edge
+ * server, so the unauthenticated health/status/metrics endpoints must stay on
+ * loopback; otherwise they are reachable from the LAN even with network access
+ * off. MODELIBR_DESKTOP is the marker ProcessManager passes to child processes.
+ * Docker leaves it unset and keeps listening on every interface, since the
+ * container publishes WORKER_PORT to the host.
+ *
+ * @returns {string|undefined} '127.0.0.1' under the desktop app, undefined
+ *   (Node's default, every interface) otherwise.
+ */
+export function healthServerHost() {
+  return process.env.MODELIBR_DESKTOP ? '127.0.0.1' : undefined
 }
 
 /**
@@ -300,6 +369,14 @@ export async function refreshBlenderConfigFromApi(apiClient) {
     if (typeof data.enableBlender === 'boolean') {
       config.blender.enabled = data.enableBlender
     }
+    // Only sent when the user chose a timeout; absent keeps the env-derived
+    // BLENDER_OPERATION_TIMEOUT_MS value from boot.
+    if (
+      typeof data.operationTimeoutMs === 'number' &&
+      data.operationTimeoutMs > 0
+    ) {
+      config.blenderOperationTimeoutMs = data.operationTimeoutMs
+    }
   } catch {
     // Silently fall back to the current config values
   }
@@ -308,12 +385,15 @@ export async function refreshBlenderConfigFromApi(apiClient) {
 // Allowed values for the single square thumbnail-size setting.
 const ALLOWED_THUMBNAIL_SIZES = new Set([64, 128, 256, 512, 1024, 2048])
 
+// Thumbnail background: 'transparent' or a #RRGGBB colour (see the Settings UI).
+const BACKGROUND_COLOUR_PATTERN = /^#[0-9a-fA-F]{6}$/
+
 /**
  * Refresh thumbnail render configuration from the backend API settings.
- * Translates the user-facing settings (size, frameCount, isAnimated) into the
- * orbit/rendering knobs the renderer reads. Thumbnails are always square so a
- * single `size` drives both outputWidth and outputHeight. Falls back silently
- * to existing in-memory config on failure.
+ * Translates the user-facing settings (size, frameCount, isAnimated, background)
+ * into the orbit/rendering knobs the renderer reads. Thumbnails are always square
+ * so a single `size` drives both outputWidth and outputHeight. Falls back
+ * silently to existing in-memory config on failure.
  *
  * When isAnimated=false, frameCount collapses to 1 (single frame at start angle)
  * - the renderer still produces a webp, just a 1-frame one. This keeps the
@@ -332,6 +412,14 @@ export async function refreshThumbnailRenderConfigFromApi(apiClient) {
     ) {
       config.rendering.outputWidth = data.size
       config.rendering.outputHeight = data.size
+    }
+
+    if (
+      typeof data.backgroundColor === 'string' &&
+      (data.backgroundColor.toLowerCase() === 'transparent' ||
+        BACKGROUND_COLOUR_PATTERN.test(data.backgroundColor))
+    ) {
+      config.rendering.backgroundColor = data.backgroundColor
     }
 
     const isAnimated = data.isAnimated !== false

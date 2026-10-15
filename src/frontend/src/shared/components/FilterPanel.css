@@ -71,6 +71,12 @@
   width: 6rem;
 }
 
+.models-filter-range-error {
+  font-size: var(--mod-text-xs, 0.75rem);
+  color: var(--mod-color-danger, #ef4444);
+  white-space: nowrap;
+}
+
 .models-filter-uv {
   min-width: 11rem;
 }

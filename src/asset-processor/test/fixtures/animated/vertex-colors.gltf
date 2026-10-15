@@ -1,0 +1,103 @@
+{
+  "asset": {
+    "version": "2.0",
+    "generator": "Modelibr animated fixture generator"
+  },
+  "scene": 0,
+  "scenes": [
+    {
+      "nodes": [
+        0
+      ]
+    }
+  ],
+  "meshes": [
+    {
+      "name": "Box",
+      "primitives": [
+        {
+          "attributes": {
+            "POSITION": 0,
+            "NORMAL": 1,
+            "COLOR_0": 2
+          },
+          "indices": 3
+        }
+      ]
+    }
+  ],
+  "nodes": [
+    {
+      "name": "Box",
+      "mesh": 0
+    }
+  ],
+  "buffers": [
+    {
+      "byteLength": 392,
+      "uri": "data:application/octet-stream;base64,AAAAvwAAAL8AAAC/AAAAPwAAAL8AAAC/AAAAPwAAAD8AAAC/AAAAvwAAAD8AAAC/AAAAvwAAAL8AAAA/AAAAPwAAAL8AAAA/AAAAPwAAAD8AAAA/AAAAvwAAAD8AAAA/RrYTv0a2E79GthO/RrYTP0a2E79GthO/RrYTP0a2Ez9GthO/RrYTv0a2Ez9GthO/RrYTv0a2E79GthM/RrYTP0a2E79GthM/RrYTP0a2Ez9GthM/RrYTv0a2Ez9GthM/AACAPwAAAAAAAAAAAACAPwAAAAAAAIA/AAAAAAAAgD8AAAAAAAAAAAAAgD8AAIA/AACAPwAAgD8AAAAAAACAPwAAgD8AAAAAAACAPwAAgD8AAAAAAACAPwAAgD8AAIA/AACAPwAAgD8AAIA/AACAPwAAAD8AAAA/AAAAPwAAgD8AAAEAAgAAAAIAAwAEAAYABQAEAAcABgAAAAQABQAAAAUAAQADAAIABgADAAYABwAAAAMABwAAAAcABAABAAUABgABAAYAAgA="
+    }
+  ],
+  "bufferViews": [
+    {
+      "buffer": 0,
+      "byteOffset": 0,
+      "byteLength": 96,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteOffset": 96,
+      "byteLength": 96,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteOffset": 192,
+      "byteLength": 128,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteOffset": 320,
+      "byteLength": 72,
+      "target": 34963
+    }
+  ],
+  "accessors": [
+    {
+      "bufferView": 0,
+      "componentType": 5126,
+      "count": 8,
+      "type": "VEC3",
+      "min": [
+        -0.5,
+        -0.5,
+        -0.5
+      ],
+      "max": [
+        0.5,
+        0.5,
+        0.5
+      ]
+    },
+    {
+      "bufferView": 1,
+      "componentType": 5126,
+      "count": 8,
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 2,
+      "componentType": 5126,
+      "count": 8,
+      "type": "VEC4"
+    },
+    {
+      "bufferView": 3,
+      "componentType": 5123,
+      "count": 36,
+      "type": "SCALAR"
+    }
+  ]
+}

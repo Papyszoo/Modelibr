@@ -1,7 +1,7 @@
 import './TexturePreviewPanel.css'
 
 import { OrbitControls, Stage } from '@react-three/drei'
-import { Canvas, useThree } from '@react-three/fiber'
+import { Canvas } from '@react-three/fiber'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Button } from 'primereact/button'
 import { ProgressBar } from 'primereact/progressbar'
@@ -13,8 +13,6 @@ import {
   useRef,
   useState,
 } from 'react'
-import * as THREE from 'three'
-import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js'
 
 import { FloatingWindow } from '@/components/FloatingWindow'
 import { LoadingPlaceholder } from '@/components/LoadingPlaceholder'
@@ -22,6 +20,8 @@ import {
   regenerateTextureSetThumbnail,
   updateTilingScale,
 } from '@/features/texture-set/api/textureSetApi'
+import { type MaterialEffectsDocument } from '@/shared/three/materialEffects'
+import { PreviewEnvironment } from '@/shared/three/PreviewEnvironment'
 import { type TextureSetDto, TextureSetKind } from '@/types'
 
 import { PreviewInfo } from './PreviewInfo'
@@ -36,38 +36,19 @@ interface TexturePreviewPanelProps {
   textureSet: TextureSetDto
   side?: 'left' | 'right'
   textureQuality: number
-}
-
-/**
- * Procedural studio IBL for the preview (RoomEnvironment → PMREM). Replaces
- * drei's `<Stage environment="city">`, which fetches an HDR from a CDN - a
- * local-first violation that also breaks on offline / air-gapped installs.
- * RoomEnvironment is generated in-process, so material previews keep real
- * reflections with zero network dependency.
- */
-function PreviewEnvironment(): null {
-  const gl = useThree(s => s.gl)
-  const scene = useThree(s => s.scene)
-  useEffect(() => {
-    const pmrem = new THREE.PMREMGenerator(gl)
-    const room = new RoomEnvironment()
-    const envMap = pmrem.fromScene(room).texture
-    const previous = scene.environment
-    scene.environment = envMap
-    room.dispose()
-    pmrem.dispose()
-    return () => {
-      scene.environment = previous
-      envMap.dispose()
-    }
-  }, [gl, scene])
-  return null
+  /**
+   * Runtime effects for the previewed surface, how a library material's
+   * preview shows its wobble, rim or pulse. Null is the plain PBR preview:
+   * behaviour and frameloop are exactly what they are today.
+   */
+  effects?: MaterialEffectsDocument | null
 }
 
 export function TexturePreviewPanel({
   textureSet,
   side = 'left',
   textureQuality,
+  effects = null,
 }: TexturePreviewPanelProps) {
   const isUniversal = textureSet.kind === TextureSetKind.Universal
 
@@ -261,10 +242,11 @@ export function TexturePreviewPanel({
           shadows
           className="texture-preview-canvas"
           camera={{ position: [3, 2, 3], fov: 45 }}
-          // Static scene (no useFrame anywhere): render only when something
-          // changes. A continuous loop starves input for seconds per event
-          // under software GL; drei's OrbitControls and React state changes
-          // (texture loads, geometry switches) invalidate on their own.
+          // Render on demand: drei's OrbitControls and React state changes
+          // (texture loads, geometry switches) invalidate on their own, and a
+          // preview whose material carries effects keeps asking for its next
+          // frame from the effects hook. A continuous loop for a static
+          // preview starves input for seconds per event under software GL.
           frameloop="demand"
           gl={{
             antialias: true,
@@ -286,6 +268,7 @@ export function TexturePreviewPanel({
                 textureStrengths={textureStrengths}
                 onLoadingChange={handleLoadingChange}
                 textureQuality={textureQuality}
+                effects={effects}
               />
             </Suspense>
           </Stage>

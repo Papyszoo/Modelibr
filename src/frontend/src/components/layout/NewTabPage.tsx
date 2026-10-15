@@ -22,6 +22,8 @@ import {
 } from '@/stores/navigationStore'
 import { type Tab, type TabType } from '@/types'
 
+import { getTabIcon } from './tabIcons'
+
 // ── Tile catalog ────────────────────────────────────────────────────────────
 //
 // Tiles surface every tab type the user can open from the New Tab page.
@@ -133,21 +135,21 @@ const TILES: Tile[] = [
   {
     key: 'scenes',
     group: 'assets',
-    icon: 'pi-box',
+    icon: 'pi-map',
     label: 'Scenes',
     description: 'Compose library assets into a scene - yours or an agent’s.',
     targetType: 'scenes',
     targetLabel: 'Scenes',
   },
   {
-    key: 'stages',
+    key: 'vfx',
     group: 'assets',
-    icon: 'pi-th-large',
-    label: 'Stages',
-    description: 'Lighting rigs for viewing one model - superseded by Scenes.',
-    targetType: 'stageList',
-    targetLabel: 'Stages',
-    disabled: true,
+    icon: 'pi-sparkles',
+    label: 'VFX',
+    description:
+      'Visual effects: particles, meshes, lights and sounds on one timeline.',
+    targetType: 'vfxList',
+    targetLabel: 'VFX',
   },
 
   // ── Organize ──────────────────────────────────────────────────────────────
@@ -225,39 +227,6 @@ const GROUP_LABELS: Record<TileGroup, string> = {
 }
 
 const GROUP_ORDER: TileGroup[] = ['assets', 'organize', 'system']
-
-/**
- * Mirrors the icon mapping in DraggableTab. Used so recently-closed entries
- * pick up the same visual identity as their dock-bar tabs.
- */
-const RECENT_TAB_ICON: Partial<Record<TabType, string>> = {
-  newTab: 'pi-home',
-  modelList: 'pi-list',
-  modelViewer: 'pi-box',
-  globalMaterials: 'pi-palette',
-  pbrMaterials: 'pi-circle-fill',
-  modelTextures: 'pi-images',
-  textureSetViewer: 'pi-image',
-  environmentMaps: 'pi-globe',
-  environmentMapViewer: 'pi-globe',
-  packs: 'pi-inbox',
-  packViewer: 'pi-folder-open',
-  projects: 'pi-briefcase',
-  projectViewer: 'pi-briefcase',
-  sprites: 'pi-image',
-  sounds: 'pi-volume-up',
-  stageList: 'pi-th-large',
-  stageEditor: 'pi-th-large',
-  scenes: 'pi-box',
-  assetStore: 'pi-shopping-bag',
-  settings: 'pi-cog',
-  history: 'pi-history',
-  recycledFiles: 'pi-trash',
-}
-
-function iconForTab(type: TabType): string {
-  return RECENT_TAB_ICON[type] ?? 'pi-file'
-}
 
 interface NewTabPageProps {
   /** The id of the host `newTab` tab - used so we can replace ourselves */
@@ -695,7 +664,7 @@ function RecentlyClosedGrid({
             title={`Reopen ${tab.label ?? tab.type}`}
           >
             <span className="newtab-recent-icon" aria-hidden="true">
-              <i className={`pi ${iconForTab(tab.type)}`} />
+              <i className={`pi ${getTabIcon(tab.type)}`} />
             </span>
             <span className="newtab-recent-label">{tab.label ?? tab.type}</span>
           </button>
@@ -766,7 +735,7 @@ function SessionTooltipColumn({ side, tabs }: SessionColumnProps): JSX.Element {
         <ul className="newtab-session-tooltip-list">
           {tabs.map(t => (
             <li key={t.id} className="newtab-session-tooltip-item">
-              <i className={`pi ${iconForTab(t.type)}`} aria-hidden="true" />
+              <i className={`pi ${getTabIcon(t.type)}`} aria-hidden="true" />
               <span>{t.label ?? t.type}</span>
             </li>
           ))}

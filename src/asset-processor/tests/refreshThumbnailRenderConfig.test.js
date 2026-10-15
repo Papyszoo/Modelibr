@@ -128,4 +128,78 @@ describe('refreshThumbnailRenderConfigFromApi', () => {
     expect(config.rendering.outputHeight).toBe(200)
     expect(config.orbit.angleStep).toBe(9)
   })
+
+  it('applies a solid background colour', async () => {
+    const apiClient = makeApiClient(async () => ({
+      data: {
+        size: 256,
+        frameCount: 30,
+        isAnimated: true,
+        backgroundColor: '#1a2b3c',
+      },
+    }))
+
+    await refreshThumbnailRenderConfigFromApi(apiClient)
+
+    expect(config.rendering.backgroundColor).toBe('#1a2b3c')
+  })
+
+  it('applies transparent as the background', async () => {
+    config.rendering.backgroundColor = '#ffffff'
+    const apiClient = makeApiClient(async () => ({
+      data: {
+        size: 256,
+        frameCount: 30,
+        isAnimated: true,
+        backgroundColor: 'transparent',
+      },
+    }))
+
+    await refreshThumbnailRenderConfigFromApi(apiClient)
+
+    expect(config.rendering.backgroundColor).toBe('transparent')
+  })
+
+  it('ignores an invalid background value and keeps the current one', async () => {
+    config.rendering.backgroundColor = '#112233'
+    const apiClient = makeApiClient(async () => ({
+      data: {
+        size: 256,
+        frameCount: 30,
+        isAnimated: true,
+        backgroundColor: 'red',
+      },
+    }))
+
+    await refreshThumbnailRenderConfigFromApi(apiClient)
+
+    expect(config.rendering.backgroundColor).toBe('#112233')
+  })
+
+  it('ignores a background that is not a full hex colour', async () => {
+    config.rendering.backgroundColor = 'transparent'
+    const apiClient = makeApiClient(async () => ({
+      data: {
+        size: 256,
+        frameCount: 30,
+        isAnimated: true,
+        backgroundColor: '#fff',
+      },
+    }))
+
+    await refreshThumbnailRenderConfigFromApi(apiClient)
+
+    expect(config.rendering.backgroundColor).toBe('transparent')
+  })
+
+  it('keeps the current background when the payload omits it', async () => {
+    config.rendering.backgroundColor = '#445566'
+    const apiClient = makeApiClient(async () => ({
+      data: { size: 256, frameCount: 30, isAnimated: true },
+    }))
+
+    await refreshThumbnailRenderConfigFromApi(apiClient)
+
+    expect(config.rendering.backgroundColor).toBe('#445566')
+  })
 })

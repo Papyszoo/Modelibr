@@ -1,11 +1,10 @@
 import * as THREE from 'three'
 
-import type { TextureSetDto } from '@/types'
-
 import {
   applyMaterialTextures,
   buildMaterialFromTextures,
 } from '@/shared/three/textureSetMaterial'
+import type { TextureSetDto } from '@/types'
 
 /**
  * Integration tests for the viewer's REAL texture → material apply path
@@ -109,5 +108,35 @@ describe('viewer texture → material apply path', () => {
       'Mat'
     )
     expect(withSpec.specularIntensity).toBe(1)
+  })
+
+  // Regression: the wildcard "" material was built once and shared across every
+  // unmatched mesh, then mergeMaterialChannels wrote each mesh's own glTF map
+  // into that one instance - the first mesh's map won and the rest silently wore
+  // it. Each mesh must get its own material.
+  it('gives each unmatched mesh its own wildcard material', () => {
+    const group = new THREE.Group()
+    const first = texturedMesh('Frame')
+    const second = texturedMesh('Cushion')
+    const firstMap = new THREE.Texture()
+    const secondMap = new THREE.Texture()
+    ;(first.mesh.material as THREE.MeshStandardMaterial).map = firstMap
+    ;(second.mesh.material as THREE.MeshStandardMaterial).map = secondMap
+    group.add(first.mesh, second.mesh)
+
+    // Wildcard texture set without a base-color map, so the merge carries each
+    // mesh's own map instead of overriding it.
+    applyMaterialTextures(
+      group,
+      matSet(''),
+      loadedTextures('', ['roughnessMap']),
+      true
+    )
+
+    const firstApplied = first.mesh.material as THREE.MeshPhysicalMaterial
+    const secondApplied = second.mesh.material as THREE.MeshPhysicalMaterial
+    expect(firstApplied).not.toBe(secondApplied)
+    expect(firstApplied.map).toBe(firstMap)
+    expect(secondApplied.map).toBe(secondMap)
   })
 })

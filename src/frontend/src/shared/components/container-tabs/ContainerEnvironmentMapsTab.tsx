@@ -153,7 +153,7 @@ export function ContainerEnvironmentMapsTab({
           <ListToolbarSearchInput
             value={localSearch}
             onChange={setLocalSearch}
-            placeholder="Search environment maps…"
+            placeholder="Search environment maps..."
           />
         </ListToolbarPanel>
       </ListToolbar>
@@ -174,6 +174,11 @@ export function ContainerEnvironmentMapsTab({
                 <AssetTile
                   key={environmentMap.id}
                   name={environmentMap.name}
+                  accessory={adapter.renderAssetAccessory?.({
+                    type: 'environmentMap',
+                    id: environmentMap.id,
+                    name: environmentMap.name,
+                  })}
                   meta={`${environmentMap.variantCount} variant${environmentMap.variantCount === 1 ? '' : 's'}`}
                   variant="wide"
                   media={

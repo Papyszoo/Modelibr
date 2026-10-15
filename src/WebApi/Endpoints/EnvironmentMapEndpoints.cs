@@ -189,6 +189,7 @@ public static class EnvironmentMapEndpoints
         int id,
         IEnvironmentMapRepository environmentMapRepository,
         IFilePreviewService previewService,
+        IUploadPathProvider pathProvider,
         ILoggerFactory loggerFactory,
         CancellationToken cancellationToken)
     {
@@ -208,6 +209,7 @@ public static class EnvironmentMapEndpoints
             environmentMap,
             previewVariant,
             previewService,
+            pathProvider,
             logger,
             "selected preview variant");
     }
@@ -217,6 +219,7 @@ public static class EnvironmentMapEndpoints
         int variantId,
         IEnvironmentMapRepository environmentMapRepository,
         IFilePreviewService previewService,
+        IUploadPathProvider pathProvider,
         ILoggerFactory loggerFactory,
         CancellationToken cancellationToken)
     {
@@ -233,6 +236,7 @@ public static class EnvironmentMapEndpoints
             environmentMap,
             variant,
             previewService,
+            pathProvider,
             logger,
             "requested variant");
     }
@@ -496,10 +500,14 @@ public static class EnvironmentMapEndpoints
         Domain.Models.EnvironmentMap environmentMap,
         Domain.Models.EnvironmentMapVariant variant,
         IFilePreviewService previewService,
+        IUploadPathProvider pathProvider,
         ILogger logger,
         string previewDescription)
     {
-        var thumbnailPath = variant.ThumbnailPath;
+        // Stored relative to the uploads root; rebase against the current root.
+        var thumbnailPath = string.IsNullOrEmpty(variant.ThumbnailPath)
+            ? null
+            : pathProvider.Resolve(variant.ThumbnailPath);
 
         if (string.IsNullOrEmpty(thumbnailPath) || !System.IO.File.Exists(thumbnailPath))
         {

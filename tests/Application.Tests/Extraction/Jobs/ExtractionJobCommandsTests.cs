@@ -194,6 +194,32 @@ public class ExtractionJobCommandsTests
     }
 
     [Fact]
+    public async Task Finish_Failure_Truncates_A_Worker_Reason_The_Job_Cannot_Accept()
+    {
+        // Regression: a Blender failure carried the whole Python traceback, which ran past
+        // the entity's 2000-character limit. The entity threw, the worker's report came back
+        // as an unhandled 500, and the job sat Processing until its lease expired instead of
+        // recording the failure. A cut-down reason must land; the report must not be lost.
+        var job = ExtractionJob.Create("Model", 42, ExtractorFamilies.Geometry, Now);
+        job.TryClaim("w1", Now);
+        var repo = new Mock<IExtractionJobRepository>();
+        repo.Setup(r => r.GetByIdAsync(job.Id, It.IsAny<CancellationToken>())).ReturnsAsync(job);
+        var uow = new Mock<IUnitOfWork>();
+
+        var handler = new FinishExtractionJobCommandHandler(repo.Object, Clock().Object, uow.Object);
+        var result = await handler.Handle(
+            new FinishExtractionJobCommand(job.Id, "w1", Success: false, ErrorMessage: new string('x', 3000)),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(Domain.ValueObjects.ExtractionJobStatus.Pending, job.Status);
+        Assert.NotNull(job.ErrorMessage);
+        Assert.Equal(2000, job.ErrorMessage!.Length);
+        Assert.EndsWith("...", job.ErrorMessage);
+        uow.Verify(u => u.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
     public async Task Finish_From_A_Worker_That_No_Longer_Holds_The_Claim_Is_Rejected()
     {
         // Regression: an expired lease let another worker re-claim the job. Without an

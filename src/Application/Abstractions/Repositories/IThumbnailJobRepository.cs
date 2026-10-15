@@ -58,6 +58,11 @@ public interface IThumbnailJobRepository
     Task<ThumbnailJob?> GetByEnvironmentMapVariantIdAsync(int environmentMapVariantId, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Gets the thumbnail job for a visual effect, regardless of status.
+    /// </summary>
+    Task<ThumbnailJob?> GetByVfxIdAsync(int vfxId, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Gets the next pending job for processing with proper locking.
     /// </summary>
     Task<ThumbnailJob?> GetNextPendingJobAsync(CancellationToken cancellationToken = default);

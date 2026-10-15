@@ -9,7 +9,9 @@ import App from './app/App'
 import { AppProvider } from './app/providers'
 import { SceneRenderView } from './features/scenes/components/SceneRenderView'
 import { sceneViewpointFromName } from './features/scenes/lib/sceneRenderCamera'
+import { VfxRenderView } from './features/vfx/components/VfxRenderView'
 import { overrideApiBaseUrl } from './lib/apiBase'
+import { sanitizeApiBaseUrlOverride } from './lib/apiOverrideUrl'
 
 async function bootstrap() {
   if (import.meta.env.VITE_DEMO_MODE === 'true') {
@@ -31,7 +33,8 @@ async function bootstrap() {
 }
 
 /**
- * What to mount: the app, or a single scene drawn for a headless renderer.
+ * What to mount: the app, or a single scene or visual effect drawn for a
+ * headless renderer.
  *
  * Branching here rather than behind a route because the app has no router - it
  * is a dock of tabs, and a scene is not addressable by URL. Mounting the render
@@ -41,15 +44,20 @@ async function bootstrap() {
  */
 function renderTarget() {
   const params = new URLSearchParams(window.location.search)
-  if (params.get('render') !== 'scene') {
+  const render = params.get('render')
+  if (render === 'vfx') {
+    return vfxRenderTarget(params)
+  }
+  if (render !== 'scene') {
     return <App />
   }
 
   // The renderer's browser lives in the worker container, where the API address
   // baked in for a user's browser generally does not resolve - so it passes the
   // one it uses itself. Applied before the view mounts, because the scene
-  // queries and every file URL read it as they go.
-  const apiOverride = params.get('api')
+  // queries and every file URL read it as they go. Only an http:/https: origin
+  // (or relative path) is honoured; anything else keeps the built-in default.
+  const apiOverride = sanitizeApiBaseUrlOverride(params.get('api'))
   if (apiOverride) {
     overrideApiBaseUrl(apiOverride)
   }
@@ -72,8 +80,49 @@ function renderTarget() {
     <SceneRenderView
       sceneId={sceneId}
       viewpoint={sceneViewpointFromName(params.get('view'))}
+      time={readRenderTime(params.get('t'))}
     />
   )
+}
+
+/**
+ * The deterministic pose time for `?render=scene`, in seconds.
+ *
+ * Passed through to every animated node's mixer, so a render does not depend
+ * on how long the page has been open and two renders of one scene match. The
+ * default is 0: each node shows its own configured start-offset pose. A
+ * missing or malformed value falls back to that default rather than failing
+ * the render - the picture is still answerable, just not at a caller-chosen
+ * time.
+ */
+function readRenderTime(raw: string | null): number {
+  if (raw === null || raw.trim() === '') {
+    return 0
+  }
+
+  const seconds = Number(raw)
+  return Number.isFinite(seconds) && seconds >= 0 ? seconds : 0
+}
+
+/** The effect page for `?render=vfx&vfxId=...`; the worker steps its time and photographs it. */
+function vfxRenderTarget(params: URLSearchParams) {
+  const apiOverride = sanitizeApiBaseUrlOverride(params.get('api'))
+  if (apiOverride) {
+    overrideApiBaseUrl(apiOverride)
+  }
+
+  const vfxId = Number(params.get('vfxId'))
+  if (!Number.isInteger(vfxId) || vfxId <= 0) {
+    window.__VFX_RENDER__ = {
+      ready: true,
+      windowSeconds: 0,
+      setTime: () => Promise.resolve(),
+      error: `render=vfx needs a positive integer vfxId, got "${params.get('vfxId') ?? ''}"`,
+    }
+    return null
+  }
+
+  return <VfxRenderView vfxId={vfxId} />
 }
 
 bootstrap()

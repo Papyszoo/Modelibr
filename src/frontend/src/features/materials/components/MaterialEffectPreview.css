@@ -1,0 +1,5 @@
+/* Fills the swatch media box; the R3F Canvas sizes itself to this parent. */
+.material-effect-preview {
+  width: 100%;
+  height: 100%;
+}

@@ -1,0 +1,8 @@
+/* The thumbnail is a dark, fixed-framing render; fill the tile with it. */
+.vfx-tile-media-image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  background: #14161b;
+}

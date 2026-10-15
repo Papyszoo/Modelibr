@@ -6,60 +6,8 @@ import { type JSX, useRef } from 'react'
 import { getWindowId } from '@/stores/navigationStore'
 import { type Tab } from '@/types'
 
-const getTabIcon = (tabType: Tab['type']): string => {
-  switch (tabType) {
-    case 'newTab':
-      return 'pi pi-home'
-    case 'modelList':
-      return 'pi pi-list'
-    case 'modelViewer':
-      return 'pi pi-box'
-    case 'globalMaterials':
-      return 'pi pi-palette'
-    case 'pbrMaterials':
-      return 'pi pi-circle-fill'
-    case 'modelTextures':
-      return 'pi pi-images'
-    case 'textureSetViewer':
-      return 'pi pi-image'
-    case 'environmentMaps':
-      return 'pi pi-globe'
-    case 'environmentMapViewer':
-      return 'pi pi-globe'
-    case 'packs':
-      return 'pi pi-inbox'
-    case 'packViewer':
-      return 'pi pi-folder-open'
-    case 'projects':
-      return 'pi pi-briefcase'
-    case 'projectViewer':
-      return 'pi pi-briefcase'
-    case 'assetStore':
-      return 'pi pi-shopping-bag'
-    case 'settings':
-      return 'pi pi-cog'
-    case 'history':
-      return 'pi pi-history'
-    case 'recycledFiles':
-      return 'pi pi-trash'
-    case 'sprites':
-      return 'pi pi-image'
-    case 'sounds':
-      return 'pi pi-volume-up'
-    case 'scripts':
-      return 'pi pi-code'
-    case 'scriptViewer':
-      return 'pi pi-file-edit'
-    case 'stageList':
-      return 'pi pi-th-large'
-    case 'stageEditor':
-      return 'pi pi-th-large'
-    case 'scenes':
-      return 'pi pi-box'
-    default:
-      return 'pi pi-file'
-  }
-}
+import { TabGlyph } from './TabGlyph'
+import { getTabIcon } from './tabIcons'
 
 const getTabTooltip = (tab: Tab): string => {
   switch (tab.type) {
@@ -105,12 +53,14 @@ const getTabTooltip = (tab: Tab): string => {
       return 'Sounds'
     case 'scripts':
       return 'Scripts'
-    case 'stageEditor':
-      return 'Stage Editor'
-    case 'stageList':
-      return 'Stages List'
     case 'scenes':
       return 'Scenes'
+    case 'sceneEditor':
+      return `Scene: ${tab.label || tab.sceneId || 'Unknown'}`
+    case 'vfxList':
+      return 'VFX'
+    case 'vfxEditor':
+      return `Effect: ${tab.label || tab.params.vfxId || 'Unknown'}`
     default:
       return tab.label || 'Unknown Tab'
   }
@@ -125,6 +75,11 @@ interface DraggableTabProps {
   onDragEnd: () => void
   /** Where the tooltip should appear relative to the tab. */
   tooltipPosition?: 'left' | 'right' | 'top' | 'bottom'
+  /**
+   * False for a pinned page in the main dock: it stays in its slot, so it has
+   * no close button and middle-click does not close it.
+   */
+  closable?: boolean
 }
 
 export function DraggableTab({
@@ -135,6 +90,7 @@ export function DraggableTab({
   onDragStart,
   onDragEnd,
   tooltipPosition = 'right',
+  closable = true,
 }: DraggableTabProps): JSX.Element {
   const tabRef = useRef<HTMLDivElement | null>(null)
 
@@ -171,6 +127,10 @@ export function DraggableTab({
   }
 
   const handleClick = (): void => {
+    // Clicking a tab opens its content but leaves the pointer on the icon, so
+    // the tooltip would stay up over the page. Dismiss it the same way the
+    // close button does.
+    dismissTooltip()
     onSelect()
   }
 
@@ -188,6 +148,7 @@ export function DraggableTab({
     if (e.button === 1) {
       e.preventDefault() // Prevent default middle button behavior (e.g., auto-scroll)
       e.stopPropagation() // Prevent tab selection when closing
+      if (!closable) return
       dismissTooltip()
       onClose()
     }
@@ -211,20 +172,23 @@ export function DraggableTab({
         onDragEnd={handleDragEnd}
         onClick={handleClick}
         onMouseDown={handleMouseDown}
+        data-tab-type={tab.type}
+        aria-label={getTabTooltip(tab)}
         data-pr-tooltip={getTabTooltip(tab)}
         data-pr-position={tooltipPosition}
       >
-        {/* Tab content - always show icon for now */}
-        <i className={`${getTabIcon(tab.type)} tab-icon`}></i>
+        <TabGlyph tab={tab} icon={getTabIcon(tab.type)} />
 
         {/* Close button in top right corner */}
-        <button
-          className="tab-close-btn p-component"
-          onClick={handleCloseClick}
-          aria-label="Close tab"
-        >
-          ×
-        </button>
+        {closable && (
+          <button
+            className="tab-close-btn p-component"
+            onClick={handleCloseClick}
+            aria-label="Close tab"
+          >
+            ×
+          </button>
+        )}
       </div>
     </>
   )

@@ -26,6 +26,31 @@ function platformExecutable(baseName) {
   return process.platform === 'win32' ? `${baseName}.exe` : baseName
 }
 
+// The address another device on the LAN should use to reach this host: the first
+// non-internal IPv4 interface the OS reports. Null when there is none (offline,
+// IPv6-only, loopback only), so the status window never shows a dead address.
+// `interfaces` is injectable so the lookup is deterministic in tests.
+export function findLanIPv4Address(interfaces = os.networkInterfaces()) {
+  for (const addresses of Object.values(interfaces)) {
+    for (const entry of addresses ?? []) {
+      // Node reports the family as 'IPv4' on current releases; older ones used
+      // the number 4. Accept both so the lookup doesn't silently find nothing.
+      if ((entry.family === 'IPv4' || entry.family === 4) && !entry.internal) {
+        return entry.address
+      }
+    }
+  }
+  return null
+}
+
+export function buildLanUrl(port, interfaces = os.networkInterfaces()) {
+  const host = findLanIPv4Address(interfaces)
+  // The edge server serves the LAN over HTTPS (self-signed), so the address a
+  // device on another machine opens is https - that is what makes it a secure
+  // context for the browser.
+  return host ? `https://${host}:${port}` : null
+}
+
 async function exists(targetPath) {
   try {
     await fs.access(targetPath)
@@ -178,12 +203,6 @@ export class ProcessManager {
     this.workerProcesses = []
     this.postgresControlPath = null
     this.stoppingWorkers = false
-    // Whether the packaged runtime actually ships the PostgreSQL client tools.
-    // Optimistic until ensureRuntimeAssets() probes it, so a caller that builds the
-    // WebApi environment without probing keeps the historical behaviour; the probe
-    // downgrades this to false, and the WebApi then skips the automatic pre-migration
-    // backup with an explicit warning instead of failing one.
-    this.postgresToolsAvailable = true
     // Shared secret the worker presents (X-Api-Key) and the WebApi validates
     // (WORKER_API_KEY) on upload endpoints. The WebApi runs as Production, where
     // an empty key is rejected as Unauthorized, so we mint a strong per-session
@@ -263,6 +282,10 @@ export class ProcessManager {
     const active = this.runningConfig
     return {
       ...active,
+      // Desktop-only options apply live, so the saved value is the effective
+      // one - unlike ports, which describe what is actually bound right now.
+      startOnLogin: this.config.startOnLogin === true,
+      autoDownloadUpdates: this.config.autoDownloadUpdates === true,
       webApiHealthUrl: `http://127.0.0.1:${active.internalApiPort}/health`,
       publicAppUrl: `http://127.0.0.1:${active.appPort}`,
       publicWebDavUrl: `http://127.0.0.1:${active.appPort}/modelibr`,
@@ -311,6 +334,11 @@ export class ProcessManager {
         configured: this.config.workerProcessCount,
       },
       frontendUrl: `http://127.0.0.1:${active.appPort}`,
+      // Only meaningful when the user has opted into network access; null
+      // otherwise so the status window hides the line entirely.
+      lanFrontendUrl: active.allowNetworkAccess
+        ? buildLanUrl(active.appPort)
+        : null,
       webDavUrl: `http://127.0.0.1:${active.appPort}/modelibr`,
       dataDirectory: this.paths.data,
       pendingRestart: this.hasPendingRestart(),
@@ -479,27 +507,11 @@ export class ProcessManager {
       }
     }
 
-    // The PostgreSQL client tools are OPTIONAL, unlike the server binaries above.
-    // The packaged runtime is a trimmed embedded distribution whose bin/ carries only
-    // initdb, pg_ctl and postgres - requiring pg_dump/psql here made every packaged
-    // desktop build refuse to start. Absent tools only downgrade backups: the WebApi
-    // logs that it is skipping the automatic pre-migration snapshot and continues.
-    this.postgresToolsAvailable = true
-    for (const tool of ['pg_dump', 'psql']) {
-      if (!(await exists(this.postgresToolPath(tool)))) {
-        this.postgresToolsAvailable = false
-        break
-      }
-    }
-  }
-
-  postgresToolPath(tool) {
-    return path.join(
-      this.runtimeDir,
-      'postgres',
-      'bin',
-      platformExecutable(tool)
-    )
+    // Nothing else is required, and that is the point: the client tools
+    // (pg_dump/pg_restore/psql) are not in the list because the app no longer
+    // needs them. Backups are written and read through the same database driver the
+    // app already uses, so a packaged build that ships only initdb/pg_ctl/postgres
+    // can still protect a user's work.
   }
 
   getPostgresEnvironment() {
@@ -707,24 +719,17 @@ export class ProcessManager {
   }
 
   buildWebApiEnvironment() {
-    // Only advertise the client tools when the packaged runtime actually has them.
-    // Pointing PG_DUMP_PATH at a file that does not exist would make the WebApi
-    // report a missing-path backup failure, which is a different (and misleading)
-    // signal from "this build ships no client tools".
-    const postgresToolEnv = this.postgresToolsAvailable
-      ? {
-          PG_DUMP_PATH: this.postgresToolPath('pg_dump'),
-          PSQL_PATH: this.postgresToolPath('psql'),
-        }
-      : {}
-
     return {
-      // pg_dump/psql are launched by the WebApi. Reuse the embedded Postgres
-      // environment so the absolute tool paths also get bundled shared libraries.
+      // The WebApi starts the embedded Postgres itself, so it needs the bundled
+      // shared libraries on the loader path.
       ...this.getPostgresEnvironment(),
       ASPNETCORE_ENVIRONMENT: 'Production',
       DisableHttpsRedirection: 'true',
       DISABLE_HTTPS_LISTENER: 'true',
+      // Marks this as the in-process WebApi launched by the desktop app (not
+      // the Docker image). The WebApi then binds loopback only, so the private
+      // API port is reachable only through the desktop's edge server.
+      MODELIBR_DESKTOP: 'true',
       HTTP_PORT: String(this.runningConfig.internalApiPort),
       EXPOSE_443_PORT: 'false',
       WEBDAV_HTTP_PORT: String(this.runningConfig.appPort),
@@ -741,9 +746,11 @@ export class ProcessManager {
       POSTGRES_DB: POSTGRES_DATABASE,
       POSTGRES_USER,
       POSTGRES_PASSWORD,
-      ...postgresToolEnv,
-      // Do not inherit a developer's skip switch into the installed app.
-      MODELIBR_SKIP_PREMIGRATION_BACKUP: 'false',
+      // MODELIBR_SKIP_PREMIGRATION_BACKUP is deliberately NOT set here: the
+      // child environment is this exact object (no process.env merge), so a
+      // developer's skip switch cannot leak in anyway, and leaving the variable
+      // unset is what lets the Settings page's "Back up before updates" choice
+      // apply on the desktop (an explicitly set env var would win over it).
     }
   }
 
@@ -795,6 +802,40 @@ export class ProcessManager {
     return this.runningConfig.internalApiPort + 100 + index
   }
 
+  buildWorkerEnvironment(index) {
+    const workerBaseDir = path.join(this.runtimeDir, 'asset-processor')
+    const healthPort = this.getWorkerHealthPort(index)
+
+    return {
+      ...process.env,
+      NODE_ENV: 'production',
+      // Marks this as the in-process worker launched by the desktop app (not the
+      // Docker image). The worker's health server then binds loopback only, so
+      // its unauthenticated health/status/metrics endpoints are not reachable
+      // from the LAN. Docker leaves it unset and keeps binding every interface.
+      MODELIBR_DESKTOP: 'true',
+      WORKER_ID: `worker-${index + 1}`,
+      WORKER_PORT: String(healthPort),
+      // Target the WebApi the workers can actually reach right now (active
+      // port), not a just-saved one that won't be bound until a restart - so
+      // recycling workers is safe even while a port change is pending. The
+      // worker-pool settings below still come from the latest saved config.
+      API_BASE_URL: `http://127.0.0.1:${this.runningConfig.internalApiPort}`,
+      // Scene render-back and animated VFX/model thumbnails photograph the
+      // running app (?render=...), so the worker needs the UI's address as well
+      // as the API's - the same reason docker-compose passes FRONTEND_URL.
+      // Loopback and the active UI port: it follows a user-changed port, and the
+      // host's own edge server is reachable there even when network access is on.
+      FRONTEND_URL: `http://127.0.0.1:${this.runningConfig.appPort}`,
+      WORKER_API_KEY: this.workerApiKey,
+      MAX_CONCURRENT_JOBS: String(this.config.maxConcurrentJobsPerWorker),
+      THUMBNAIL_STORAGE_PATH: this.paths.thumbnails,
+      BLENDER_INSTALL_PATH: this.paths.blender,
+      ENABLE_GPU_RENDERING: this.config.enableHardwareAcceleration ? 'true' : 'false',
+      PUPPETEER_CACHE_DIR: path.join(workerBaseDir, '.cache', 'puppeteer'),
+    }
+  }
+
   async spawnWorker(index) {
     const nodeExecutable = path.join(this.runtimeDir, 'node', platformExecutable('node'))
     const workerScript = path.join(this.runtimeDir, 'asset-processor', 'index.js')
@@ -803,23 +844,7 @@ export class ProcessManager {
 
     const proc = spawn(nodeExecutable, [workerScript], {
       cwd: workerBaseDir,
-      env: {
-        ...process.env,
-        NODE_ENV: 'production',
-        WORKER_ID: `worker-${index + 1}`,
-        WORKER_PORT: String(healthPort),
-        // Target the WebApi the workers can actually reach right now (active
-        // port), not a just-saved one that won't be bound until a restart - so
-        // recycling workers is safe even while a port change is pending. The
-        // worker-pool settings below still come from the latest saved config.
-        API_BASE_URL: `http://127.0.0.1:${this.runningConfig.internalApiPort}`,
-        WORKER_API_KEY: this.workerApiKey,
-        MAX_CONCURRENT_JOBS: String(this.config.maxConcurrentJobsPerWorker),
-        THUMBNAIL_STORAGE_PATH: this.paths.thumbnails,
-        BLENDER_INSTALL_PATH: this.paths.blender,
-        ENABLE_GPU_RENDERING: this.config.enableHardwareAcceleration ? 'true' : 'false',
-        PUPPETEER_CACHE_DIR: path.join(workerBaseDir, '.cache', 'puppeteer'),
-      },
+      env: this.buildWorkerEnvironment(index),
       stdio: ['ignore', 'pipe', 'pipe'],
       windowsHide: true,
     })

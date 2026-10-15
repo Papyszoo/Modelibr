@@ -15,9 +15,13 @@ import {
 import { useForm } from 'react-hook-form'
 import { type z } from 'zod'
 
+import { PINNED_TAB_TYPES } from '@/components/layout/dock-panel/pinnedTabs'
 import { useModelsQuery } from '@/features/models/api/queries'
 import { ScriptTemplatesSection } from '@/features/scripts/components/ScriptTemplatesSection'
-import { useSettingsQuery } from '@/features/settings/api/queries'
+import {
+  useNativeRuntimeQuery,
+  useSettingsQuery,
+} from '@/features/settings/api/queries'
 import type {
   BlenderInstallStatus,
   BlenderVersionInfo,
@@ -35,10 +39,17 @@ import {
   updateSettings,
 } from '@/features/settings/api/settingsApi'
 import { BackupsSection } from '@/features/settings/BackupsSection'
+import { McpAgentsSection } from '@/features/settings/McpAgentsSection'
+import { NativeDesktopSection } from '@/features/settings/NativeDesktopSection'
+import { SettingNumberField } from '@/features/settings/SettingNumberField'
+import { SettingToggle } from '@/features/settings/SettingToggle'
+import { ThumbnailBackgroundField } from '@/features/settings/ThumbnailBackgroundField'
 import { useTabUiState } from '@/hooks/useTabUiState'
 import { useTheme } from '@/hooks/useTheme'
+import { isDemoMode } from '@/lib/env'
 import { settingsFormSchema } from '@/shared/validation/formSchemas'
 import { useBlenderEnabledStore } from '@/stores/blenderEnabledStore'
+import { getTabLabel } from '@/stores/navigationStore'
 import {
   type MobileBarPosition,
   useUIPreferencesStore,
@@ -59,6 +70,8 @@ type SectionKey =
   | 'webdav'
   | 'scriptTemplates'
   | 'backup'
+  | 'mcpAgents'
+  | 'desktop'
 
 interface SectionMeta {
   key: SectionKey
@@ -79,7 +92,7 @@ const SECTIONS: SectionMeta[] = [
     label: 'Appearance',
     icon: 'pi-palette',
     desc: 'Theme and interface display options',
-    fields: ['Color theme', 'Mobile tab bar position'],
+    fields: ['Color theme', 'Mobile tab bar position', 'Pinned tabs'],
     hasFormSave: false,
     demoLocked: false,
   },
@@ -87,11 +100,12 @@ const SECTIONS: SectionMeta[] = [
     key: 'fileUpload',
     label: 'File Upload',
     icon: 'pi-upload',
-    desc: 'Size limits and duplicate-name policy',
+    desc: 'Size limits, duplicate names and import automation',
     fields: [
       'Maximum file size',
       'Maximum thumbnail size',
       'Duplicate name policy',
+      'Auto-tag on import',
     ],
     hasFormSave: true,
     demoLocked: false,
@@ -106,6 +120,8 @@ const SECTIONS: SectionMeta[] = [
       'Animated thumbnail',
       'Frame count',
       'Thumbnail size',
+      'Reuse duplicate thumbnails',
+      'Thumbnail background',
       'Regenerate all thumbnails',
     ],
     hasFormSave: true,
@@ -125,7 +141,7 @@ const SECTIONS: SectionMeta[] = [
     label: 'Blender',
     icon: 'pi-box',
     desc: 'Version management for .blend file support',
-    fields: ['Blender version', 'Install', 'Uninstall'],
+    fields: ['Blender version', 'Install', 'Uninstall', 'Operation timeout'],
     hasFormSave: false,
     demoLocked: true,
   },
@@ -161,9 +177,34 @@ const SECTIONS: SectionMeta[] = [
     label: 'Backup & Restore',
     icon: 'pi-history',
     desc: 'Database and uploads snapshots',
-    fields: ['Create backup', 'Download backup', 'Restore backup'],
+    fields: [
+      'Create backup',
+      'Download backup',
+      'Restore backup',
+      'Back up before updates',
+      'Pre-update backups to keep',
+      'Recycled file retention',
+    ],
     hasFormSave: false,
     demoLocked: true,
+  },
+  {
+    key: 'mcpAgents',
+    label: 'MCP explorer',
+    icon: 'pi-microchip-ai',
+    desc: 'Agents and every tool the server exposes',
+    fields: ['MCP agents', 'MCP tools', 'Connect a client'],
+    hasFormSave: false,
+    demoLocked: false,
+  },
+  {
+    key: 'desktop',
+    label: 'Desktop',
+    icon: 'pi-desktop',
+    desc: 'Start on login and update downloads',
+    fields: ['Start on login', 'Download updates automatically'],
+    hasFormSave: false,
+    demoLocked: false,
   },
 ]
 
@@ -187,7 +228,7 @@ function highlight(text: string, query: string): ReactNode {
 }
 
 interface SettingsProps {
-  /** Owning tab id - used to persist activeSection across tab switches. */
+  /** Owning tab id - scopes the per-tab dirty form draft. */
   tabId?: string
 }
 
@@ -195,19 +236,16 @@ export function Settings({ tabId }: SettingsProps = {}): JSX.Element {
   const queryClient = useQueryClient()
   const settingsQuery = useSettingsQuery()
   const isLoading = settingsQuery.isLoading
-  const isDemo = import.meta.env.VITE_DEMO_MODE === 'true'
+  const isDemo = isDemoMode()
 
   // ── Top-level UI state ──────────────────────────────────────────────
-  // activeSection and the dirty form draft both live in the per-tab UI
-  // state store so they survive the unmount-on-tab-switch the TabContent
-  // rendering performs. Without the draft, typed-but-unsaved values are
-  // discarded when the user briefly visits another tab.
+  // The selected section is a persisted UI preference (survives reloads and
+  // tab switches). The dirty form draft stays in the per-tab UI state store so
+  // typed-but-unsaved values are not discarded when the user briefly visits
+  // another tab.
   const tabStateKey = tabId ?? 'settings'
-  const [activeSection, setActiveSection] = useTabUiState<SectionKey | null>(
-    tabStateKey,
-    'activeSection',
-    null
-  )
+  const settingsSection = useUIPreferencesStore(s => s.settingsSection)
+  const setSettingsSection = useUIPreferencesStore(s => s.setSettingsSection)
   const [search, setSearch] = useState('')
   const [searchOpen, setSearchOpen] = useState(false)
   const searchWrapRef = useRef<HTMLDivElement | null>(null)
@@ -252,6 +290,8 @@ export function Settings({ tabId }: SettingsProps = {}): JSX.Element {
   const setMobileBarPosition = useUIPreferencesStore(
     s => s.setMobileBarPosition
   )
+  const pinnedTabTypes = useUIPreferencesStore(s => s.pinnedTabTypes)
+  const setPinnedTabType = useUIPreferencesStore(s => s.setPinnedTabType)
 
   // ── Settings form (file upload + thumbnails + texture proxy) ────────
   const [isSaving, setIsSaving] = useState(false)
@@ -439,6 +479,39 @@ export function Settings({ tabId }: SettingsProps = {}): JSX.Element {
   const [duplicateNamePolicySaving, setDuplicateNamePolicySaving] =
     useState(false)
 
+  // ── Immediately-saved key-value settings ────────────────────────────
+  // These save on change/blur instead of through the form footer, and are
+  // hydrated from the settings snapshot below.
+  const nativeRuntimeQuery = useNativeRuntimeQuery()
+  const isNativeDesktop = nativeRuntimeQuery.isSuccess
+  const visibleSections = useMemo(
+    () =>
+      isNativeDesktop
+        ? SECTIONS
+        : SECTIONS.filter(section => section.key !== 'desktop'),
+    [isNativeDesktop]
+  )
+
+  const [savingKvKey, setSavingKvKey] = useState<string | null>(null)
+  const [autoAssignOnImport, setAutoAssignOnImport] = useState(true)
+  const [skipDuplicateThumbnails, setSkipDuplicateThumbnails] = useState(false)
+  const [thumbnailBackground, setThumbnailBackground] = useState('transparent')
+  const [blenderOperationTimeoutMinutes, setBlenderOperationTimeoutMinutes] =
+    useState(15)
+
+  const saveKvSetting = async (key: string, value: string): Promise<void> => {
+    setSavingKvKey(key)
+    setError(null)
+    try {
+      await updateSetting(key, value)
+      await queryClient.invalidateQueries({ queryKey: ['settings'] })
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save setting')
+    } finally {
+      setSavingKvKey(null)
+    }
+  }
+
   // ── Bulk thumbnail regenerate ───────────────────────────────────────
   const [isRegeneratingThumbnails, setIsRegeneratingThumbnails] =
     useState(false)
@@ -509,6 +582,10 @@ export function Settings({ tabId }: SettingsProps = {}): JSX.Element {
     }
     setOriginalValues(original)
     setDuplicateNamePolicy(data.duplicateNamePolicy ?? 'Allow')
+    setAutoAssignOnImport(data.autoAssignOnImport ?? true)
+    setSkipDuplicateThumbnails(data.skipDuplicateThumbnails ?? false)
+    setThumbnailBackground(data.thumbnailBackground ?? 'transparent')
+    setBlenderOperationTimeoutMinutes(data.blenderOperationTimeoutMinutes ?? 15)
 
     // First hydration after mount: prefer the persisted draft (typed but
     // not yet saved) over the server snapshot so a tab switch doesn't wipe
@@ -576,19 +653,6 @@ export function Settings({ tabId }: SettingsProps = {}): JSX.Element {
       })
       .catch(() => {})
   }, [isDemo])
-
-  // If we boot in demo mode but the persisted activeSection points at a
-  // demo-locked section (Blender, SSL, WebDAV, Backup), bounce back to the
-  // grid - otherwise the detail view renders with disabled actions and no
-  // clear path out.
-  useEffect(() => {
-    if (!isDemo || !activeSection) return
-    const target = SECTIONS.find(s => s.key === activeSection)
-    if (target?.demoLocked) {
-      setActiveSection(null)
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isDemo, activeSection])
 
   // ── Close search dropdown when focus or pointer leaves the wrapper ──
   // `mousedown` covers click-outside; `focusout` covers Tab/Shift+Tab. The
@@ -668,30 +732,6 @@ export function Settings({ tabId }: SettingsProps = {}): JSX.Element {
     setError(null)
     clearSuccess()
     setFormDraft(null)
-  }
-
-  const handleBack = () => {
-    if (
-      activeSection &&
-      dirtyFieldsForSection(activeSection).length > 0 &&
-      !hasValidationErrors()
-    ) {
-      confirmDialog({
-        message:
-          'You have unsaved changes in this section. Leave without saving?',
-        header: 'Discard changes',
-        icon: 'pi pi-exclamation-triangle',
-        acceptLabel: 'Discard',
-        rejectLabel: 'Stay',
-        accept: () => {
-          handleDiscard()
-          setActiveSection(null)
-        },
-      })
-      return
-    }
-    handleDiscard()
-    setActiveSection(null)
   }
 
   const handleRegenerateAllThumbnails = (): void => {
@@ -815,7 +855,7 @@ export function Settings({ tabId }: SettingsProps = {}): JSX.Element {
   // ── Search index ────────────────────────────────────────────────────
   const searchIndex = useMemo<SearchResult[]>(
     () =>
-      SECTIONS.flatMap(section => [
+      visibleSections.flatMap(section => [
         {
           sectionKey: section.key,
           sectionLabel: section.label,
@@ -832,7 +872,7 @@ export function Settings({ tabId }: SettingsProps = {}): JSX.Element {
           label: f,
         })),
       ]),
-    []
+    [visibleSections]
   )
 
   const searchResults = useMemo<SearchResult[]>(() => {
@@ -880,14 +920,14 @@ export function Settings({ tabId }: SettingsProps = {}): JSX.Element {
   }
 
   const matchingSectionKeys = useMemo<Set<SectionKey>>(() => {
-    if (!search.trim()) return new Set(SECTIONS.map(s => s.key))
+    if (!search.trim()) return new Set(visibleSections.map(s => s.key))
     return new Set(searchResults.map(r => r.sectionKey))
-  }, [search, searchResults])
+  }, [search, searchResults, visibleSections])
 
   const handleSelectSection = (key: SectionKey) => {
     clearSuccess()
     setError(null)
-    setActiveSection(key)
+    setSettingsSection(key)
     setSearch('')
     setSearchOpen(false)
     setSearchActiveIndex(0)
@@ -901,568 +941,21 @@ export function Settings({ tabId }: SettingsProps = {}): JSX.Element {
     )
   }
 
-  const currentSection = activeSection
-    ? SECTIONS.find(s => s.key === activeSection)
-    : null
-
-  // ────────────────────────────────────────────────────────────────────
-  // Detail view
-  // ────────────────────────────────────────────────────────────────────
-  if (currentSection) {
-    const sectionDirty = dirtyFieldsForSection(currentSection.key).length > 0
-
-    return (
-      <div className="settings-container">
-        {error && (
-          <div className="settings-error">
-            <strong>Error:</strong> {error}
-          </div>
-        )}
-        {successMessage && (
-          <div className="settings-success">{successMessage}</div>
-        )}
-
-        <form
-          onSubmit={handleSubmit(handleSave, handleInvalidSave)}
-          className="settings-form section-detail"
-        >
-          <div className="section-detail-header">
-            <button type="button" className="btn-back" onClick={handleBack}>
-              <i className="pi pi-arrow-left" />
-              <span>Settings</span>
-            </button>
-            <h2 className="section-detail-title">
-              <i className={`pi ${currentSection.icon}`} />
-              {currentSection.label}
-            </h2>
-            <p className="section-detail-desc">{currentSection.desc}</p>
-          </div>
-
-          <div className="section-detail-body settings-section-content">
-            {currentSection.key === 'appearance' && (
-              <div className="section-fields">
-                <div className="settings-field">
-                  <label htmlFor="colorTheme">Color theme</label>
-                  <div className="theme-picker">
-                    <button
-                      type="button"
-                      className={`theme-card ${theme === 'light' ? 'selected' : ''}`}
-                      onClick={() => setTheme('light')}
-                    >
-                      <div className="theme-card-swatch theme-card-swatch--light" />
-                      <div className="theme-card-label">Light</div>
-                    </button>
-                    <button
-                      type="button"
-                      className={`theme-card ${theme === 'dark' ? 'selected' : ''}`}
-                      onClick={() => setTheme('dark')}
-                    >
-                      <div className="theme-card-swatch theme-card-swatch--dark" />
-                      <div className="theme-card-label">Dark</div>
-                    </button>
-                  </div>
-                  {/* Hidden select kept for e2e tests targeting #colorTheme */}
-                  <select
-                    id="colorTheme"
-                    value={theme}
-                    onChange={e => setTheme(e.target.value as 'light' | 'dark')}
-                    className="settings-select theme-select-hidden"
-                    aria-hidden="true"
-                    tabIndex={-1}
-                  >
-                    <option value="light">Light Theme</option>
-                    <option value="dark">Dark Theme</option>
-                  </select>
-                  <span className="settings-help">
-                    Switches the PrimeReact theme across the whole app.
-                  </span>
-                </div>
-
-                <div className="settings-field">
-                  <label htmlFor="mobileBarPosition">
-                    Mobile tab bar position
-                  </label>
-                  <select
-                    id="mobileBarPosition"
-                    value={mobileBarPosition}
-                    onChange={e =>
-                      setMobileBarPosition(e.target.value as MobileBarPosition)
-                    }
-                    className="settings-select"
-                  >
-                    <option value="left">Left (vertical)</option>
-                    <option value="bottom">Bottom (horizontal)</option>
-                    <option value="top">Top (horizontal)</option>
-                  </select>
-                  <span className="settings-help">
-                    Where the tab bar appears on narrow (mobile) screens. The
-                    desktop layout is unaffected.
-                  </span>
-                </div>
-              </div>
-            )}
-
-            {currentSection.key === 'fileUpload' && (
-              <div className="section-fields">
-                <div className="settings-field">
-                  <label htmlFor="maxFileSize">
-                    Maximum file size (MB)
-                    {isFieldDirty('maxFileSizeMB') && (
-                      <span className="settings-dirty-indicator">
-                        <span className="unsaved-dot" />
-                      </span>
-                    )}
-                  </label>
-                  <input
-                    id="maxFileSize"
-                    type="number"
-                    min="1"
-                    max="10240"
-                    {...register('maxFileSizeMB', { valueAsNumber: true })}
-                    disabled={isSaving}
-                    className={
-                      errors.maxFileSizeMB ? 'settings-input-error' : ''
-                    }
-                  />
-                  {errors.maxFileSizeMB && (
-                    <span className="settings-error-message">
-                      {errors.maxFileSizeMB.message}
-                    </span>
-                  )}
-                  <span className="settings-help">
-                    Per-file limit for 3D model uploads (1–10240 MB).
-                  </span>
-                  <span className="settings-default">Default: 1024 MB</span>
-                </div>
-
-                <div className="settings-field">
-                  <label htmlFor="maxThumbnailSize">
-                    Maximum thumbnail size (MB)
-                    {isFieldDirty('maxThumbnailSizeMB') && (
-                      <span className="settings-dirty-indicator">
-                        <span className="unsaved-dot" />
-                      </span>
-                    )}
-                  </label>
-                  <input
-                    id="maxThumbnailSize"
-                    type="number"
-                    min="1"
-                    max="100"
-                    {...register('maxThumbnailSizeMB', { valueAsNumber: true })}
-                    disabled={isSaving}
-                    className={
-                      errors.maxThumbnailSizeMB ? 'settings-input-error' : ''
-                    }
-                  />
-                  {errors.maxThumbnailSizeMB && (
-                    <span className="settings-error-message">
-                      {errors.maxThumbnailSizeMB.message}
-                    </span>
-                  )}
-                  <span className="settings-help">
-                    Per-file limit for thumbnail uploads (1–100 MB).
-                  </span>
-                  <span className="settings-default">Default: 10 MB</span>
-                </div>
-
-                <div className="settings-field">
-                  <label htmlFor="duplicateNamePolicy">
-                    Duplicate name policy
-                  </label>
-                  <select
-                    id="duplicateNamePolicy"
-                    value={duplicateNamePolicy}
-                    onChange={e =>
-                      void handleDuplicateNamePolicyChange(e.target.value)
-                    }
-                    disabled={duplicateNamePolicySaving || isDemo}
-                    className="settings-select"
-                  >
-                    <option value="Allow">
-                      Allow duplicates (disambiguated by ID in WebDAV)
-                    </option>
-                    <option value="Reject">Reject duplicate names</option>
-                    <option value="AutoRename">
-                      Auto-rename duplicates (e.g. Chair → Chair (2))
-                    </option>
-                  </select>
-                  <span className="settings-help">
-                    Controls what happens when uploading an asset with a name
-                    that already exists. Applies to all asset types.{' '}
-                    <strong>Allow</strong> keeps the name as-is - WebDAV
-                    disambiguates colliding names with an ID suffix.{' '}
-                    <strong>Reject</strong> blocks the upload.{' '}
-                    <strong>Auto-rename</strong> appends a numeric suffix.
-                  </span>
-                  <span className="settings-default">
-                    Default: Allow duplicates
-                  </span>
-                </div>
-              </div>
-            )}
-
-            {currentSection.key === 'thumbnails' && (
-              <div className="section-fields">
-                <ToggleField
-                  label="Generate thumbnail on upload"
-                  help="Automatically generate thumbnails when uploading new models."
-                  isOn={generateThumbnailOnUpload}
-                  dirty={isFieldDirty('generateThumbnailOnUpload')}
-                  registerProps={register('generateThumbnailOnUpload')}
-                />
-
-                <ToggleField
-                  id="generateAnimatedThumbnail"
-                  label="Animated thumbnail"
-                  help="Render a multi-frame orbiting animation. Disable to produce a single static frame."
-                  isOn={generateAnimatedThumbnail}
-                  dirty={isFieldDirty('generateAnimatedThumbnail')}
-                  registerProps={register('generateAnimatedThumbnail')}
-                />
-
-                {generateAnimatedThumbnail && (
-                  <div className="settings-field">
-                    <label htmlFor="frameCount">
-                      Frame count
-                      {isFieldDirty('thumbnailFrameCount') && (
-                        <span className="settings-dirty-indicator">
-                          <span className="unsaved-dot" />
-                        </span>
-                      )}
-                    </label>
-                    <input
-                      id="frameCount"
-                      type="number"
-                      min="1"
-                      max="360"
-                      {...register('thumbnailFrameCount', {
-                        valueAsNumber: true,
-                      })}
-                      disabled={isSaving}
-                      className={
-                        errors.thumbnailFrameCount ? 'settings-input-error' : ''
-                      }
-                    />
-                    {errors.thumbnailFrameCount && (
-                      <span className="settings-error-message">
-                        {errors.thumbnailFrameCount.message}
-                      </span>
-                    )}
-                    <span className="settings-help">
-                      Number of frames in the turntable animation (1–360).
-                      Higher values look smoother but take longer to render.
-                    </span>
-                    <span className="settings-default">Default: 30 frames</span>
-                  </div>
-                )}
-
-                <div className="settings-field">
-                  <label htmlFor="thumbnailSize">
-                    Thumbnail size (px)
-                    {isFieldDirty('thumbnailSize') && (
-                      <span className="settings-dirty-indicator">
-                        <span className="unsaved-dot" />
-                      </span>
-                    )}
-                  </label>
-                  <select
-                    id="thumbnailSize"
-                    {...register('thumbnailSize', { valueAsNumber: true })}
-                    disabled={isSaving}
-                    className={
-                      errors.thumbnailSize
-                        ? 'settings-input-error'
-                        : 'settings-select'
-                    }
-                  >
-                    <option value={64}>64 px</option>
-                    <option value={128}>128 px</option>
-                    <option value={256}>256 px</option>
-                    <option value={512}>512 px</option>
-                    <option value={1024}>1024 px</option>
-                    <option value={2048}>2048 px</option>
-                  </select>
-                  {errors.thumbnailSize && (
-                    <span className="settings-error-message">
-                      {errors.thumbnailSize.message}
-                    </span>
-                  )}
-                  <span className="settings-help">
-                    Square side length for rendered thumbnails.
-                  </span>
-                  <span className="settings-default">Default: 256 px</span>
-                </div>
-
-                <div className="settings-field">
-                  <label>Regenerate existing thumbnails</label>
-                  <button
-                    type="button"
-                    onClick={() => void handleRegenerateAllThumbnails()}
-                    disabled={isRegeneratingThumbnails || isDemo}
-                    className="btn btn-outline"
-                  >
-                    <i className="pi pi-refresh" />
-                    {isRegeneratingThumbnails
-                      ? 'Queueing…'
-                      : 'Regenerate All Thumbnails'}
-                  </button>
-                  <span className="settings-help">
-                    {regenerateAssetCountLabel} will be re-rendered using the
-                    settings above. Each model uses its current default texture
-                    set / material.
-                  </span>
-                </div>
-              </div>
-            )}
-
-            {currentSection.key === 'textureProxy' && (
-              <div className="section-fields">
-                <div className="settings-field">
-                  <label htmlFor="textureProxySize">
-                    Web proxy resolution
-                    {isFieldDirty('textureProxySize') && (
-                      <span className="settings-dirty-indicator">
-                        <span className="unsaved-dot" />
-                      </span>
-                    )}
-                  </label>
-                  <select
-                    id="textureProxySize"
-                    {...register('textureProxySize', { valueAsNumber: true })}
-                    disabled={isSaving}
-                    className={
-                      errors.textureProxySize
-                        ? 'settings-input-error'
-                        : 'settings-select'
-                    }
-                  >
-                    <option value={256}>256 px</option>
-                    <option value={512}>512 px</option>
-                    <option value={1024}>1024 px</option>
-                    <option value={2048}>2048 px</option>
-                  </select>
-                  {errors.textureProxySize && (
-                    <span className="settings-error-message">
-                      {errors.textureProxySize.message}
-                    </span>
-                  )}
-                  <span className="settings-help">
-                    Maximum square resolution for web preview textures. Lower
-                    values load faster; higher values show more detail. Proxies
-                    are generated on next texture set processing.
-                  </span>
-                  <span className="settings-default">Default: 512 px</span>
-                </div>
-              </div>
-            )}
-
-            {currentSection.key === 'blender' && (
-              <div className="section-fields">
-                {isDemo ? (
-                  <div className="section-locked-notice">
-                    <i className="pi pi-lock" />
-                    <span>Blender management is disabled in demo mode.</span>
-                  </div>
-                ) : (
-                  <>
-                    <div className="settings-field">
-                      <label>What is Blender CLI?</label>
-                      <p className="settings-help">
-                        Blender is an open-source 3D creation suite. When
-                        installed, Modelibr uses Blender&apos;s command-line
-                        interface to import <code>.blend</code> files (via
-                        upload or WebDAV) and to render thumbnails.
-                      </p>
-                    </div>
-
-                    <div className="settings-field">
-                      <label>Blender version</label>
-                      <div className="blender-version-row">
-                        <select
-                          value={selectedVersion}
-                          onChange={e => setSelectedVersion(e.target.value)}
-                          disabled={isBlenderBusy || blenderVersionsOffline}
-                          className="settings-select"
-                        >
-                          {blenderVersions.map(v => (
-                            <option key={v.version} value={v.version}>
-                              {v.label}
-                            </option>
-                          ))}
-                          {blenderVersionsOffline &&
-                            blenderVersions.length === 0 && (
-                              <option value="">No internet connection</option>
-                            )}
-                          {!blenderVersionsOffline &&
-                            blenderVersions.length === 0 && (
-                              <option value="">Loading versions...</option>
-                            )}
-                        </select>
-
-                        {!blenderVersionsOffline &&
-                          (blenderStatus.state === 'installed' &&
-                          selectedVersion !== blenderStatus.installedVersion ? (
-                            <button
-                              type="button"
-                              onClick={handleInstallBlender}
-                              disabled={!selectedVersion}
-                              className="btn btn-primary btn-sm"
-                            >
-                              <i className="pi pi-sync" /> Switch
-                            </button>
-                          ) : blenderStatus.state !== 'installed' &&
-                            !isBlenderBusy ? (
-                            <button
-                              type="button"
-                              onClick={handleInstallBlender}
-                              disabled={!selectedVersion}
-                              className="btn btn-primary btn-sm"
-                            >
-                              <i className="pi pi-download" /> Install
-                            </button>
-                          ) : null)}
-
-                        {blenderStatus.state === 'installed' && (
-                          <button
-                            type="button"
-                            onClick={handleUninstallBlender}
-                            className="btn btn-danger btn-sm"
-                          >
-                            <i className="pi pi-trash" /> Uninstall
-                          </button>
-                        )}
-                      </div>
-
-                      {blenderVersionsOffline && (
-                        <span className="blender-status-none">
-                          No internet connection - version list unavailable.
-                          {blenderStatus.state === 'installed'
-                            ? ' Currently installed version can still be used.'
-                            : ' Connect to the internet to download Blender.'}
-                        </span>
-                      )}
-
-                      {blenderStatus.state === 'installed' && (
-                        <span className="blender-status-installed">
-                          <i className="pi pi-check-circle" /> Installed (v
-                          {blenderStatus.installedVersion})
-                        </span>
-                      )}
-
-                      {blenderStatus.state === 'none' &&
-                        !blenderVersionsOffline && (
-                          <span className="blender-status-none">
-                            Not installed - select a version and click Install.
-                          </span>
-                        )}
-
-                      {blenderStatus.state === 'failed' && (
-                        <span className="blender-status-failed">
-                          <i className="pi pi-times-circle" /> Installation
-                          failed: {blenderStatus.error}
-                        </span>
-                      )}
-
-                      {isBlenderBusy && (
-                        <div className="blender-progress-container">
-                          <div className="blender-progress-bar">
-                            <div
-                              className="blender-progress-fill"
-                              style={{ width: `${blenderStatus.progress}%` }}
-                            />
-                          </div>
-                          <span className="blender-progress-text">
-                            {blenderStatus.state === 'downloading'
-                              ? `Downloading… ${blenderStatus.progress}% (${formatBytes(blenderStatus.downloadedBytes)} / ${formatBytes(blenderStatus.totalBytes)})`
-                              : 'Extracting…'}
-                          </span>
-                        </div>
-                      )}
-
-                      <span className="settings-help">
-                        Only one Blender version can be installed at a time.
-                      </span>
-                    </div>
-                  </>
-                )}
-              </div>
-            )}
-
-            {currentSection.key === 'ssl' && (
-              <div className="section-fields">
-                <SslCertField webDavUrls={webDavUrls} />
-              </div>
-            )}
-
-            {currentSection.key === 'webdav' && (
-              <div className="section-fields">
-                <WebDavSectionContent
-                  webDavUrls={webDavUrls}
-                  probeResults={probeResults}
-                  probeLoading={probeLoading}
-                />
-              </div>
-            )}
-
-            {currentSection.key === 'scriptTemplates' && (
-              <div className="section-fields">
-                <ScriptTemplatesSection />
-              </div>
-            )}
-
-            {currentSection.key === 'backup' && (
-              <div className="section-fields backup-section-body">
-                {isDemo ? (
-                  <div className="section-locked-notice">
-                    <i className="pi pi-lock" />
-                    <span>Backup & Restore is disabled in demo mode.</span>
-                  </div>
-                ) : (
-                  <BackupsSection />
-                )}
-              </div>
-            )}
-          </div>
-
-          {currentSection.hasFormSave && (
-            <div className="section-detail-footer">
-              {successMessage && (
-                <span className="saved-notice">
-                  <i className="pi pi-check" /> {successMessage}
-                </span>
-              )}
-              {sectionDirty && !hasValidationErrors() && !successMessage && (
-                <span className="settings-unsaved-changes">
-                  <span className="unsaved-dot" /> Unsaved changes
-                </span>
-              )}
-              <button
-                type="button"
-                className="btn btn-secondary"
-                onClick={handleDiscard}
-                disabled={isSaving || !sectionDirty}
-              >
-                Discard
-              </button>
-              <button
-                type="submit"
-                className="btn btn-primary"
-                disabled={isSaving || !hasChanges() || hasValidationErrors()}
-              >
-                <i className="pi pi-save" />
-                {isSaving ? 'Saving…' : 'Save'}
-              </button>
-            </div>
-          )}
-        </form>
-      </div>
-    )
+  // Resolve the shown section from the persisted preference. Unknown keys
+  // (removed section, or one hidden on this host) and demo-locked sections
+  // fall back to the first selectable one so the page always has content.
+  const isSelectable = (key: SectionKey): boolean => {
+    const section = visibleSections.find(s => s.key === key)
+    return section !== undefined && !(isDemo && section.demoLocked)
   }
+  const fallbackSection =
+    visibleSections.find(s => !(isDemo && s.demoLocked)) ?? visibleSections[0]
+  const currentSection =
+    visibleSections.find(
+      s => s.key === settingsSection && isSelectable(s.key)
+    ) ?? fallbackSection
+  const sectionDirty = dirtyFieldsForSection(currentSection.key).length > 0
 
-  // ────────────────────────────────────────────────────────────────────
-  // Grid view
-  // ────────────────────────────────────────────────────────────────────
   return (
     <div className="settings-container">
       <div className="settings-header">
@@ -1537,36 +1030,678 @@ export function Settings({ tabId }: SettingsProps = {}): JSX.Element {
         <div className="settings-success">{successMessage}</div>
       )}
 
-      <div className="settings-grid-area">
-        <div className="settings-grid">
-          {SECTIONS.map(section => {
-            const dimmed = !matchingSectionKeys.has(section.key)
+      <div className="settings-body">
+        <nav className="settings-nav" aria-label="Settings sections">
+          {visibleSections.map(section => {
             const locked = isDemo && section.demoLocked
+            const active = section.key === currentSection.key
+            const dimmed =
+              search.trim() !== '' && !matchingSectionKeys.has(section.key)
             return (
               <button
-                type="button"
                 key={section.key}
-                className={`setting-card ${dimmed ? 'dimmed' : ''} ${locked ? 'locked' : ''}`}
+                type="button"
+                data-testid={`settings-nav-${section.key}`}
+                className={`settings-nav-item ${active ? 'is-active' : ''} ${
+                  dimmed ? 'is-dimmed' : ''
+                } ${locked ? 'is-locked' : ''}`}
+                aria-current={active ? 'page' : undefined}
                 onClick={() => {
                   if (locked) return
                   handleSelectSection(section.key)
                 }}
                 disabled={locked}
+                title={
+                  locked
+                    ? `${section.label} - disabled in demo mode`
+                    : undefined
+                }
               >
-                <div className="card-icon">
-                  <i className={`pi ${section.icon}`} />
-                  {locked && (
-                    <i className="pi pi-lock card-lock" aria-hidden="true" />
-                  )}
-                </div>
-                <div className="card-title">{section.label}</div>
-                <div className="card-desc">{section.desc}</div>
+                <i className={`pi ${section.icon}`} aria-hidden="true" />
+                <span className="settings-nav-label">{section.label}</span>
                 {locked && (
-                  <div className="card-locked-note">Disabled in demo mode</div>
+                  <i
+                    className="pi pi-lock settings-nav-lock"
+                    aria-hidden="true"
+                  />
                 )}
               </button>
             )
           })}
+        </nav>
+
+        <div className="settings-content">
+          <form
+            onSubmit={handleSubmit(handleSave, handleInvalidSave)}
+            className="settings-form section-detail"
+          >
+            <div className="section-detail-header">
+              <h2 className="section-detail-title">
+                <i className={`pi ${currentSection.icon}`} />
+                {currentSection.label}
+              </h2>
+              <p className="section-detail-desc">{currentSection.desc}</p>
+            </div>
+
+            <div className="section-detail-body settings-section-content">
+              {currentSection.key === 'appearance' && (
+                <div className="section-fields">
+                  <div className="settings-field">
+                    <label htmlFor="colorTheme">Color theme</label>
+                    <div className="theme-picker">
+                      <button
+                        type="button"
+                        className={`theme-card ${theme === 'light' ? 'selected' : ''}`}
+                        onClick={() => setTheme('light')}
+                      >
+                        <div className="theme-card-swatch theme-card-swatch--light" />
+                        <div className="theme-card-label">Light</div>
+                      </button>
+                      <button
+                        type="button"
+                        className={`theme-card ${theme === 'dark' ? 'selected' : ''}`}
+                        onClick={() => setTheme('dark')}
+                      >
+                        <div className="theme-card-swatch theme-card-swatch--dark" />
+                        <div className="theme-card-label">Dark</div>
+                      </button>
+                    </div>
+                    {/* Hidden select kept for e2e tests targeting #colorTheme */}
+                    <select
+                      id="colorTheme"
+                      value={theme}
+                      onChange={e =>
+                        setTheme(e.target.value as 'light' | 'dark')
+                      }
+                      className="settings-select theme-select-hidden"
+                      aria-hidden="true"
+                      tabIndex={-1}
+                    >
+                      <option value="light">Light Theme</option>
+                      <option value="dark">Dark Theme</option>
+                    </select>
+                    <span className="settings-help">
+                      Switches the PrimeReact theme across the whole app.
+                    </span>
+                  </div>
+
+                  <div className="settings-field">
+                    <label htmlFor="mobileBarPosition">
+                      Mobile tab bar position
+                    </label>
+                    <select
+                      id="mobileBarPosition"
+                      value={mobileBarPosition}
+                      onChange={e =>
+                        setMobileBarPosition(
+                          e.target.value as MobileBarPosition
+                        )
+                      }
+                      className="settings-select"
+                    >
+                      <option value="left">Left (vertical)</option>
+                      <option value="bottom">Bottom (horizontal)</option>
+                      <option value="top">Top (horizontal)</option>
+                    </select>
+                    <span className="settings-help">
+                      Where the tab bar appears on narrow (mobile) screens. The
+                      desktop layout is unaffected.
+                    </span>
+                  </div>
+
+                  <div className="settings-field">
+                    <label>Pinned tabs</label>
+                    <div className="pinned-tabs-options">
+                      {PINNED_TAB_TYPES.map(type => (
+                        <label key={type} className="settings-checkbox-label">
+                          <input
+                            type="checkbox"
+                            checked={pinnedTabTypes.includes(type)}
+                            onChange={e =>
+                              setPinnedTabType(type, e.target.checked)
+                            }
+                          />
+                          <span>{getTabLabel(type)}</span>
+                        </label>
+                      ))}
+                    </div>
+                    <span className="settings-help">
+                      Pinned pages are always present in the main dock and
+                      cannot be closed. The rest open from the New Tab page like
+                      any other tab.
+                    </span>
+                    <span className="settings-default">
+                      Default: Models and Projects
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {currentSection.key === 'fileUpload' && (
+                <div className="section-fields">
+                  <div className="settings-field">
+                    <label htmlFor="maxFileSize">
+                      Maximum file size (MB)
+                      {isFieldDirty('maxFileSizeMB') && (
+                        <span className="settings-dirty-indicator">
+                          <span className="unsaved-dot" />
+                        </span>
+                      )}
+                    </label>
+                    <input
+                      id="maxFileSize"
+                      type="number"
+                      min="1"
+                      max="10240"
+                      {...register('maxFileSizeMB', { valueAsNumber: true })}
+                      disabled={isSaving}
+                      className={
+                        errors.maxFileSizeMB ? 'settings-input-error' : ''
+                      }
+                    />
+                    {errors.maxFileSizeMB && (
+                      <span className="settings-error-message">
+                        {errors.maxFileSizeMB.message}
+                      </span>
+                    )}
+                    <span className="settings-help">
+                      Per-file limit for 3D model uploads (1–10240 MB).
+                    </span>
+                    <span className="settings-default">Default: 1024 MB</span>
+                  </div>
+
+                  <div className="settings-field">
+                    <label htmlFor="maxThumbnailSize">
+                      Maximum thumbnail size (MB)
+                      {isFieldDirty('maxThumbnailSizeMB') && (
+                        <span className="settings-dirty-indicator">
+                          <span className="unsaved-dot" />
+                        </span>
+                      )}
+                    </label>
+                    <input
+                      id="maxThumbnailSize"
+                      type="number"
+                      min="1"
+                      max="100"
+                      {...register('maxThumbnailSizeMB', {
+                        valueAsNumber: true,
+                      })}
+                      disabled={isSaving}
+                      className={
+                        errors.maxThumbnailSizeMB ? 'settings-input-error' : ''
+                      }
+                    />
+                    {errors.maxThumbnailSizeMB && (
+                      <span className="settings-error-message">
+                        {errors.maxThumbnailSizeMB.message}
+                      </span>
+                    )}
+                    <span className="settings-help">
+                      Per-file limit for thumbnail uploads (1–100 MB).
+                    </span>
+                    <span className="settings-default">Default: 10 MB</span>
+                  </div>
+
+                  <div className="settings-field">
+                    <label htmlFor="duplicateNamePolicy">
+                      Duplicate name policy
+                    </label>
+                    <select
+                      id="duplicateNamePolicy"
+                      value={duplicateNamePolicy}
+                      onChange={e =>
+                        void handleDuplicateNamePolicyChange(e.target.value)
+                      }
+                      disabled={duplicateNamePolicySaving || isDemo}
+                      className="settings-select"
+                    >
+                      <option value="Allow">
+                        Allow duplicates (disambiguated by ID in WebDAV)
+                      </option>
+                      <option value="Reject">Reject duplicate names</option>
+                      <option value="AutoRename">
+                        Auto-rename duplicates (e.g. Chair → Chair (2))
+                      </option>
+                    </select>
+                    <span className="settings-help">
+                      Controls what happens when uploading an asset with a name
+                      that already exists. Applies to all asset types.{' '}
+                      <strong>Allow</strong> keeps the name as-is - WebDAV
+                      disambiguates colliding names with an ID suffix.{' '}
+                      <strong>Reject</strong> blocks the upload.{' '}
+                      <strong>Auto-rename</strong> appends a numeric suffix.
+                    </span>
+                    <span className="settings-default">
+                      Default: Allow duplicates
+                    </span>
+                  </div>
+
+                  <SettingToggle
+                    id="autoAssignOnImport"
+                    label="Auto-tag on import"
+                    help="Suggest a category and tags from the file name and folder when importing. Everything it suggests is reviewable."
+                    isOn={autoAssignOnImport}
+                    saving={savingKvKey === 'AutoAssignOnImport'}
+                    onChange={next =>
+                      void saveKvSetting('AutoAssignOnImport', String(next))
+                    }
+                  />
+                </div>
+              )}
+
+              {currentSection.key === 'thumbnails' && (
+                <div className="section-fields">
+                  <ToggleField
+                    label="Generate thumbnail on upload"
+                    help="Automatically generate thumbnails when uploading new models."
+                    isOn={generateThumbnailOnUpload}
+                    dirty={isFieldDirty('generateThumbnailOnUpload')}
+                    registerProps={register('generateThumbnailOnUpload')}
+                  />
+
+                  <ToggleField
+                    id="generateAnimatedThumbnail"
+                    label="Animated thumbnail"
+                    help="Render a multi-frame orbiting animation. Disable to produce a single static frame."
+                    isOn={generateAnimatedThumbnail}
+                    dirty={isFieldDirty('generateAnimatedThumbnail')}
+                    registerProps={register('generateAnimatedThumbnail')}
+                  />
+
+                  {generateAnimatedThumbnail && (
+                    <div className="settings-field">
+                      <label htmlFor="frameCount">
+                        Frame count
+                        {isFieldDirty('thumbnailFrameCount') && (
+                          <span className="settings-dirty-indicator">
+                            <span className="unsaved-dot" />
+                          </span>
+                        )}
+                      </label>
+                      <input
+                        id="frameCount"
+                        type="number"
+                        min="1"
+                        max="360"
+                        {...register('thumbnailFrameCount', {
+                          valueAsNumber: true,
+                        })}
+                        disabled={isSaving}
+                        className={
+                          errors.thumbnailFrameCount
+                            ? 'settings-input-error'
+                            : ''
+                        }
+                      />
+                      {errors.thumbnailFrameCount && (
+                        <span className="settings-error-message">
+                          {errors.thumbnailFrameCount.message}
+                        </span>
+                      )}
+                      <span className="settings-help">
+                        Number of frames in the turntable animation (1–360).
+                        Higher values look smoother but take longer to render.
+                      </span>
+                      <span className="settings-default">
+                        Default: 30 frames
+                      </span>
+                    </div>
+                  )}
+
+                  <div className="settings-field">
+                    <label htmlFor="thumbnailSize">
+                      Thumbnail size (px)
+                      {isFieldDirty('thumbnailSize') && (
+                        <span className="settings-dirty-indicator">
+                          <span className="unsaved-dot" />
+                        </span>
+                      )}
+                    </label>
+                    <select
+                      id="thumbnailSize"
+                      {...register('thumbnailSize', { valueAsNumber: true })}
+                      disabled={isSaving}
+                      className={
+                        errors.thumbnailSize
+                          ? 'settings-input-error'
+                          : 'settings-select'
+                      }
+                    >
+                      <option value={64}>64 px</option>
+                      <option value={128}>128 px</option>
+                      <option value={256}>256 px</option>
+                      <option value={512}>512 px</option>
+                      <option value={1024}>1024 px</option>
+                      <option value={2048}>2048 px</option>
+                    </select>
+                    {errors.thumbnailSize && (
+                      <span className="settings-error-message">
+                        {errors.thumbnailSize.message}
+                      </span>
+                    )}
+                    <span className="settings-help">
+                      Square side length for rendered thumbnails.
+                    </span>
+                    <span className="settings-default">Default: 256 px</span>
+                  </div>
+
+                  <SettingToggle
+                    id="skipDuplicateThumbnails"
+                    label="Reuse duplicate thumbnails"
+                    help="When the same model file is uploaded again, reuse its existing thumbnail instead of rendering a new one."
+                    isOn={skipDuplicateThumbnails}
+                    saving={savingKvKey === 'SkipDuplicateThumbnails'}
+                    onChange={next =>
+                      void saveKvSetting(
+                        'SkipDuplicateThumbnails',
+                        String(next)
+                      )
+                    }
+                  />
+
+                  <ThumbnailBackgroundField
+                    background={thumbnailBackground}
+                    saving={savingKvKey === 'ThumbnailBackground'}
+                    onChange={next =>
+                      void saveKvSetting('ThumbnailBackground', next)
+                    }
+                  />
+
+                  <div className="settings-field">
+                    <label>Regenerate existing thumbnails</label>
+                    <button
+                      type="button"
+                      onClick={() => void handleRegenerateAllThumbnails()}
+                      disabled={isRegeneratingThumbnails || isDemo}
+                      className="btn btn-outline"
+                    >
+                      <i className="pi pi-refresh" />
+                      {isRegeneratingThumbnails
+                        ? 'Queueing…'
+                        : 'Regenerate All Thumbnails'}
+                    </button>
+                    <span className="settings-help">
+                      {regenerateAssetCountLabel} will be re-rendered using the
+                      settings above. Each model uses its current default
+                      texture set / material.
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {currentSection.key === 'textureProxy' && (
+                <div className="section-fields">
+                  <div className="settings-field">
+                    <label htmlFor="textureProxySize">
+                      Web proxy resolution
+                      {isFieldDirty('textureProxySize') && (
+                        <span className="settings-dirty-indicator">
+                          <span className="unsaved-dot" />
+                        </span>
+                      )}
+                    </label>
+                    <select
+                      id="textureProxySize"
+                      {...register('textureProxySize', { valueAsNumber: true })}
+                      disabled={isSaving}
+                      className={
+                        errors.textureProxySize
+                          ? 'settings-input-error'
+                          : 'settings-select'
+                      }
+                    >
+                      <option value={256}>256 px</option>
+                      <option value={512}>512 px</option>
+                      <option value={1024}>1024 px</option>
+                      <option value={2048}>2048 px</option>
+                    </select>
+                    {errors.textureProxySize && (
+                      <span className="settings-error-message">
+                        {errors.textureProxySize.message}
+                      </span>
+                    )}
+                    <span className="settings-help">
+                      Maximum square resolution for web preview textures. Lower
+                      values load faster; higher values show more detail.
+                      Proxies are generated on next texture set processing.
+                    </span>
+                    <span className="settings-default">Default: 512 px</span>
+                  </div>
+                </div>
+              )}
+
+              {currentSection.key === 'blender' && (
+                <div className="section-fields">
+                  {isDemo ? (
+                    <div className="section-locked-notice">
+                      <i className="pi pi-lock" />
+                      <span>Blender management is disabled in demo mode.</span>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="settings-field">
+                        <label>What is Blender CLI?</label>
+                        <p className="settings-help">
+                          Blender is an open-source 3D creation suite. When
+                          installed, Modelibr uses Blender&apos;s command-line
+                          interface to import <code>.blend</code> files (via
+                          upload or WebDAV) and to render thumbnails.
+                        </p>
+                      </div>
+
+                      <div className="settings-field">
+                        <label>Blender version</label>
+                        <div className="blender-version-row">
+                          <select
+                            value={selectedVersion}
+                            onChange={e => setSelectedVersion(e.target.value)}
+                            disabled={isBlenderBusy || blenderVersionsOffline}
+                            className="settings-select"
+                          >
+                            {blenderVersions.map(v => (
+                              <option key={v.version} value={v.version}>
+                                {v.label}
+                              </option>
+                            ))}
+                            {blenderVersionsOffline &&
+                              blenderVersions.length === 0 && (
+                                <option value="">No internet connection</option>
+                              )}
+                            {!blenderVersionsOffline &&
+                              blenderVersions.length === 0 && (
+                                <option value="">Loading versions...</option>
+                              )}
+                          </select>
+
+                          {!blenderVersionsOffline &&
+                            (blenderStatus.state === 'installed' &&
+                            selectedVersion !==
+                              blenderStatus.installedVersion ? (
+                              <button
+                                type="button"
+                                onClick={handleInstallBlender}
+                                disabled={!selectedVersion}
+                                className="btn btn-primary btn-sm"
+                              >
+                                <i className="pi pi-sync" /> Switch
+                              </button>
+                            ) : blenderStatus.state !== 'installed' &&
+                              !isBlenderBusy ? (
+                              <button
+                                type="button"
+                                onClick={handleInstallBlender}
+                                disabled={!selectedVersion}
+                                className="btn btn-primary btn-sm"
+                              >
+                                <i className="pi pi-download" /> Install
+                              </button>
+                            ) : null)}
+
+                          {blenderStatus.state === 'installed' && (
+                            <button
+                              type="button"
+                              onClick={handleUninstallBlender}
+                              className="btn btn-danger btn-sm"
+                            >
+                              <i className="pi pi-trash" /> Uninstall
+                            </button>
+                          )}
+                        </div>
+
+                        {blenderVersionsOffline && (
+                          <span className="blender-status-none">
+                            No internet connection - version list unavailable.
+                            {blenderStatus.state === 'installed'
+                              ? ' Currently installed version can still be used.'
+                              : ' Connect to the internet to download Blender.'}
+                          </span>
+                        )}
+
+                        {blenderStatus.state === 'installed' && (
+                          <span className="blender-status-installed">
+                            <i className="pi pi-check-circle" /> Installed (v
+                            {blenderStatus.installedVersion})
+                          </span>
+                        )}
+
+                        {blenderStatus.state === 'none' &&
+                          !blenderVersionsOffline && (
+                            <span className="blender-status-none">
+                              Not installed - select a version and click
+                              Install.
+                            </span>
+                          )}
+
+                        {blenderStatus.state === 'failed' && (
+                          <span className="blender-status-failed">
+                            <i className="pi pi-times-circle" /> Installation
+                            failed: {blenderStatus.error}
+                          </span>
+                        )}
+
+                        {isBlenderBusy && (
+                          <div className="blender-progress-container">
+                            <div className="blender-progress-bar">
+                              <div
+                                className="blender-progress-fill"
+                                style={{ width: `${blenderStatus.progress}%` }}
+                              />
+                            </div>
+                            <span className="blender-progress-text">
+                              {blenderStatus.state === 'downloading'
+                                ? `Downloading… ${blenderStatus.progress}% (${formatBytes(blenderStatus.downloadedBytes)} / ${formatBytes(blenderStatus.totalBytes)})`
+                                : 'Extracting…'}
+                            </span>
+                          </div>
+                        )}
+
+                        <span className="settings-help">
+                          Only one Blender version can be installed at a time.
+                        </span>
+                      </div>
+
+                      <SettingNumberField
+                        id="blenderOperationTimeout"
+                        label="Operation timeout (minutes)"
+                        help="Kill a Blender run that exceeds this. Protects the queue from a hung unwrap or bake."
+                        value={blenderOperationTimeoutMinutes}
+                        min={1}
+                        max={240}
+                        saving={
+                          savingKvKey === 'BlenderOperationTimeoutMinutes'
+                        }
+                        onCommit={next =>
+                          void saveKvSetting(
+                            'BlenderOperationTimeoutMinutes',
+                            String(next)
+                          )
+                        }
+                      />
+                    </>
+                  )}
+                </div>
+              )}
+
+              {currentSection.key === 'ssl' && (
+                <div className="section-fields">
+                  <SslCertField webDavUrls={webDavUrls} />
+                </div>
+              )}
+
+              {currentSection.key === 'webdav' && (
+                <div className="section-fields">
+                  <WebDavSectionContent
+                    webDavUrls={webDavUrls}
+                    probeResults={probeResults}
+                    probeLoading={probeLoading}
+                  />
+                </div>
+              )}
+
+              {currentSection.key === 'scriptTemplates' && (
+                <div className="section-fields">
+                  <ScriptTemplatesSection />
+                </div>
+              )}
+
+              {currentSection.key === 'backup' && (
+                <div className="section-fields backup-section-body">
+                  {isDemo ? (
+                    <div className="section-locked-notice">
+                      <i className="pi pi-lock" />
+                      <span>Backup & Restore is disabled in demo mode.</span>
+                    </div>
+                  ) : (
+                    <BackupsSection />
+                  )}
+                </div>
+              )}
+
+              {currentSection.key === 'mcpAgents' && (
+                <div className="section-fields">
+                  <McpAgentsSection />
+                </div>
+              )}
+
+              {currentSection.key === 'desktop' && (
+                <div className="section-fields">
+                  <NativeDesktopSection />
+                </div>
+              )}
+            </div>
+
+            {currentSection.hasFormSave && (
+              <div className="section-detail-footer">
+                {successMessage && (
+                  <span className="saved-notice">
+                    <i className="pi pi-check" /> {successMessage}
+                  </span>
+                )}
+                {sectionDirty && !hasValidationErrors() && !successMessage && (
+                  <span className="settings-unsaved-changes">
+                    <span className="unsaved-dot" /> Unsaved changes
+                  </span>
+                )}
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={handleDiscard}
+                  disabled={isSaving || !sectionDirty}
+                >
+                  Discard
+                </button>
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  disabled={isSaving || !hasChanges() || hasValidationErrors()}
+                >
+                  <i className="pi pi-save" />
+                  {isSaving ? 'Saving…' : 'Save'}
+                </button>
+              </div>
+            )}
+          </form>
         </div>
       </div>
     </div>

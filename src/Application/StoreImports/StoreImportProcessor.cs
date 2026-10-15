@@ -2,6 +2,7 @@ using System.Text.Json;
 using Application.Abstractions;
 using Application.Abstractions.Repositories;
 using Application.Abstractions.Services;
+using Application.Metadata;
 using Domain.Models;
 using Domain.Services;
 using Microsoft.Extensions.Logging;
@@ -178,12 +179,17 @@ internal sealed class StoreImportProcessor : IStoreImportProcessor
                     // leaves poisoned entities in the shared change tracker that would make
                     // every later save in this scope re-fail - reset before the next item.
                     _trackerReset.Clear();
+                    // The failed item's transaction rolled back, taking any category it
+                    // created with it. A cached id would then be a dangling reference for
+                    // every later item (CategoryNotFound), so resolution starts fresh.
+                    _categoryResolver.ClearCache();
                     outcome = new StoreImportItemResult(item.ItemType, item.Name, OutcomeFailed, ex.Message);
                 }
                 catch (Exception ex)
                 {
                     _logger.LogWarning(ex, "Store import: item '{Item}' ({ItemType}) failed", item.Name, item.ItemType);
                     _trackerReset.Clear();
+                    _categoryResolver.ClearCache();
                     outcome = new StoreImportItemResult(item.ItemType, item.Name, OutcomeFailed, ex.Message);
                 }
 
@@ -319,6 +325,24 @@ internal sealed class StoreImportProcessor : IStoreImportProcessor
             var license = StoreManifestMapping.MapSchemaLicense(manifest.License);
             var canonicalStoreUrl = StoreUrlCanonicalizer.Canonicalize(work.StoreUrl);
 
+            // Facets are typed, so an unknown value would make the metadata command refuse the
+            // whole patch. Filter here, where the processor's logger can say what was dropped,
+            // rather than letting one stray store value sink the asset's rights and provenance.
+            var (styles, droppedStyles) = StoreMetadataStampFields.FilterEnum(item.Styles, AssetMetadataSchema.Styles);
+            var (themes, droppedThemes) = StoreMetadataStampFields.FilterEnum(item.Themes, AssetMetadataSchema.Themes);
+            foreach (var dropped in droppedStyles)
+            {
+                _logger.LogWarning(
+                    "Store import: style '{Style}' on {AssetType} {AssetId} is not in the schema vocabulary; dropped",
+                    dropped, assetType, assetId);
+            }
+            foreach (var dropped in droppedThemes)
+            {
+                _logger.LogWarning(
+                    "Store import: theme '{Theme}' on {AssetType} {AssetId} is not in the schema vocabulary; dropped",
+                    dropped, assetType, assetId);
+            }
+
             await _sink.StampAssetMetadataAsync(
                 assetType,
                 assetId,
@@ -336,7 +360,11 @@ internal sealed class StoreImportProcessor : IStoreImportProcessor
                     StoreAssetId: work.AssetId,
                     StoreItemId: item.Id,
                     ImportedAt: _clock.UtcNow,
-                    FacetsJson: StoreManifestMapping.GetItemFacets(item.MetadataJson)),
+                    FacetsJson: StoreManifestMapping.GetItemFacets(item.MetadataJson),
+                    Description: item.Description,
+                    Tags: item.Tags,
+                    Styles: styles,
+                    Themes: themes),
                 ct);
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
@@ -1149,8 +1177,11 @@ internal sealed class StoreImportProcessor : IStoreImportProcessor
     private Task<int?> ResolveCategoryAsync(StoreManifestMapping.ImportTarget target, StoreManifestItem item, CancellationToken ct)
         => _categoryResolver.ResolveAsync(
             target,
-            StoreManifestMapping.GetItemCategory(item.MetadataJson),
-            StoreManifestMapping.GetItemSubcategory(item.MetadataJson),
+            // The manifest now carries category/subcategory at the top level; the values
+            // inside metadataJson are the older home for the same names. Prefer the top
+            // level and fall back, so either shape resolves.
+            item.Category ?? StoreManifestMapping.GetItemCategory(item.MetadataJson),
+            item.Subcategory ?? StoreManifestMapping.GetItemSubcategory(item.MetadataJson),
             ct);
 
     private async Task<StoreDownloadedFile> DownloadAndVerifyAsync(StoreImportWorkItem work, StoreManifestFile file, CancellationToken ct)

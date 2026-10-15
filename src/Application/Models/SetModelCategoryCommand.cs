@@ -10,7 +10,7 @@ namespace Application.Models;
 /// <summary>
 /// Assigns (or clears, with null) a model's category without touching its tags or
 /// description - distinct from <see cref="UpdateModelTagsCommand"/>, which rewrites all
-/// three together. Used by the MCP <c>set_category</c> write tool and category-only edits.
+/// three together. Used by the category editor in the app.
 /// </summary>
 internal sealed class SetModelCategoryCommandHandler
     : ICommandHandler<SetModelCategoryCommand, SetModelCategoryResponse>
@@ -62,9 +62,9 @@ internal sealed class SetModelCategoryCommandHandler
         await _modelRepository.UpdateAsync(model, cancellationToken);
 
         // Category is denormalised into the search projection during extraction, so a
-        // category-only write has to re-point it here as well - otherwise an agent that
-        // calls set_category cannot confirm its own write with a category-filtered
-        // search until something happens to re-derive the asset.
+        // category-only write has to re-point it here as well - otherwise a category edit
+        // cannot confirm itself with a category-filtered search until something happens
+        // to re-derive the asset.
         await _searchDocumentRepository.SetCategoryForAssetAsync(
             ExtractionAssetTypes.Model, model.Id, command.CategoryId, categoryName, cancellationToken);
 

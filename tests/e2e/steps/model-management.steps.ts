@@ -55,9 +55,10 @@ Given("a model with at least 2 versions exists", async ({ page }) => {
     );
     console.log(`[Setup] Created base model (ID: ${multiVersionModelId})`);
 
-    // 3. Upload second version (requires setAsActive query param)
+    // 3. Upload second version. setAsActive is a multipart FORM field - the
+    // endpoint binds it with [FromForm]; on the query string it is ignored.
     const versionResponse = await page.request.post(
-        `${API_BASE}/models/${multiVersionModelId}/versions?setAsActive=false`,
+        `${API_BASE}/models/${multiVersionModelId}/versions`,
         {
             multipart: {
                 file: {
@@ -65,6 +66,7 @@ Given("a model with at least 2 versions exists", async ({ page }) => {
                     mimeType: "application/octet-stream",
                     buffer: fs.readFileSync(versionFile),
                 },
+                setAsActive: "false",
             },
         },
     );

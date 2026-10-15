@@ -8,7 +8,8 @@ import {
   createTab,
   getWindowId,
 } from '@/stores/navigationStore'
-import { type Tab } from '@/types'
+import { useTabCloseGuardStore } from '@/stores/tabCloseGuardStore'
+import { type Tab, type TabType } from '@/types'
 
 import { DockBar, type DockPlacement } from './dock-panel/DockBar'
 import { DockContentArea } from './dock-panel/DockContentArea'
@@ -34,6 +35,10 @@ interface DockPanelContentProps {
   draggedTab: Tab | null
   setDraggedTab: (tab: Tab | null) => void
   moveTabBetweenPanels: (tab: Tab, fromSide: 'left' | 'right') => void
+  /** Shows the pinned entries in this panel's dock; called with the picked kind. */
+  onPinnedSelect?: (type: TabType) => void
+  /** Tab types open in the other panel; hidden from this dock's pinned entries. */
+  pinnedTypesOpenElsewhere?: readonly TabType[]
 }
 
 export function DockPanelContent({
@@ -46,6 +51,8 @@ export function DockPanelContent({
   draggedTab,
   setDraggedTab,
   moveTabBetweenPanels,
+  onPinnedSelect,
+  pinnedTypesOpenElsewhere,
 }: DockPanelContentProps) {
   const { addRecentlyClosedTab, removeRecentlyClosedTab } = useDockContext()
 
@@ -111,8 +118,22 @@ export function DockPanelContent({
     }
   }
 
-  const closeTab = (tabId: string): void => {
+  const closeTab = async (tabId: string): Promise<void> => {
     const tab = tabs.find(candidate => candidate.id === tabId)
+
+    // A tab that installed a guard answers for itself, because only it knows
+    // whether it can save. The scene editor uses this to offer Save / Discard /
+    // Cancel instead of a browser confirm, which is not a product decision UI.
+    const guard = useTabCloseGuardStore.getState().get(tabId)
+    if (guard) {
+      const decision = await guard()
+      if (decision === 'cancel') {
+        return
+      }
+      performClose(tabId)
+      return
+    }
+
     if (hasUnsavedChanges(tab)) {
       const accepted = window.confirm(
         `${tab?.label ?? 'This tab'} has unsaved changes. Close it without saving?`
@@ -153,10 +174,17 @@ export function DockPanelContent({
         const currentWindowId = getWindowId()
 
         if (sourceWindowId !== currentWindowId) {
-          // Cross-window transfer: add tab here, broadcast removal to source
-          const newTabs = [...tabs, droppedTab]
-          setTabs(newTabs)
-          setActiveTab(droppedTab.id)
+          // Cross-window transfer: add tab here (or focus the one already here)
+          // then broadcast removal to the source. Dedup by id so a re-drop never
+          // leaves two tabs of a pinned type sharing its singleton id.
+          const existingTab = tabs.find(tab => tab.id === droppedTab.id)
+          if (existingTab) {
+            setActiveTab(existingTab.id)
+          } else {
+            const newTabs = [...tabs, droppedTab]
+            setTabs(newTabs)
+            setActiveTab(droppedTab.id)
+          }
 
           broadcastNavigation({
             type: 'TAB_MOVED',
@@ -234,6 +262,8 @@ export function DockPanelContent({
           tabs={tabs}
           activeTab={activeTab}
           onTabSelect={setActiveTab}
+          onPinnedSelect={onPinnedSelect}
+          pinnedTypesOpenElsewhere={pinnedTypesOpenElsewhere}
         />
 
         {/* Content Area */}

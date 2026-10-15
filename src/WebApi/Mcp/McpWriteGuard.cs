@@ -94,6 +94,20 @@ internal static class McpWriteGuard
         // an unattributed row by forgetting to pass it.
         write = write with { Actor = caller.Actor };
 
+        // Refused before the claim, so a bad id does not burn the idempotency key. The audit
+        // row's own guard also rejects an id <= 0, but it does so by throwing - which for a
+        // tool that passed a raw 0 surfaced as an unhandled fault instead of the {error,
+        // message} every other validation failure returns.
+        if (write.AssetId is <= 0)
+        {
+            // .Response on purpose: every other refusal returns the inner {error, message},
+            // and returning the ToolOutcome itself would serialize the wrapper's Response and
+            // Succeeded properties into the MCP payload instead.
+            return Failed(new SharedKernel.Error(
+                "InvalidAssetId",
+                $"'{write.Operation}' needs a positive asset id; got {write.AssetId}.")).Response;
+        }
+
         var claim = await audit.TryBeginAsync(write, cancellationToken);
         switch (claim.Outcome)
         {
@@ -298,6 +312,17 @@ internal static class McpWriteGuard
         message = "A previous call with this idempotency key stopped before it could record its outcome, so whether it applied is unknown. This key is now permanently in that state and will answer the same to every call.",
         remedy = "Check whether the operation's effect is already there (the recorded assetId, if any, is the one it was working on). If it is, there is nothing to do. If it is not, repeat the operation under a NEW idempotency key - retrying this one will not run it.",
     };
+
+    /// <summary>
+    /// The operator flag that turns the write surface on. It decides which tool types are
+    /// registered, and a read tool that may queue work honours the same flag here rather
+    /// than being registered behind it - so "writes off" means the same thing whether the
+    /// tool is a write tool or a read one with a queueing branch.
+    /// </summary>
+    internal const string WriteFlag = "MCP_WRITE_ENABLED";
+
+    internal static bool WriteEnabled(IConfiguration configuration) =>
+        configuration[WriteFlag] == "true";
 
     /// <summary>
     /// The operator flag that permits work nothing can quietly undo.

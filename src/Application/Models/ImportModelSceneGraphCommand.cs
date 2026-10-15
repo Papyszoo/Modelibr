@@ -51,7 +51,32 @@ public record SceneGraphRollupsDto(
     int? BoneCount,
     SceneGraphWorldBoundsDto? WorldBounds,
     int? AnimationCount,
-    List<string>? AnimationNames);
+    List<string>? AnimationNames,
+    // Per clip {name, durationSeconds, kinds} from the worker's scene-graph walk.
+    // Round-trips into the verbatim raw payload; shape keys ride in each part's detail.
+    List<ModelAnimationDto>? Animations = null,
+    // The rig features a .blend source carries that a plain web conversion cannot
+    // run (web_bake.inspect()'s counts). Only .blend exports produce one, and only
+    // when there is something to warn about.
+    SceneGraphUnbakedRigDto? UnbakedRig = null);
+
+/// <summary>
+/// Counts of the rig features a .blend carries that the web viewer cannot run,
+/// written by the worker's <c>web_bake.inspect()</c>. IK constraints are included
+/// in <paramref name="BoneConstraints"/> and counted separately in
+/// <paramref name="IkConstraints"/>; <paramref name="DroppedModifiers"/> names the
+/// modifiers glTF would drop (object:modifier (TYPE)).
+/// </summary>
+public record SceneGraphUnbakedRigDto(
+    int? ObjectConstraints = null,
+    int? BoneConstraints = null,
+    int? IkConstraints = null,
+    int? ObjectDrivers = null,
+    int? ArmatureDrivers = null,
+    int? ShapeKeyDrivers = null,
+    int? ShapeKeyActions = null,
+    List<string>? DroppedModifiers = null,
+    bool? HasRigFeatures = null);
 
 /// <summary>
 /// The asset's world bounding box. <paramref name="Min"/> and <paramref name="Max"/> are

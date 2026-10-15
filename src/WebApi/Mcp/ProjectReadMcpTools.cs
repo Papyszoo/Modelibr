@@ -1,6 +1,8 @@
 using System.ComponentModel;
 using Application.Abstractions.Messaging;
+using Application.Projects;
 using Application.Projects.Profile;
+using Domain.Projects;
 using ModelContextProtocol.Server;
 
 namespace WebApi.Mcp;
@@ -52,5 +54,63 @@ public sealed class ProjectReadMcpTools
         return result.IsFailure
             ? new { error = result.Error.Code, message = result.Error.Message }
             : new { options = result.Value };
+    }
+
+    [McpServerTool(Name = "list_project_comments")]
+    [Description("A project's comments, pinned ones (the project's decisions) first. Each is open or resolved, a resolved one may carry a resolution saying what changed, and each names at most one target: a level, reference image, character, model, texture set, sprite, sound, environment map or VFX. Filter by status, pinnedOnly, or any target id to read one thing's comments.")]
+    public static async Task<object> ListProjectComments(
+        IQueryHandler<GetProjectCommentsQuery, IReadOnlyList<ProjectCommentDto>> handler,
+        [Description("Project id.")] int projectId,
+        [Description("open or resolved; omit for both.")] string? status = null,
+        [Description("Only pinned comments, the project's decisions (default false = all comments).")] bool pinnedOnly = false,
+        [Description("Optional level filter.")] int? levelId = null,
+        [Description("Optional reference-image filter.")] int? referenceImageId = null,
+        [Description("Optional character filter.")] int? characterId = null,
+        [Description("Optional model filter.")] int? modelId = null,
+        [Description("Optional texture-set filter.")] int? textureSetId = null,
+        [Description("Optional sprite filter.")] int? spriteId = null,
+        [Description("Optional sound filter.")] int? soundId = null,
+        [Description("Optional environment-map filter.")] int? environmentMapId = null,
+        [Description("Optional VFX filter.")] int? vfxId = null,
+        CancellationToken cancellationToken = default)
+    {
+        var target = new ProjectCommentTarget(
+            levelId, referenceImageId, characterId, modelId, textureSetId,
+            spriteId, soundId, environmentMapId, vfxId);
+        var result = await handler.Handle(
+            new GetProjectCommentsQuery(projectId, target, pinnedOnly ? true : null, status),
+            cancellationToken);
+
+        return result.IsFailure
+            ? new { error = result.Error.Code, message = result.Error.Message }
+            : new { comments = result.Value };
+    }
+
+    [McpServerTool(Name = "list_project_levels")]
+    [Description("A project's levels in production order, with their status, description and variant counts.")]
+    public static async Task<object> ListProjectLevels(
+        IQueryHandler<GetProjectLevelsQuery, IReadOnlyList<ProjectLevelDto>> handler,
+        [Description("Project id.")] int projectId,
+        CancellationToken cancellationToken = default)
+    {
+        var result = await handler.Handle(new GetProjectLevelsQuery(projectId), cancellationToken);
+
+        return result.IsFailure
+            ? new { error = result.Error.Code, message = result.Error.Message }
+            : new { levels = result.Value };
+    }
+
+    [McpServerTool(Name = "list_project_characters")]
+    [Description("A project's characters, with their tags, images, linked models, abilities and variants.")]
+    public static async Task<object> ListProjectCharacters(
+        IQueryHandler<GetProjectCharactersQuery, IReadOnlyList<ProjectCharacterDto>> handler,
+        [Description("Project id.")] int projectId,
+        CancellationToken cancellationToken = default)
+    {
+        var result = await handler.Handle(new GetProjectCharactersQuery(projectId), cancellationToken);
+
+        return result.IsFailure
+            ? new { error = result.Error.Code, message = result.Error.Message }
+            : new { characters = result.Value };
     }
 }

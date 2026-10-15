@@ -293,6 +293,43 @@ public class SetAssetMetadataCommandHandlerTests
     }
 
     [Fact]
+    public async Task ATagLongerThanTheSchemaAllows_IsRefusedWithMetadataValueTooLong()
+    {
+        // A list entry is bounded like a scalar one. Without a bound, a 101-character tag
+        // reached ModelTag.SanitizeName, which throws - so REST answered 500 and the MCP
+        // path marked the idempotency claim Interrupted and rethrew.
+        var fixture = new Fixture();
+
+        var result = await fixture.Handle(new { tags = new[] { new string('t', 101) } });
+
+        Assert.True(result.IsFailure);
+        Assert.Equal("MetadataValueTooLong", result.Error.Code);
+        Assert.Contains("tags", result.Error.Message);
+        fixture.Entity.Verify(
+            e => e.WriteAsync(
+                It.IsAny<string>(), It.IsAny<int>(), It.IsAny<AssetEntityMetadataWrite>(),
+                It.IsAny<CancellationToken>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task ATagExactlyAtTheSchemaLimit_IsAccepted()
+    {
+        var fixture = new Fixture();
+        var atTheLimit = new string('t', 100);
+
+        var result = await fixture.Handle(new { tags = new[] { atTheLimit } });
+
+        Assert.True(result.IsSuccess);
+        fixture.Entity.Verify(
+            e => e.WriteAsync(
+                Family, AssetId,
+                It.Is<AssetEntityMetadataWrite>(w => w.SetTags && w.Tags!.Single() == atTheLimit),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
     public void EveryStringFieldTheColumnBounds_CarriesItsLimit()
     {
         // A field added without its length is a field that fails at the database again. The

@@ -10,6 +10,7 @@ import { EnvironmentMapsPage } from "../pages/EnvironmentMapsPage";
 import { ModelListPage } from "../pages/ModelListPage";
 import { ModelViewerPage } from "../pages/ModelViewerPage";
 import { RecycledFilesPage } from "../pages/RecycledFilesPage";
+import { ScenesPage } from "../pages/ScenesPage";
 import { SettingsPage } from "../pages/SettingsPage";
 import { SoundListPage } from "../pages/SoundListPage";
 import { SpriteListPage } from "../pages/SpriteListPage";
@@ -455,12 +456,24 @@ test.describe("demo mode e2e", () => {
                 page.locator(".container-cover-card img").first(),
             ).toBeVisible({ timeout: 15000 });
 
+            // Concept art lives on the studio's Reference Board. The studio is a
+            // four-view workspace now (Overview/Levels/Cast/References), so the
+            // board is its own view rather than a strip above the details layout.
+            const referencesTab = page.getByTestId(
+                "project-workspace-tab-references",
+            );
+            await referencesTab.click();
+            await expect(referencesTab).toHaveAttribute(
+                "aria-selected",
+                "true",
+            );
+
             await page
-                .locator('.container-rich-main input[type="file"][multiple]')
+                .locator('[data-testid="project-reference-upload"]')
                 .first()
                 .setInputFiles(concept.filePath);
             await expect(
-                page.locator(".container-media-card").first(),
+                page.locator(".project-reference-card").first(),
             ).toBeVisible({
                 timeout: 15000,
             });
@@ -488,9 +501,9 @@ test.describe("demo mode e2e", () => {
         await settingsPage.navigateToSettings();
         await settingsPage.waitForLoaded();
 
-        // The new grid uses .setting-card.locked for demo-disabled sections.
-        const lockedCards = page.locator(".setting-card.locked");
-        await expect(lockedCards).toHaveCount(4);
+        // Demo-disabled sections render as disabled nav items.
+        const lockedItems = page.locator(".settings-nav-item.is-locked");
+        await expect(lockedItems).toHaveCount(4);
 
         for (const name of [
             "Blender",
@@ -498,20 +511,22 @@ test.describe("demo mode e2e", () => {
             "WebDAV",
             "Backup & Restore",
         ]) {
-            const card = page.locator(".setting-card.locked", {
+            const item = page.locator(".settings-nav-item.is-locked", {
                 hasText: name,
             });
-            await expect(card).toBeVisible();
-            await expect(card).toContainText("Disabled in demo mode");
+            await expect(item).toBeVisible();
+            await expect(item).toHaveAttribute("title", /disabled in demo mode/i);
         }
 
-        // Clicking a locked card must not navigate into the detail view -
-        // the grid stays visible.
+        // Clicking a locked nav item must not switch the content away from the
+        // default Appearance section.
         await page
-            .locator(".setting-card.locked", { hasText: "Blender" })
+            .locator(".settings-nav-item.is-locked", { hasText: "Blender" })
             .click({ force: true });
-        await expect(page.locator(".settings-grid")).toBeVisible();
-        await expect(page.locator(".section-detail")).toHaveCount(0);
+        await expect(page.locator(".settings-nav")).toBeVisible();
+        await expect(page.locator(".section-detail-title")).toContainText(
+            "Appearance",
+        );
     });
 
     test("shows the demo mode banner with reset and info buttons", async ({ page }) => {
@@ -630,5 +645,58 @@ test.describe("demo mode e2e", () => {
         } finally {
             await upload.cleanup();
         }
+    });
+
+    // Regression: the seeded Crossing Layout scene's two Model nodes had no
+    // versionId, so the real 0.7 scene loader refused them ("A model resource
+    // must pin a versionId") and the canvas showed two failed, bounds-unknown
+    // placeholders. Asserting on the progress badge catches the missing pin.
+    // (A "bounds unknown" flag is expected in the demo: it derives no geometry.)
+    test("loads the seeded Crossing Layout scene with no failed resources", async ({
+        page,
+    }) => {
+        const scenesPage = new ScenesPage(page);
+
+        await scenesPage.goto();
+        await scenesPage.openScene("Crossing Layout");
+
+        await expect(page.locator('[data-testid="scene-node-row"]')).toHaveCount(
+            2,
+        );
+        // The badge mounts only while resources are incomplete or failed and
+        // unmounts once they resolve, so its absence is the durable statement
+        // that the canvas settled with nothing failed. Asserting on its text
+        // raced the unmount after the scene's two nodes finished loading, where
+        // "element(s) not found" is not "no failed resources". A failed or
+        // stuck resource keeps the badge mounted, which still fails this.
+        await expect(
+            page.locator('[data-testid="scene-resource-progress"]'),
+        ).toHaveCount(0);
+        await expect(page.getByText("failed to load")).toHaveCount(0);
+    });
+
+    // Regression: Ambient Loop's file id had no demo fixture, so its play button
+    // was permanently disabled by a 404 on the audio element's metadata.
+    test("plays the seeded Ambient Loop sound", async ({ page }) => {
+        const soundListPage = new SoundListPage(page);
+
+        await soundListPage.goto();
+        const card = soundListPage.getSoundCardByName("Ambient Loop").first();
+        await expect(card).toBeVisible({ timeout: 15000 });
+
+        const playButton = card.locator(".sound-control-btn").first();
+        await expect(playButton).toBeEnabled({ timeout: 15000 });
+        await playButton.click();
+
+        // The seeded clip is about a second long, so asserting on the transient
+        // "playing" class is racy. The durable proof of playback is the audio
+        // element advancing past zero with no decode error.
+        const audio = card.locator("audio");
+        await expect
+            .poll(() => audio.evaluate((el) => el.currentTime), {
+                timeout: 10000,
+            })
+            .toBeGreaterThan(0);
+        expect(await audio.evaluate((el) => el.error)).toBeNull();
     });
 });

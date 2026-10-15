@@ -29,9 +29,11 @@ export class ModelFileService {
    * Fetch model file for processing
    * @param {number} modelId - The model ID
    * @param {number} [modelVersionId] - Optional model version ID
+   * @param {{preferSource?: boolean}} [options] - `preferSource` fetches the version's
+   *   authored file instead of the renderable one (see {@link findSourceFileId}).
    * @returns {Promise<{filePath: string, fileType: string, originalFileName: string}>} File information
    */
-  async fetchModelFile(modelId, modelVersionId = null) {
+  async fetchModelFile(modelId, modelVersionId = null, options = {}) {
     logger.debug('Fetching model file', { modelId, modelVersionId })
 
     // Retry logic for transient errors (network issues, server overload)
@@ -41,11 +43,14 @@ export class ModelFileService {
 
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
-        // Get file stream from API
-        const response = await this.jobService.getModelFile(
-          modelId,
-          modelVersionId
-        )
+        // Get file stream from API. The source preference downloads a specific file
+        // id; everything else asks for the version's renderable file.
+        const sourceFileId = options.preferSource
+          ? await this.findSourceFileId(modelId, modelVersionId)
+          : null
+        const response = sourceFileId
+          ? await this.jobService.getFile(sourceFileId)
+          : await this.jobService.getModelFile(modelId, modelVersionId)
 
         if (!response || !response.data) {
           throw new Error('No file data received from API')
@@ -81,6 +86,43 @@ export class ModelFileService {
         await this.sleep(retryDelay)
       }
     }
+  }
+
+  /**
+   * The version's SOURCE file - the one the user actually uploaded.
+   *
+   * A `.blend` upload gets a renderable `.glb` added to its version by the automatic
+   * conversion, and the version's file endpoint prefers that derivative. Blender
+   * operations must not take it: a bake exists to collapse the rig a glTF cannot carry,
+   * and the conversion is the step that dropped the rig in the first place. It also made
+   * the operation's input depend on whether the conversion had finished, so the same
+   * action succeeded or failed on timing alone.
+   *
+   * Returns null (meaning "ask the version's file endpoint") when there is no version to
+   * read, when the version cannot be read, or when its only files are renderable - a
+   * native `.glb` upload has no separate source.
+   *
+   * @param {number} modelId
+   * @param {number} [modelVersionId]
+   * @returns {Promise<number|null>} The source file's id, or null.
+   */
+  async findSourceFileId(modelId, modelVersionId = null) {
+    if (!modelVersionId) return null
+
+    let version
+    try {
+      version = await this.jobService.getModelVersion(modelId, modelVersionId)
+    } catch (error) {
+      logger.warn('Could not read the model version to pick its source file', {
+        modelId,
+        modelVersionId,
+        error: error.message,
+      })
+      return null
+    }
+
+    const files = Array.isArray(version?.files) ? version.files : []
+    return files.find(file => file.isRenderable === false)?.id ?? null
   }
 
   /**
@@ -212,12 +254,19 @@ export class ModelFileService {
    *
    * @param {number} modelId
    * @param {number} modelVersionId
+   * @param {{preferSource?: boolean}} [options] - Forwarded to {@link fetchModelFile};
+   *   the Blender operations pass `preferSource` so an operation reads the file the user
+   *   made rather than an automatically converted derivative of it.
    * @returns {Promise<{filePath: string, fileType: string, originalFileName: string, workDir: string, auxiliaryCount: number}>}
    * @throws {Error} when the auxiliary manifest cannot be read, an advertised
    *   auxiliary cannot be downloaded, or one names a path outside the work
    *   directory.
    */
-  async fetchModelFileWithAuxiliaries(modelId, modelVersionId = null) {
+  async fetchModelFileWithAuxiliaries(
+    modelId,
+    modelVersionId = null,
+    options = {}
+  ) {
     // Same shape as fetchModelFile's own retry: transient network trouble while
     // staging is not a reason to fail an operation, but exhausting the attempts
     // is - the alternative is publishing a result computed from half a model.
@@ -227,7 +276,11 @@ export class ModelFileService {
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       let staged = null
       try {
-        staged = await this.stageModelWithAuxiliaries(modelId, modelVersionId)
+        staged = await this.stageModelWithAuxiliaries(
+          modelId,
+          modelVersionId,
+          options
+        )
         return staged
       } catch (error) {
         // Nothing partially staged survives an attempt, successful or not.
@@ -258,9 +311,10 @@ export class ModelFileService {
    *
    * @param {number} modelId
    * @param {number} modelVersionId
+   * @param {{preferSource?: boolean}} [options] - Forwarded to {@link fetchModelFile}.
    */
-  async stageModelWithAuxiliaries(modelId, modelVersionId) {
-    const source = await this.fetchModelFile(modelId, modelVersionId)
+  async stageModelWithAuxiliaries(modelId, modelVersionId, options = {}) {
+    const source = await this.fetchModelFile(modelId, modelVersionId, options)
 
     let workDir = null
     try {

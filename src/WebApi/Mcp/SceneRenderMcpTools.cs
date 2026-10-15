@@ -2,6 +2,7 @@ using System.ComponentModel;
 using System.Text.Json;
 using Application.Abstractions.Messaging;
 using Application.Abstractions.Repositories;
+using Application.Abstractions.Storage;
 using Application.Scenes;
 using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
@@ -42,6 +43,7 @@ public sealed class SceneRenderMcpTools
         ISceneRenderRepository renderRepository,
         [Description("Scene id.")] int sceneId,
         [Description("Camera angle: iso, front, side or top. Defaults to iso.")] string? viewpoint = null,
+        IUploadPathProvider? pathProvider = null,
         CancellationToken cancellationToken = default)
     {
         var requested = await requestHandler.Handle(
@@ -69,7 +71,7 @@ public sealed class SceneRenderMcpTools
 
             if (view.Value.Status == "Ready")
             {
-                return await Picture(renderRepository, view.Value, cancellationToken);
+                return await Picture(renderRepository, view.Value, pathProvider, cancellationToken);
             }
 
             // A job that died has nothing to wait for. Reporting it now beats spending the
@@ -99,6 +101,7 @@ public sealed class SceneRenderMcpTools
         IQueryHandler<GetSceneRenderQuery, SceneRenderView> renderQueryHandler,
         ISceneRenderRepository renderRepository,
         [Description("The renderId render_scene handed back.")] int renderId,
+        IUploadPathProvider? pathProvider = null,
         CancellationToken cancellationToken = default)
     {
         var view = await renderQueryHandler.Handle(
@@ -121,7 +124,7 @@ public sealed class SceneRenderMcpTools
             });
         }
 
-        return await Picture(renderRepository, view.Value, cancellationToken);
+        return await Picture(renderRepository, view.Value, pathProvider, cancellationToken);
     }
 
     /// <summary>
@@ -135,17 +138,28 @@ public sealed class SceneRenderMcpTools
     private static async Task<CallToolResult> Picture(
         ISceneRenderRepository renderRepository,
         SceneRenderView view,
+        IUploadPathProvider? pathProvider,
         CancellationToken cancellationToken)
     {
         var render = await renderRepository.GetByJobIdAsync(view.RenderId, cancellationToken);
-        if (render is null || !File.Exists(render.FilePath))
+        if (render is null || pathProvider is null)
         {
             return Error(
                 "SceneRender.FileMissing",
                 $"Render {view.RenderId} was recorded but its image is not on disk.");
         }
 
-        var bytes = await File.ReadAllBytesAsync(render.FilePath, cancellationToken);
+        // SceneRenders.FilePath is stored relative to the uploads root, like every
+        // other stored file; it is only openable once the current root is applied.
+        var filePath = pathProvider.Resolve(render.FilePath);
+        if (!File.Exists(filePath))
+        {
+            return Error(
+                "SceneRender.FileMissing",
+                $"Render {view.RenderId} was recorded but its image is not on disk.");
+        }
+
+        var bytes = await File.ReadAllBytesAsync(filePath, cancellationToken);
 
         var summary = new
         {
@@ -176,12 +190,9 @@ public sealed class SceneRenderMcpTools
         {
             Content =
             [
-                new ImageContentBlock
-                {
-                    // Raw bytes: the block base64-encodes them itself on the wire.
-                    Data = bytes,
-                    MimeType = "image/png"
-                },
+                // FromBytes, not Data: Data must already hold base64 text, and raw PNG bytes
+                // assigned to it went out on the wire as a corrupt string.
+                ImageContentBlock.FromBytes(bytes, "image/png"),
                 new TextContentBlock { Text = JsonSerializer.Serialize(summary) }
             ]
         };

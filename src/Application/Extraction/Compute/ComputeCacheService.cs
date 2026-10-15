@@ -9,7 +9,7 @@ namespace Application.Extraction.Compute;
 /// Read-through cache for expensive compute, keyed on the geometry hash. The first
 /// asset to request a metric pays for it; every later asset that shares the same
 /// geometry hash gets the stored result without recomputing - this is what makes
-/// per-part renders and UV/texel analysis affordable across a kit scene.
+/// a surface-area or manifold answer affordable across a kit scene.
 /// </summary>
 public sealed class ComputeCacheService
 {

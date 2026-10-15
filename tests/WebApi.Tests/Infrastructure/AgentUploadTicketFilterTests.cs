@@ -2,6 +2,7 @@ using Application.Abstractions.Services;
 using Application.Agents;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Moq;
 using WebApi.Infrastructure;
 using Xunit;
@@ -105,5 +106,61 @@ public class AgentUploadTicketFilterTests
         });
 
         Assert.True(reachedEndpoint);
+    }
+
+    [Fact]
+    public async Task An_Upload_That_Outlived_Its_Claim_Reports_The_Lost_Record()
+    {
+        // The upload landed but its idempotency claim had lapsed and been taken over, so the
+        // outcome could not be recorded. McpWriteGuard answers that as LostClaim; this endpoint
+        // used to discard the verdict silently, leaving a real upload with no audit row and
+        // nobody told.
+        var tickets = new Mock<IAgentUploadTickets>();
+        tickets.Setup(t => t.TryRedeemAsync(Secret, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new RedeemedUploadTicket(5, "key-1", "import-model", AgentAssetFamilies.Model, "curator", null));
+        var audit = new Mock<IAgentAudit>();
+        audit.Setup(a => a.TryBeginAsync(It.IsAny<AgentWrite>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new AgentClaim(AgentClaimOutcome.Owned, null, "gen-1"));
+        audit.Setup(a => a.CompleteAsync(
+                It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int?>(),
+                It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(false);
+
+        var logger = new CapturingLogger();
+        var services = new ServiceCollection();
+        services.AddSingleton(tickets.Object);
+        services.AddSingleton(audit.Object);
+        services.AddSingleton<ILogger<AgentUploadTicketFilter>>(logger);
+
+        var http = new DefaultHttpContext { RequestServices = services.BuildServiceProvider() };
+        http.Request.Headers[AgentUploadTicketFilter.TicketHeader] = Secret;
+        var filter = new AgentUploadTicketFilter(AgentAssetFamilies.Model);
+
+        var result = await filter.InvokeAsync(
+            EndpointFilterInvocationContext.Create(http),
+            _ => ValueTask.FromResult<object?>(Results.Ok(new { Id = 7 })));
+
+        Assert.NotNull(result);
+        Assert.Contains(logger.Warnings, w => w.Contains("idempotency claim had lapsed"));
+        tickets.Verify(t => t.SettleAsync(5, true, 7, It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    private sealed class CapturingLogger : ILogger<AgentUploadTicketFilter>
+    {
+        public List<string> Warnings { get; } = new();
+
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+
+        public bool IsEnabled(LogLevel logLevel) => true;
+
+        public void Log<TState>(
+            LogLevel logLevel, EventId eventId, TState state, Exception? exception,
+            Func<TState, Exception?, string> formatter)
+        {
+            if (logLevel == LogLevel.Warning)
+            {
+                Warnings.Add(formatter(state, exception));
+            }
+        }
     }
 }
